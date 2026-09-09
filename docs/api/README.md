@@ -112,5 +112,5 @@ runtime dependency of the API process.
 
 - [System architecture](../architecture/system-architecture.md)
 - [Technology decisions](../architecture/technology-decisions.md)
-- [FND-001 Go API Foundation](../roadmap/feature-plans/planned/FND-001-go-api-foundation.md)
+- [FND-001 Go API Foundation](../roadmap/feature-plans/completed/FND-001-go-api-foundation.md)
 - [Roadmap](../roadmap/roadmap.md)

@@ -1,6 +1,6 @@
 # FND-001 — Go API Foundation
 
-Status: Ready for review
+Status: Complete
 
 Branch: `feat/fnd-001-go-api-foundation`
 

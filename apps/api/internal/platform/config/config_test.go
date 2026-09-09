@@ -113,6 +113,22 @@ func TestLoadFromDoesNotReadDotenvInProduction(t *testing.T) {
 	}
 }
 
+func TestLoadFromAcceptsExplicitProductionBindHost(t *testing.T) {
+	got, err := LoadFrom(map[string]string{
+		"PULSEGRID_ENV":              "production",
+		"PULSEGRID_HTTP_HOST":        "0.0.0.0",
+		"PULSEGRID_HTTP_PORT":        "8080",
+		"PULSEGRID_LOG_LEVEL":        "info",
+		"PULSEGRID_SHUTDOWN_TIMEOUT": "15s",
+	}, t.TempDir(), missingDotenv)
+	if err != nil {
+		t.Fatalf("LoadFrom returned error: %v", err)
+	}
+	if got.HTTPHost != "0.0.0.0" {
+		t.Fatalf("host = %q, want explicit production bind host", got.HTTPHost)
+	}
+}
+
 func TestLoadFromRejectsInvalidConfiguration(t *testing.T) {
 	tests := []struct {
 		name string

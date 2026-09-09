@@ -108,8 +108,10 @@ required production configuration is a startup error.
 ### Production
 
 - Uses process-injected configuration and a managed secret source.
-- Rejects development defaults, wildcard hosts, debug behavior, and missing
-  required secrets.
+- Rejects development defaults, debug behavior, and missing required values.
+  Wildcard bind hosts are allowed only when explicitly injected by an operator
+  and the deployment network policy intentionally scopes the listener; they are
+  never a code default.
 - Separates migration execution from application startup unless a later
   deployment decision explicitly proves another model safe.
 - Logs configuration validation results without logging values.

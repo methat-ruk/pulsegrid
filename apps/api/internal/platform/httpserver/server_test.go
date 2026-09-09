@@ -23,6 +23,7 @@ func TestHealthEndpointsExposeMinimalStates(t *testing.T) {
 	if response.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("not-ready status = %d, want %d", response.StatusCode, http.StatusServiceUnavailable)
 	}
+	assertJSONContentType(t, response)
 	if body := readBody(t, response); body != `{"status":"not_ready","reason":"starting"}` {
 		t.Fatalf("not-ready body = %q", body)
 	}
@@ -31,6 +32,7 @@ func TestHealthEndpointsExposeMinimalStates(t *testing.T) {
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("live status = %d, want %d", response.StatusCode, http.StatusOK)
 	}
+	assertJSONContentType(t, response)
 	if body := readBody(t, response); body != `{"status":"ok"}` {
 		t.Fatalf("live body = %q", body)
 	}
@@ -40,6 +42,7 @@ func TestHealthEndpointsExposeMinimalStates(t *testing.T) {
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("ready status = %d, want %d", response.StatusCode, http.StatusOK)
 	}
+	assertJSONContentType(t, response)
 	if body := readBody(t, response); body != `{"status":"ready"}` {
 		t.Fatalf("ready body = %q", body)
 	}
@@ -52,8 +55,22 @@ func TestHealthEndpointsExposeMinimalStates(t *testing.T) {
 	if response.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("draining status = %d, want %d", response.StatusCode, http.StatusServiceUnavailable)
 	}
+	assertJSONContentType(t, response)
 	if body := readBody(t, response); body != `{"status":"not_ready","reason":"draining"}` {
 		t.Fatalf("draining body = %q", body)
+	}
+}
+
+func TestUnsupportedMethodUsesStableErrorContract(t *testing.T) {
+	server := New(testConfig(), slog.New(slog.NewTextHandler(io.Discard, nil)))
+
+	response := performRequest(t, server, http.MethodPost, LivePath)
+	if response.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("method status = %d, want %d", response.StatusCode, http.StatusMethodNotAllowed)
+	}
+	assertJSONContentType(t, response)
+	if body := readBody(t, response); body != `{"error":{"code":"method_not_allowed","message":"method not allowed"}}` {
+		t.Fatalf("method error body = %q", body)
 	}
 }
 
@@ -174,4 +191,11 @@ func readBody(t *testing.T, response *http.Response) string {
 		t.Fatalf("read response body: %v", err)
 	}
 	return string(body)
+}
+
+func assertJSONContentType(t *testing.T, response *http.Response) {
+	t.Helper()
+	if contentType := response.Header.Get("Content-Type"); !strings.HasPrefix(contentType, "application/json") {
+		t.Fatalf("content type = %q, want application/json", contentType)
+	}
 }

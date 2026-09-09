@@ -80,15 +80,14 @@ flowchart TD
     MVP012 --> MVP013
 
     classDef complete fill:#DCFCE7,stroke:#15803D,color:#14532D;
-    classDef review fill:#FEF3C7,stroke:#B45309,color:#78350F;
     class DOC001 complete;
-    class FND001 review;
+    class FND001 complete;
 ```
 
-FND-001 implementation is ready for review and establishes the backend runtime
-shell. FND-002 is the next independently startable Foundation plan; FND-003
-waits for both application foundations. FND-004 is the Foundation acceptance
-gate before the first MVP persistence slice begins.
+FND-001 implementation establishes the backend runtime shell. FND-002 is the
+next independently startable Foundation plan; FND-003 waits for both
+application foundations. FND-004 is the Foundation acceptance gate before the
+first MVP persistence slice begins.
 
 ## Milestones
 
@@ -119,7 +118,7 @@ and documented developer commands.
 
 Plans:
 
-- [FND-001 — Go API foundation](feature-plans/planned/FND-001-go-api-foundation.md)
+- [FND-001 — Go API foundation](feature-plans/completed/FND-001-go-api-foundation.md)
 - [FND-002 — Nuxt console foundation](feature-plans/planned/FND-002-nuxt-console-foundation.md)
 - [FND-003 — Repository quality and local workflow](feature-plans/planned/FND-003-repository-quality-and-local-workflow.md)
 - [FND-004 — Full-stack development integration](feature-plans/planned/FND-004-full-stack-development-integration.md)

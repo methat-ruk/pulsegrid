@@ -74,9 +74,9 @@ platform foundation” is not an acceptable PR boundary.
 
 - [DOC-001 — Documentation foundation](completed/DOC-001-documentation-foundation.md)
 
-### Foundation — ready for review
+### Foundation — completed
 
-- [FND-001 — Go API foundation](planned/FND-001-go-api-foundation.md)
+- [FND-001 — Go API foundation](completed/FND-001-go-api-foundation.md)
 
 ### Foundation — remaining
 
