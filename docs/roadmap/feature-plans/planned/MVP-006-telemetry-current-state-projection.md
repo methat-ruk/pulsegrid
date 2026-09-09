@@ -2,6 +2,8 @@
 
 Status: Planned
 
+Branch: `feat/mvp-006-telemetry-current-state-projection`
+
 Intended PR: One backend-state PR
 
 Milestone: M2 — Telemetry and current state

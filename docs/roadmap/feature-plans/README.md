@@ -36,6 +36,7 @@ Every feature plan must contain:
 
 ```text
 Status
+Branch
 Intended PR
 Milestone
 Goal
@@ -53,6 +54,19 @@ Done Criteria
 
 The plan must describe an observable or enabling outcome. “Implement the
 platform foundation” is not an acceptable PR boundary.
+
+## Branch conventions
+
+- Every plan owns one branch named `<type>/<plan-id>-<short-slug>`.
+- Use `feat/` for product or application slices, `chore/` for repository
+  workflow, `test/` for acceptance-only work, `build/` for packaging, and
+  `docs/` for documentation-only work.
+- Create a plan branch from the latest `main` only after every listed dependency
+  has been accepted. Do not combine multiple plans on one long-lived branch.
+- A branch name records intended ownership; it does not mean implementation has
+  started. `Status` remains the source of truth for lifecycle state.
+- Completed plans retain the branch or commit location through which they were
+  delivered. DOC-001 was delivered directly on `main` before this convention.
 
 ## Plan index
 

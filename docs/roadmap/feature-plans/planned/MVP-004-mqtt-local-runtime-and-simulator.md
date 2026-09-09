@@ -2,6 +2,8 @@
 
 Status: Planned
 
+Branch: `feat/mvp-004-mqtt-local-runtime-and-simulator`
+
 Intended PR: One device-transport fixture PR
 
 Milestone: M2 — Telemetry and current state
@@ -32,7 +34,7 @@ consumers or event abstractions are designed.
 
 ## Dependencies
 
-- MVP-001 and FND-003.
+- MVP-001.
 
 ## Architecture / Boundaries
 

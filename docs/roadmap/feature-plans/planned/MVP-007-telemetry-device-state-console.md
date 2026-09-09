@@ -2,6 +2,8 @@
 
 Status: Planned
 
+Branch: `feat/mvp-007-telemetry-device-state-console`
+
 Intended PR: One frontend-telemetry PR
 
 Milestone: M2 — Telemetry and current state

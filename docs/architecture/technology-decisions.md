@@ -22,10 +22,11 @@ or immediately required dependency.
 
 | Technology or approach | State | Current rationale or adoption trigger |
 | --- | --- | --- |
-| Go | Selected — Foundation | Backend implementation language |
-| Fiber | Selected — Foundation | HTTP runtime for the initial Go application |
-| Vue 3 and Nuxt | Selected — Foundation | Web console framework and application structure |
+| Go 1.27 | Selected — Foundation | Current supported Go release for the initial module; pin the toolchain in `go.mod` |
+| Fiber v3 | Selected — Foundation | HTTP runtime for the initial Go application |
+| Vue 3 and Nuxt 4 | Selected — Foundation | Web console framework using the Nuxt 4 `app/` directory structure |
 | TypeScript | Selected — Foundation | Frontend static typing |
+| pnpm workspace | Selected — Foundation | One root lockfile and explicit workspace for JavaScript tooling and the Nuxt application |
 | Tailwind CSS v4 and Nuxt UI | Selected — Foundation | UI implementation foundation governed by the UI design system |
 | Iconify | Selected — Foundation | Consistent icon source for the console |
 | Apache ECharts | Selected — MVP | Added when the telemetry console has a concrete chart requirement |
@@ -47,9 +48,23 @@ or immediately required dependency.
 | GitHub Actions | Selected — Foundation | Authoritative repository validation boundary |
 | Husky and lint-staged | Selected — Foundation | Fast staged-file feedback after frontend/repository files exist |
 
+## Repository layout decision
+
+Foundation uses application-owned roots inside `apps/`:
+
+```text
+apps/
+├── api/          # Go module and Fiber application
+└── web-console/  # Nuxt application and pnpm workspace package
+```
+
+The Go module path is
+`github.com/methat-ruk/pulsegrid/apps/api`. The repository does not add
+`services/`, `workers/`, shared `packages/`, or `go.work` until a second real
+consumer or independently owned runtime requires one.
+
 ## Decisions intentionally left open
 
-- Node package manager and monorepo workspace tool.
 - Nuxt rendering mode for the authenticated operations console.
 - GraphQL client and client-cache policy.
 - Polling, GraphQL subscriptions, SSE, or WebSocket transport for live UI state.
@@ -64,6 +79,17 @@ or immediately required dependency.
 Each decision should be made in the first feature plan whose acceptance criteria
 depend on it. Decisions that are expensive to reverse should receive a durable
 decision record at that time rather than a speculative record now.
+
+## Foundation selection evidence
+
+- [Go release history](https://go.dev/doc/devel/release) identifies Go 1.27 as
+  the current supported release line selected for FND-001.
+- [Fiber documentation](https://docs.gofiber.io/) documents the v3 module and
+  its Go version requirement.
+- [Nuxt 4 directory structure](https://nuxt.com/docs/4.x/directory-structure)
+  defines the `app/` application root selected for FND-002.
+- [pnpm workspace documentation](https://pnpm.io/workspaces) defines the root
+  `pnpm-workspace.yaml` contract selected for the JavaScript workspace.
 
 ## Adoption rules
 

@@ -2,6 +2,8 @@
 
 Status: Planned
 
+Branch: `feat/mvp-002-device-graphql-api`
+
 Intended PR: One API-slice PR
 
 Milestone: M1 — Device registry

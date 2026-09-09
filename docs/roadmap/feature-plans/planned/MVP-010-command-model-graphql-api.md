@@ -2,6 +2,8 @@
 
 Status: Planned
 
+Branch: `feat/mvp-010-command-model-graphql-api`
+
 Intended PR: One command-domain PR
 
 Milestone: M4 — Remote command loop

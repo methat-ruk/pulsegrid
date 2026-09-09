@@ -2,6 +2,8 @@
 
 Status: Planned
 
+Branch: `chore/fnd-003-repository-quality-and-local-workflow`
+
 Intended PR: One repository-tooling PR
 
 Milestone: F0 — Executable repository foundation

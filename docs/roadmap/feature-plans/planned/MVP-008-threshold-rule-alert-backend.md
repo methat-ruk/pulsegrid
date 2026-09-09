@@ -2,6 +2,8 @@
 
 Status: Planned
 
+Branch: `feat/mvp-008-threshold-rule-alert-backend`
+
 Intended PR: One backend-condition PR
 
 Milestone: M3 — Rules and alerts

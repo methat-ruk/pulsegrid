@@ -2,6 +2,8 @@
 
 Status: Planned
 
+Branch: `feat/mvp-001-tenant-device-persistence`
+
 Intended PR: One persistence-foundation PR
 
 Milestone: M1 — Device registry
@@ -30,7 +32,7 @@ device-to-tenant authority.
 
 ## Dependencies
 
-- FND-001 and FND-003.
+- FND-004. It represents completion of the executable Foundation sequence.
 
 ## Architecture / Boundaries
 

@@ -2,6 +2,8 @@
 
 Status: Complete
 
+Branch: `main` (delivered in initial repository commit `32a3e95`)
+
 Intended PR: One documentation-only PR
 
 Milestone: D0 — Documentation foundation
@@ -71,9 +73,10 @@ All work in this plan is documentation.
 
 ## Risks / Open Decisions
 
-- The current workspace has no `.git` metadata, so Git-based diff and rollback
-  evidence is unavailable.
-- Exact future application layout remains subject to the Foundation plans.
+- The initial documentation was delivered directly on `main` before the
+  one-plan/one-branch convention was established.
+- Application layout was intentionally deferred to Foundation plan review and
+  is now recorded in the technology decision register.
 
 ## Done Criteria
 

@@ -2,6 +2,8 @@
 
 Status: Planned
 
+Branch: `feat/mvp-003-device-registry-console`
+
 Intended PR: One frontend-journey PR
 
 Milestone: M1 — Device registry
@@ -31,7 +33,7 @@ boundaries compose coherently.
 
 ## Dependencies
 
-- FND-002, FND-004, and MVP-002.
+- FND-004 and MVP-002.
 
 ## Architecture / Boundaries
 

@@ -29,13 +29,14 @@ Applications will recognize exactly these logical environments:
 | `test` | Automated unit, integration, and end-to-end validation | Isolated test resources only |
 | `production` | Deployed production behavior and production-mode smoke tests | Explicitly configured production resources |
 
-An explicit environment selector will be used by each application. Exact key
-names are chosen in the application-foundation plans so they follow the native
-Go and Nuxt configuration mechanisms.
+The Go application uses `PULSEGRID_ENV`. The Nuxt application will select its
+native server-only and `NUXT_PUBLIC_*` keys in FND-002; it must map to the same
+three logical environments without exposing backend configuration.
 
 ## Planned file contract
 
-Tracked files may include:
+Each application owns its examples at its application root. Tracked files may
+include:
 
 ```text
 .env.example
@@ -119,6 +120,21 @@ broker credentials, signing material, or private service endpoints.
 Shared variable names do not imply shared files. Each application should own
 and validate the smallest configuration surface it consumes.
 
+### FND-001 Go keys
+
+FND-001 introduces only these backend keys under `apps/api/`:
+
+| Key | Development/test behavior | Production behavior |
+| --- | --- | --- |
+| `PULSEGRID_ENV` | Required enum: `development` or `test` | Required value: `production` |
+| `PULSEGRID_HTTP_HOST` | Defaults to `127.0.0.1` | Required and explicitly injected |
+| `PULSEGRID_HTTP_PORT` | Safe local/test default; isolated in tests | Required and explicitly injected |
+| `PULSEGRID_LOG_LEVEL` | Validated safe default | Validated; no debug default |
+| `PULSEGRID_SHUTDOWN_TIMEOUT` | Validated bounded duration | Required or an explicitly documented safe default |
+
+No database, broker, token, or credential key is introduced until its consumer
+plan begins.
+
 ## Delivery sequence
 
 1. This documentation foundation defines the policy and plan.
@@ -145,9 +161,7 @@ and validate the smallest configuration surface it consumes.
 
 ## Open decisions
 
-- Exact environment-selector names for Go and Nuxt.
-- Whether example files live at repository root, application roots, or both;
-  this depends on the selected workspace layout.
+- Exact Nuxt server-only and public key names; FND-002 owns this decision.
 - Secret manager and deployment injection mechanism.
 - Per-test database strategy and MQTT namespace isolation.
 

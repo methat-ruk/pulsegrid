@@ -2,6 +2,8 @@
 
 Status: Planned
 
+Branch: `feat/mvp-011-mqtt-command-delivery-acknowledgement`
+
 Intended PR: One command-transport PR
 
 Milestone: M4 — Remote command loop
