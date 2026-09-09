@@ -127,6 +127,8 @@ domain capability.
   `apps/api`.
 - Binary smoke validation returned minimal liveness/readiness JSON, safe 404
   errors, generated bounded request IDs, and no CORS header.
+- Error contract tests and runtime smoke verify that the response request ID is
+  also present in the corresponding server-owned failure log.
 - SIGINT validation reached draining and stopped states within the configured
   shutdown bound with one idempotent stopped log.
 - Production configuration validation rejects missing values, debug logging,

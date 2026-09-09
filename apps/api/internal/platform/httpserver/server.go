@@ -32,6 +32,8 @@ const (
 	lifecycleStopped
 )
 
+type requestIDContextKey struct{}
+
 type statusResponse struct {
 	Status string `json:"status"`
 	Reason string `json:"reason,omitempty"`
@@ -165,6 +167,7 @@ func (s *Server) requestIDMiddleware(c fiber.Ctx) error {
 	}
 	if requestID != "" {
 		c.Set(requestIDHeader, requestID)
+		c.Locals(requestIDContextKey{}, requestID)
 	}
 	return c.Next()
 }
@@ -202,7 +205,7 @@ func (s *Server) errorHandler(c fiber.Ctx, err error) error {
 		"status", statusCode,
 		"reason_code", publicCode,
 	}
-	if requestID := c.Get(requestIDHeader); isSafeRequestID(requestID) {
+	if requestID, ok := c.Locals(requestIDContextKey{}).(string); ok && isSafeRequestID(requestID) {
 		logAttributes = append(logAttributes, "request_id", requestID)
 	}
 	s.logger.Error("http request failed", logAttributes...)

@@ -97,8 +97,12 @@ func TestErrorResponsesAreStableAndDoNotLeakInternalErrors(t *testing.T) {
 	if strings.Contains(body, "secret provider detail") || strings.Contains(logs.String(), "secret provider detail") {
 		t.Fatal("internal error detail leaked to response or log")
 	}
-	if response.Header.Get(requestIDHeader) == "" {
+	requestID := response.Header.Get(requestIDHeader)
+	if requestID == "" {
 		t.Fatal("response did not include a generated request ID")
+	}
+	if !strings.Contains(logs.String(), "request_id="+requestID) {
+		t.Fatalf("error log did not include response request ID %q; logs: %s", requestID, logs.String())
 	}
 }
 
