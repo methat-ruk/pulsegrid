@@ -6,16 +6,19 @@ project documentation.
 
 Use the following sources according to the active concern:
 
-- Product intent and MVP boundary: `docs/product/product-scope.md`
+- Product intent and MVP boundary:
+  [product scope](../../docs/product/product-scope.md)
 - Logical architecture and system guarantees:
-  `docs/architecture/system-architecture.md`
+  [system architecture](../../docs/architecture/system-architecture.md)
 - Technology status and adoption triggers:
-  `docs/architecture/technology-decisions.md`
+  [technology decisions](../../docs/architecture/technology-decisions.md)
 - Environment and configuration policy:
-  `docs/project-setup/environment-configuration.md`
-- UI implementation and review: `docs/design/ui-design/ui-design-system.md`
-- Milestones and delivery status: `docs/roadmap/roadmap.md`
-- PR-sized work: `docs/roadmap/feature-plans/`
+  [environment configuration](../../docs/project-setup/environment-configuration.md)
+- UI implementation and review:
+  [UI design system](../../docs/design/ui-design/ui-design-system.md)
+- Milestones and delivery status: [roadmap](../../docs/roadmap/roadmap.md)
+- PR-sized work:
+  [feature-plan index](../../docs/roadmap/feature-plans/README.md)
 
 Current repository state: documentation foundation complete and FND-001 Go API
 foundation implemented and validated, including its operational OpenAPI
