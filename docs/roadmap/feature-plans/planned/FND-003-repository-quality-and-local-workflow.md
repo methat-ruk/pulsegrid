@@ -22,6 +22,8 @@ consistent repository-level checks or if CI does not enforce them.
 
 - Add repository-level commands for setup, run, format, lint, typecheck, and
   test without hiding native tool output.
+- Add a pinned Redocly CLI workflow for OpenAPI linting, bundling, and static
+  documentation artifacts; do not add a runtime documentation server.
 - Add GitHub Actions for backend and frontend checks.
 - Add Husky and lint-staged for fast staged-file checks.
 - Finalize `.gitignore` rules for real `.env` files and allow reviewed example
@@ -52,6 +54,8 @@ safe dependency/build inputs. Make test environment selection visible in CI.
 
 - Clean-checkout setup and documented commands succeed.
 - CI runs the same material checks as local commands.
+- An invalid or incomplete OpenAPI contract fails the API documentation gate,
+  and a valid contract can be bundled into a reviewable artifact.
 - A deliberately failing check blocks CI and the relevant hook.
 - Test jobs cannot target development resource names or endpoints.
 - No tracked file contains a real secret or usable production credential.
@@ -59,6 +63,8 @@ safe dependency/build inputs. Make test environment selection visible in CI.
 ## Documentation Updates
 
 - Create `docs/project-setup/local-development.md`.
+- Document API contract lint and preview commands, linking the operational
+  contract instead of duplicating its schemas.
 - Update environment examples and the environment strategy if implementation
   changes the planned precedence.
 - Link development commands from the root README.
@@ -67,6 +73,7 @@ safe dependency/build inputs. Make test environment selection visible in CI.
 
 - Root task runner or script mechanism.
 - Node dependency-cache strategy.
+- Redocly CLI version and the exact OpenAPI lint ruleset.
 - Whether hooks should run tests or only fast static checks.
 
 ## Done Criteria

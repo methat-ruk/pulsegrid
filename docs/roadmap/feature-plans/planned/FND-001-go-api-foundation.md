@@ -1,6 +1,6 @@
 # FND-001 — Go API Foundation
 
-Status: Planned
+Status: Ready for review
 
 Branch: `feat/fnd-001-go-api-foundation`
 
@@ -28,6 +28,8 @@ configuration, shutdown, and test boundary.
   Go module exists.
 - Add Fiber startup, `GET /health/live`, `GET /health/ready`, graceful
   shutdown, and structured logging with the standard-library `log/slog`.
+- Document the operational health contract with OpenAPI; do not add product
+  domain routes.
 - Add typed configuration for `PULSEGRID_ENV`, `PULSEGRID_HTTP_HOST`,
   `PULSEGRID_HTTP_PORT`, `PULSEGRID_LOG_LEVEL`, and
   `PULSEGRID_SHUTDOWN_TIMEOUT`.
@@ -66,6 +68,11 @@ production listener. Bind development to `127.0.0.1` by default. Configure
 bounded request/server timeouts and a small body limit appropriate for
 bodyless operational endpoints.
 
+Keep the operational OpenAPI document contract-first and application-owned.
+It describes only the health surface in this plan; Redocly lint and generated
+HTML publication belong to the repository workflow plan after the pnpm
+workspace exists.
+
 Process environment has highest precedence. Load `.env.development` or
 `.env.test` only when `PULSEGRID_ENV` explicitly selects that mode. Production
 reads process environment only and fails closed on missing or invalid required
@@ -80,6 +87,8 @@ authorization headers.
   behavior, and that production never loads development/test dotenv files.
 - HTTP contract tests for method, status code, content type, minimal response
   body, readiness transition, and safe 404/error behavior.
+- OpenAPI contract review covers both health paths, readiness reason codes,
+  bounded request IDs, and the safe public error envelope.
 - Tests proving CORS is not enabled by this PR and public responses do not
   expose framework versions or configuration.
 - Graceful-shutdown test with bounded completion.
@@ -88,6 +97,10 @@ authorization headers.
 ## Documentation Updates
 
 - Add backend commands to local-development documentation.
+- Add the application-owned OpenAPI operational contract and API documentation
+  index; keep GraphQL and event contracts in their consuming feature plans.
+- Add the application-owned [API development guide](../../../../apps/api/README.md)
+  until FND-003 creates the repository-wide local-development guide.
 - Add only the environment keys consumed by this application to reviewed
   example files.
 
@@ -105,3 +118,20 @@ authorization headers.
 The Go process starts, reports accurate health, validates its configuration,
 shuts down gracefully, and passes its documented local checks without claiming
 domain capability.
+
+## Completion Evidence
+
+- `goenv` 3.2.0 is installed and Go 1.27.1 is selected by the repository root
+  `.go-version`.
+- `go test ./...`, `go test -race ./...`, and `go vet ./...` pass under
+  `apps/api`.
+- Binary smoke validation returned minimal liveness/readiness JSON, safe 404
+  errors, generated bounded request IDs, and no CORS header.
+- SIGINT validation reached draining and stopped states within the configured
+  shutdown bound with one idempotent stopped log.
+- Production configuration validation rejects missing values, debug logging,
+  and dotenv loading; development/test dotenv precedence is covered by unit
+  tests.
+- The application-owned OpenAPI contract documents both health paths without
+  introducing a product-domain API; repository-wide Redocly CI is deferred to
+  FND-003.

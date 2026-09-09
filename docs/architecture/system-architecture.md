@@ -12,9 +12,10 @@ by the [roadmap](../roadmap/roadmap.md).
 
 ## Current state
 
-PulseGrid currently consists of planning and design documentation. No
-application runtime, database schema, event contract, or deployment topology
-has been implemented or validated.
+The Go/Fiber API foundation is implemented and validated as one modular process
+with lifecycle and health endpoints only. No product API, database schema,
+event contract, frontend runtime, or deployment topology has been implemented
+or validated yet.
 
 Architecture diagrams below describe an intended sequence of evolution. They
 must not be read as deployed topology.
@@ -118,6 +119,24 @@ ownership evidence identifies a separate scaling or failure unit.
 Modules may share one PostgreSQL deployment in the MVP, but each module should
 own its tables and write paths. Cross-module behavior should go through narrow
 application interfaces rather than arbitrary table mutation.
+
+## API boundaries and contract ownership
+
+The API strategy is deliberately split by consumer and protocol:
+
+- operational HTTP uses REST and OpenAPI, currently limited to the FND-001
+  liveness and readiness endpoints;
+- the operator-facing product API uses GraphQL and gqlgen when MVP-002
+  introduces the first device contract;
+- MQTT and any later Kafka flow use flow-specific message contracts, documented
+  with AsyncAPI only after a concrete producer and consumer exist;
+- gRPC and Protocol Buffers remain conditional on an independently deployed
+  synchronous service boundary.
+
+The [API documentation index](../api/README.md) owns the human testing and
+contract map. Machine-readable contracts remain next to the application or
+producer that owns them. No REST CRUD surface is created merely to mirror the
+GraphQL product API.
 
 ## Event-driven evolution
 

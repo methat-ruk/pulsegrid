@@ -33,6 +33,10 @@ The Go application uses `PULSEGRID_ENV`. The Nuxt application will select its
 native server-only and `NUXT_PUBLIC_*` keys in FND-002; it must map to the same
 three logical environments without exposing backend configuration.
 
+The repository root `.go-version` pins the Go toolchain for goenv. This is a
+developer-tool selection only; the API module remains the source of truth for
+the required Go language version.
+
 ## Planned file contract
 
 Each application owns its examples at its application root. Tracked files may
@@ -138,8 +142,8 @@ plan begins.
 ## Delivery sequence
 
 1. This documentation foundation defines the policy and plan.
-2. The Go foundation implements typed development/test configuration loading
-   and validation for the variables it actually uses.
+2. The Go foundation implements typed development/test/production validation
+   for the variables it actually uses. (FND-001 complete.)
 3. The Nuxt foundation implements public/private runtime configuration and
    browser-exposure tests.
 4. Repository CI supplies the `test` environment explicitly and verifies that

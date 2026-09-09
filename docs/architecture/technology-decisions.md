@@ -23,7 +23,10 @@ or immediately required dependency.
 | Technology or approach | State | Current rationale or adoption trigger |
 | --- | --- | --- |
 | Go 1.27 | Selected — Foundation | Current supported Go release for the initial module; pin the toolchain in `go.mod` |
+| goenv | Selected — Foundation | Developer tool that follows the repository `.go-version`; runtime builds remain pinned by the Go module |
 | Fiber v3 | Selected — Foundation | HTTP runtime for the initial Go application |
+| REST and OpenAPI 3.1.0 | Selected — Foundation | Operational HTTP contract for health and future operational endpoints; do not create domain REST CRUD without a concrete consumer |
+| Redocly CLI | Selected — Foundation | Lint, bundle, and render OpenAPI contracts in the repository workflow once the pnpm/CI foundation exists |
 | Vue 3 and Nuxt 4 | Selected — Foundation | Web console framework using the Nuxt 4 `app/` directory structure |
 | TypeScript | Selected — Foundation | Frontend static typing |
 | pnpm workspace | Selected — Foundation | One root lockfile and explicit workspace for JavaScript tooling and the Nuxt application |
@@ -39,6 +42,7 @@ or immediately required dependency.
 | Dedicated time-series storage | Open | Select from measured volume, retention, aggregation, and query patterns |
 | Redis | Conditional target | Adopt for a concrete ephemeral, cache, coordination, or idempotency use case |
 | Apache Kafka | Conditional target | Adopt for a concrete durable fan-out, replay, or independent-consumer flow |
+| AsyncAPI | Conditional target | Introduce with the first concrete MQTT or Kafka producer/consumer message flow |
 | Kafka consumer groups | Conditional target | Introduce with a Kafka workload that requires parallel consumption |
 | gRPC and Protocol Buffers | Conditional target | Adopt when independently deployed services need a synchronous typed contract |
 | OpenTelemetry | Conditional target | Adopt when cross-process request/event diagnosis is required |
@@ -104,6 +108,7 @@ Technology is introduced only when:
 
 ## Related documents
 
+- [API documentation](../api/README.md)
 - [System architecture](system-architecture.md)
 - [Product scope](../product/product-scope.md)
 - [Roadmap](../roadmap/roadmap.md)

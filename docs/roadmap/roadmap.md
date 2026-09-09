@@ -80,13 +80,15 @@ flowchart TD
     MVP012 --> MVP013
 
     classDef complete fill:#DCFCE7,stroke:#15803D,color:#14532D;
+    classDef review fill:#FEF3C7,stroke:#B45309,color:#78350F;
     class DOC001 complete;
+    class FND001 review;
 ```
 
-The current implementation entry point is FND-001. FND-002 is independently
-startable after DOC-001, but FND-003 waits for both application foundations.
-FND-004 is the Foundation acceptance gate before the first MVP persistence
-slice begins.
+FND-001 implementation is ready for review and establishes the backend runtime
+shell. FND-002 is the next independently startable Foundation plan; FND-003
+waits for both application foundations. FND-004 is the Foundation acceptance
+gate before the first MVP persistence slice begins.
 
 ## Milestones
 
@@ -106,13 +108,14 @@ Plans:
 
 ### F0 — Executable repository foundation
 
-Status: Planned
+Status: In progress
 
 Dependency: D0
 
-Outcome: The initial Go and Nuxt applications run locally, have explicit
-development/test configuration, and are protected by formatting, linting,
-tests, Git hooks, CI, and documented developer commands.
+Outcome: The initial Go and Nuxt applications run locally, expose only the
+documented operational API surface, have explicit development/test
+configuration, and are protected by formatting, linting, tests, Git hooks, CI,
+and documented developer commands.
 
 Plans:
 
