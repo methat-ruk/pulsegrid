@@ -1,0 +1,233 @@
+openapi: 3.1.0
+info:
+  title: PulseGrid Operational API
+  version: 0.1.0
+  description: >-
+    Operational HTTP endpoints for the PulseGrid process. This contract does
+    not contain product-domain APIs; those will be introduced through the
+    GraphQL contract when the corresponding MVP feature is implemented.
+servers:
+  - url: http://127.0.0.1:8080
+    description: Local development default
+security: []
+tags:
+  - name: Health
+    description: Process liveness and readiness probes.
+paths:
+  /health/live:
+    get:
+      operationId: getHealthLive
+      tags:
+        - Health
+      summary: Check process liveness
+      description: >-
+        Returns success when the process is serving HTTP. Liveness does not
+        assert that databases, brokers, or other external dependencies are
+        available.
+      parameters:
+        - $ref: '#/components/parameters/RequestID'
+      responses:
+        '200':
+          description: The process is serving HTTP.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LiveResponse'
+              examples:
+                live:
+                  value:
+                    status: ok
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /health/ready:
+    get:
+      operationId: getHealthReady
+      tags:
+        - Health
+      summary: Check process readiness
+      description: >-
+        Returns success only while the process is ready to accept normal
+        traffic. A 503 response is expected while startup is incomplete or
+        while graceful shutdown is draining work.
+      parameters:
+        - $ref: '#/components/parameters/RequestID'
+      responses:
+        '200':
+          description: The process is ready to accept normal traffic.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyResponse'
+              examples:
+                ready:
+                  value:
+                    status: ready
+        '503':
+          description: The process is not ready to accept normal traffic.
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotReadyResponse'
+              examples:
+                starting:
+                  summary: Startup has not completed.
+                  value:
+                    status: not_ready
+                    reason: starting
+                draining:
+                  summary: Graceful shutdown is draining work.
+                  value:
+                    status: not_ready
+                    reason: draining
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  parameters:
+    RequestID:
+      name: X-Request-ID
+      in: header
+      required: false
+      description: >-
+        Optional caller-supplied correlation identifier. Unsafe, empty, or
+        oversized values are replaced by a bounded server-generated value.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+        pattern: '^[A-Za-z0-9._-]+$'
+      example: local-health-check-001
+
+  headers:
+    RequestID:
+      description: >-
+        Correlation identifier echoed from a safe request value or generated
+        by the server when available.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+        pattern: '^[A-Za-z0-9._-]+$'
+      example: local-health-check-001
+
+  schemas:
+    LiveResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          const: ok
+
+    ReadyResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          const: ready
+
+    NotReadyResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - reason
+      properties:
+        status:
+          type: string
+          const: not_ready
+        reason:
+          type: string
+          enum:
+            - starting
+            - draining
+
+    PublicError:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          $ref: '#/components/schemas/PublicErrorDetail'
+
+    PublicErrorDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable error code.
+          pattern: '^[a-z][a-z0-9_]*$'
+          example: not_found
+        message:
+          type: string
+          description: Safe human-readable message without internal details.
+          example: route not found
+
+  responses:
+    NotFound:
+      description: The requested route was not found.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/RequestID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PublicError'
+          example:
+            error:
+              code: not_found
+              message: route not found
+    MethodNotAllowed:
+      description: The HTTP method is not allowed for the requested route.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/RequestID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PublicError'
+          example:
+            error:
+              code: method_not_allowed
+              message: method not allowed
+    InternalError:
+      description: An internal error was handled without exposing internals.
+      headers:
+        X-Request-ID:
+          $ref: '#/components/headers/RequestID'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PublicError'
+          example:
+            error:
+              code: internal_error
+              message: internal server error

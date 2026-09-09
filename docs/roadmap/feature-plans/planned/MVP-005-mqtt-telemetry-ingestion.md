@@ -2,6 +2,8 @@
 
 Status: Planned
 
+Branch: `feat/mvp-005-mqtt-telemetry-ingestion`
+
 Intended PR: One ingestion-boundary PR
 
 Milestone: M2 — Telemetry and current state

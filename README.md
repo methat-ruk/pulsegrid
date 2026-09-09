@@ -5,12 +5,12 @@
 Connect devices · Stream telemetry · Detect conditions · Deliver commands ·
 Operate fleets
 
-![Status](https://img.shields.io/badge/status-planning-lightgrey)
+![Status](https://img.shields.io/badge/status-foundation--in--progress-yellow)
 
 > [!IMPORTANT]
-> PulseGrid is currently in documentation and planning. No application runtime
-> or validated developer workflow has been implemented yet. This README
-> describes the product direction and links to the detailed sources of truth.
+> PulseGrid's documentation foundation is complete and the Go API foundation
+> is implemented. Nuxt, product APIs, dependencies, and the validated
+> repository-wide workflow remain on the roadmap.
 
 ## What is PulseGrid?
 
@@ -85,7 +85,7 @@ the [system architecture](docs/architecture/system-architecture.md).
 | Area | Foundation / MVP | Conditional target |
 | --- | --- | --- |
 | Web console | Vue 3, Nuxt, TypeScript, Tailwind CSS v4, Nuxt UI | Realtime transport selected from product need |
-| Backend and API | Go, Fiber, GraphQL, gqlgen | gRPC when an independent synchronous service boundary exists |
+| Backend and API | Go, Fiber, REST/OpenAPI for operations, GraphQL/gqlgen for MVP product API | gRPC when an independent synchronous service boundary exists |
 | Device transport | MQTT | Broker topology and production device identity remain open |
 | Data | PostgreSQL | MongoDB, dedicated time-series storage, and Redis when access patterns justify them |
 | Event processing | Direct modular boundaries for MVP | Kafka and consumer groups for concrete durable fan-out or scaling |
@@ -98,13 +98,14 @@ The decision state and adoption trigger for each technology are maintained in
 
 ## Project status
 
-**Current phase: Documentation foundation complete; implementation not started**
+**Current phase: Executable repository foundation in progress**
 
 - Product intent and MVP boundary: documented.
 - Architecture and technology adoption rules: documented.
 - Dependency-ordered Foundation and MVP plans: documented.
-- Application code: not started.
-- Local application commands: not available yet.
+- Go/Fiber API foundation: implemented and locally validated.
+- Nuxt console, database, MQTT, and product APIs: not started.
+- Repository-wide hooks, CI, and frontend workflow: not started.
 - Production readiness: out of current scope.
 
 Claims in this README should change from planned to implemented only after the
@@ -115,7 +116,7 @@ corresponding behavior has been validated.
 | Stage | Outcome | Status |
 | --- | --- | --- |
 | Documentation foundation | Sources of truth, MVP boundary, roadmap, and PR-sized plans | Complete |
-| Executable repository foundation | Runnable Go and Nuxt shells with configuration, tests, local workflow, and CI | Planned |
+| Executable repository foundation | Runnable Go and Nuxt shells with configuration, tests, local workflow, and CI | In progress |
 | Device registry | Tenant-scoped device provisioning, list, and detail | Planned |
 | Telemetry and current state | Simulator-to-console MQTT telemetry flow | Planned |
 | Rules and alerts | A threshold condition creates an investigable alert | Planned |
@@ -128,9 +129,11 @@ and linked feature plans.
 
 ## Development entry points
 
-There is no runnable application yet. Development commands will be added by the
-Foundation plans together with the code and checks they operate.
+The Go API foundation is runnable from its application directory. The Nuxt
+console and repository-wide commands will be added by their Foundation plans.
 
+- [Go API development guide](apps/api/README.md)
+- [API documentation and operational contract](docs/api/README.md)
 - [Environment and configuration strategy](docs/project-setup/environment-configuration.md)
 - [Foundation and MVP feature plans](docs/roadmap/feature-plans/README.md)
 - [UI design system](docs/design/ui-design/ui-design-system.md)
@@ -143,6 +146,7 @@ the deployment runtime or secret manager.
 
 | Document | Owns |
 | --- | --- |
+| [API documentation](docs/api/README.md) | API surface map, operational contract ownership, and local API testing |
 | [Product scope](docs/product/product-scope.md) | Product purpose, capabilities, MVP boundary, and non-goals |
 | [System architecture](docs/architecture/system-architecture.md) | Logical boundaries, event/data design, reliability, observability, and runtime evolution |
 | [Technology decisions](docs/architecture/technology-decisions.md) | Selected, conditional, deferred, and open technology choices |

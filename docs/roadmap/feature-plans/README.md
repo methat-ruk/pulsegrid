@@ -36,6 +36,7 @@ Every feature plan must contain:
 
 ```text
 Status
+Branch
 Intended PR
 Milestone
 Goal
@@ -54,15 +55,31 @@ Done Criteria
 The plan must describe an observable or enabling outcome. “Implement the
 platform foundation” is not an acceptable PR boundary.
 
+## Branch conventions
+
+- Every plan owns one branch named `<type>/<plan-id>-<short-slug>`.
+- Use `feat/` for product or application slices, `chore/` for repository
+  workflow, `test/` for acceptance-only work, `build/` for packaging, and
+  `docs/` for documentation-only work.
+- Create a plan branch from the latest `main` only after every listed dependency
+  has been accepted. Do not combine multiple plans on one long-lived branch.
+- A branch name records intended ownership; it does not mean implementation has
+  started. `Status` remains the source of truth for lifecycle state.
+- Completed plans retain the branch or commit location through which they were
+  delivered. DOC-001 was delivered directly on `main` before this convention.
+
 ## Plan index
 
 ### Completed
 
 - [DOC-001 — Documentation foundation](completed/DOC-001-documentation-foundation.md)
 
-### Planned — Foundation
+### Foundation — completed
 
-- [FND-001 — Go API foundation](planned/FND-001-go-api-foundation.md)
+- [FND-001 — Go API foundation](completed/FND-001-go-api-foundation.md)
+
+### Foundation — remaining
+
 - [FND-002 — Nuxt console foundation](planned/FND-002-nuxt-console-foundation.md)
 - [FND-003 — Repository quality and local workflow](planned/FND-003-repository-quality-and-local-workflow.md)
 - [FND-004 — Full-stack development integration](planned/FND-004-full-stack-development-integration.md)
@@ -104,6 +121,7 @@ platform foundation” is not an acceptable PR boundary.
 | Concern | Owning plan or plans | Why it is placed there |
 | --- | --- | --- |
 | Go project and backend foundation | FND-001 | Creates the first runnable backend process and its configuration/tests |
+| Operational REST/OpenAPI contract | FND-001, then FND-003 | FND-001 documents the health surface; FND-003 adds repository lint and CI authority |
 | Vue/Nuxt project and frontend foundation | FND-002 | Creates the console shell and browser-safe configuration boundary |
 | Repository commands, lint, tests, Git hooks, and CI | FND-003 | Composes real backend/frontend checks after both applications exist |
 | Frontend-to-backend local connection | FND-004 | Proves HTTP/proxy/origin and failure behavior before domain APIs |

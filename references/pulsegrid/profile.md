@@ -17,6 +17,8 @@ Use the following sources according to the active concern:
 - Milestones and delivery status: `docs/roadmap/roadmap.md`
 - PR-sized work: `docs/roadmap/feature-plans/`
 
-Current repository state: documentation and planning only. No application
-runtime or validated developer commands exist yet. Read the roadmap and the
-relevant feature plan before assuming a planned component is implemented.
+Current repository state: documentation foundation complete and FND-001 Go API
+foundation implemented and validated, including its operational OpenAPI
+contract. Nuxt, product APIs, infrastructure, and repository-wide developer
+workflow remain planned. Read the roadmap and the relevant feature plan before
+assuming a planned component is implemented.

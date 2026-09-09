@@ -2,6 +2,8 @@
 
 Status: Planned
 
+Branch: `feat/mvp-012-command-console`
+
 Intended PR: One frontend-command PR
 
 Milestone: M4 — Remote command loop

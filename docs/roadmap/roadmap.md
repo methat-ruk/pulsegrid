@@ -40,6 +40,55 @@ flowchart TD
     M5 --> P6[P6 Fleet operations]
 ```
 
+## Feature-plan dependency flow
+
+The plan graph shows the minimum merge prerequisites. Plans on separate branches
+may be reviewed in parallel only when the arrows do not connect them; milestone
+outcomes still require every plan listed under that milestone.
+
+```mermaid
+flowchart TD
+    DOC001[DOC-001 Complete] --> FND001[FND-001 Go API]
+    DOC001 --> FND002[FND-002 Nuxt console]
+    FND001 --> FND003[FND-003 Repository workflow]
+    FND002 --> FND003
+    FND003 --> FND004[FND-004 Full-stack integration]
+
+    FND004 --> MVP001[MVP-001 Tenant/device persistence]
+    MVP001 --> MVP002[MVP-002 Device GraphQL]
+    FND004 --> MVP003[MVP-003 Device console]
+    MVP002 --> MVP003
+
+    MVP001 --> MVP004[MVP-004 MQTT runtime/simulator]
+    MVP002 --> MVP005[MVP-005 Telemetry ingestion]
+    MVP004 --> MVP005
+    MVP005 --> MVP006[MVP-006 Telemetry/state projection]
+    MVP003 --> MVP007[MVP-007 Telemetry console]
+    MVP006 --> MVP007
+
+    MVP006 --> MVP008[MVP-008 Rules/alerts backend]
+    MVP007 --> MVP009[MVP-009 Alert console]
+    MVP008 --> MVP009
+
+    MVP002 --> MVP010[MVP-010 Command model/API]
+    MVP004 --> MVP011[MVP-011 MQTT command delivery]
+    MVP010 --> MVP011
+    MVP003 --> MVP012[MVP-012 Command console]
+    MVP011 --> MVP012
+
+    MVP009 --> MVP013[MVP-013 MVP acceptance]
+    MVP012 --> MVP013
+
+    classDef complete fill:#DCFCE7,stroke:#15803D,color:#14532D;
+    class DOC001 complete;
+    class FND001 complete;
+```
+
+FND-001 implementation establishes the backend runtime shell. FND-002 is the
+next independently startable Foundation plan; FND-003 waits for both
+application foundations. FND-004 is the Foundation acceptance gate before the
+first MVP persistence slice begins.
+
 ## Milestones
 
 ### D0 — Documentation foundation
@@ -58,17 +107,18 @@ Plans:
 
 ### F0 — Executable repository foundation
 
-Status: Planned
+Status: In progress
 
 Dependency: D0
 
-Outcome: The initial Go and Nuxt applications run locally, have explicit
-development/test configuration, and are protected by formatting, linting,
-tests, Git hooks, CI, and documented developer commands.
+Outcome: The initial Go and Nuxt applications run locally, expose only the
+documented operational API surface, have explicit development/test
+configuration, and are protected by formatting, linting, tests, Git hooks, CI,
+and documented developer commands.
 
 Plans:
 
-- [FND-001 — Go API foundation](feature-plans/planned/FND-001-go-api-foundation.md)
+- [FND-001 — Go API foundation](feature-plans/completed/FND-001-go-api-foundation.md)
 - [FND-002 — Nuxt console foundation](feature-plans/planned/FND-002-nuxt-console-foundation.md)
 - [FND-003 — Repository quality and local workflow](feature-plans/planned/FND-003-repository-quality-and-local-workflow.md)
 - [FND-004 — Full-stack development integration](feature-plans/planned/FND-004-full-stack-development-integration.md)

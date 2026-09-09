@@ -2,6 +2,8 @@
 
 Status: Planned
 
+Branch: `feat/fnd-002-nuxt-console-foundation`
+
 Intended PR: One frontend-foundation PR
 
 Milestone: F0 — Executable repository foundation
@@ -18,8 +20,10 @@ navigation, runtime configuration, and frontend validation boundary.
 
 ## Scope
 
-- Establish the frontend application and selected package-manager workspace.
-- Add Nuxt, Vue, TypeScript, Tailwind CSS v4, Nuxt UI, and Iconify.
+- Establish `apps/web-console` as a pnpm workspace package, with one root
+  `pnpm-workspace.yaml` and `pnpm-lock.yaml`.
+- Add Nuxt 4 using its `app/` directory structure, Vue 3, TypeScript, Tailwind
+  CSS v4, Nuxt UI, and Iconify.
 - Implement semantic design tokens and the minimal responsive application shell.
 - Add a neutral planned-state page rather than fake operational data.
 - Add lint, typecheck, and component/smoke-test commands.
@@ -42,9 +46,10 @@ authority for tenant, device, alert, or command rules.
 
 ## Implementation Direction
 
-Use the UI design system as the visual source of truth. Choose rendering mode
-and package manager in this PR based on the console's actual local and testing
-needs. Expose only deliberately public Nuxt runtime values to browser code.
+Use the UI design system as the visual source of truth and pnpm as the only
+Node package manager. Keep Nuxt's default rendering mode unless a concrete
+client-only constraint appears during implementation. Expose only deliberately
+public `NUXT_PUBLIC_*` runtime values to browser code.
 
 ## Validation
 
@@ -61,8 +66,8 @@ needs. Expose only deliberately public Nuxt runtime values to browser code.
 
 ## Risks / Open Decisions
 
-- Package manager and workspace configuration.
-- SSR versus client-rendered console behavior.
+- Whether an authenticated console requirement later justifies changing the
+  default Nuxt rendering mode.
 - Font delivery and dependency policy.
 
 ## Done Criteria

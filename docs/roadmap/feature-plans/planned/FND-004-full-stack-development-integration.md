@@ -2,6 +2,8 @@
 
 Status: Planned
 
+Branch: `feat/fnd-004-full-stack-development-integration`
+
 Intended PR: One local-integration PR
 
 Milestone: F0 — Executable repository foundation
@@ -20,7 +22,7 @@ correctly.
 ## Scope
 
 - Define the development frontend-to-backend route and origin policy.
-- Connect the console to a narrow backend health/version response.
+- Connect the console to the narrow backend readiness response.
 - Add visible connected, unavailable, and retry states without fake product
   data.
 - Add a full-stack smoke test using the same public HTTP boundary as the browser.
@@ -33,18 +35,20 @@ correctly.
 
 ## Dependencies
 
-- FND-001, FND-002, and FND-003.
+- FND-003. It already requires FND-001 and FND-002.
 
 ## Architecture / Boundaries
 
 The frontend consumes a public backend boundary and never imports backend code
-or server-only configuration. The health/version response is operational
-evidence, not a product-domain API.
+or server-only configuration. The readiness response is operational evidence,
+not a product-domain API, and exposes no runtime or dependency versions.
 
 ## Implementation Direction
 
-Use the simplest local proxy or explicit origin configuration supported by the
-selected Nuxt run mode. Keep production origin and routing decisions open.
+Prefer a same-origin Nuxt development proxy so FND-001 can keep CORS disabled.
+If implementation evidence requires direct cross-origin browser access, define
+an explicit development-only allowlist and test methods, headers, credentials,
+and rejected origins. Keep production origin and routing decisions open.
 
 ## Validation
 

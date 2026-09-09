@@ -2,6 +2,8 @@
 
 Status: Planned
 
+Branch: `feat/mvp-009-alert-console`
+
 Intended PR: One frontend-alert PR
 
 Milestone: M3 — Rules and alerts
