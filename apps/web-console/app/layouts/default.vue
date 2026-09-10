@@ -24,6 +24,7 @@ const toggleSidebar = () => {
     >
       <div class="app-sidebar-header">
         <NuxtLink
+          v-if="!sidebarCollapsed"
           class="brand"
           to="/"
           aria-label="PulseGrid home"

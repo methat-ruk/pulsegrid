@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/vue'
+import { fireEvent, screen, within } from '@testing-library/vue'
 import { renderSuspended } from '@nuxt/test-utils/runtime'
 import { h } from 'vue'
 import { describe, expect, it } from 'vitest'
@@ -27,5 +27,10 @@ describe('default layout', () => {
     expect(expandButton.getAttribute('aria-expanded')).toBe('false')
     expect(sidebar?.classList.contains('app-sidebar--collapsed')).toBe(true)
     expect(overviewLink.getAttribute('title')).toBe('Overview')
+    expect(within(sidebar as HTMLElement).queryByRole('link', { name: 'PulseGrid home' })).toBeNull()
+
+    await fireEvent.click(expandButton)
+
+    expect(within(sidebar as HTMLElement).getByRole('link', { name: 'PulseGrid home' })).toBeTruthy()
   })
 })

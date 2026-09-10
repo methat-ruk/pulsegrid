@@ -148,7 +148,6 @@ a {
   justify-content: center;
 }
 
-.app-sidebar--collapsed .brand-wordmark,
 .app-sidebar--collapsed .nav-label {
   position: absolute;
   width: 1px;
