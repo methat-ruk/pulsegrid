@@ -164,6 +164,31 @@ func TestListenBecomesReadyAndStopsOnContextCancellation(t *testing.T) {
 	}
 }
 
+func TestListenHandlesContextCancellationDuringStartup(t *testing.T) {
+	server := New(testConfig(), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	listenErr := make(chan error, 1)
+	go func() {
+		listenErr <- server.Listen(ctx, 2*time.Second)
+	}()
+
+	select {
+	case err := <-listenErr:
+		if err != nil && !errors.Is(err, context.Canceled) {
+			t.Fatalf("Listen returned error after startup cancellation: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("server did not stop after startup cancellation")
+	}
+	select {
+	case <-server.StoppedSignal():
+	case <-time.After(time.Second):
+		t.Fatal("server did not complete post-shutdown lifecycle")
+	}
+}
+
 func testConfig() config.Config {
 	return config.Config{
 		Environment:     config.Test,

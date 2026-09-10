@@ -134,6 +134,8 @@ jobs:
             ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-
       - name: Install workspace dependencies
         run: corepack pnpm install --frozen-lockfile
+      - name: Prepare Nuxt workspace
+        run: NUXT_TELEMETRY_DISABLED=1 corepack pnpm --filter @pulsegrid/web-console exec nuxt prepare
       - name: Run frontend lint
         run: corepack pnpm run web:lint
 
@@ -198,6 +200,8 @@ jobs:
             ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-
       - name: Install workspace dependencies
         run: corepack pnpm install --frozen-lockfile
+      - name: Prepare Nuxt workspace
+        run: NUXT_TELEMETRY_DISABLED=1 corepack pnpm --filter @pulsegrid/web-console exec nuxt prepare
       - name: Run frontend tests
         env:
           NUXT_APP_ENV: test
@@ -307,6 +311,7 @@ jobs:
           name: openapi-review-${{ github.sha }}
           path: .openapi/
           if-no-files-found: error
+          include-hidden-files: true
           retention-days: 3
 
   browser-smoke:
