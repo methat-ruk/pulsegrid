@@ -29,12 +29,19 @@ consistent repository-level checks or if CI does not enforce them.
 - Finalize `.gitignore` rules for real `.env` files and allow reviewed example
   files only.
 - Supply explicit test-mode configuration in CI.
+- Establish the Playwright Test browser-test foundation once the application
+  commands are stable: pin the package, define a deterministic config and
+  web-server boundary, and make browser installation and CI execution
+  reproducible. Keep product journeys in their consuming plans.
 - Create the canonical local-development document.
 
 ## Out of Scope
 
 - PostgreSQL, MQTT, integration environments, release/deployment pipelines, or
   production secrets.
+- Full-stack product journeys and domain-specific browser assertions; FND-004
+  owns the first frontend-to-backend journey and later MVP plans own their
+  product flows.
 
 ## Dependencies
 
@@ -44,11 +51,19 @@ consistent repository-level checks or if CI does not enforce them.
 
 Local hooks optimize feedback; CI remains authoritative. Repository commands
 compose application-native tools rather than replacing their contracts.
+Playwright is a browser-evidence layer, not a replacement for Vitest,
+component tests, API contract checks, or backend integration tests.
 
 ## Implementation Direction
 
 Keep commands non-interactive and cross-project behavior explicit. Cache only
 safe dependency/build inputs. Make test environment selection visible in CI.
+Use `@playwright/test` with a pinned browser project and a `webServer` command
+that starts the deterministic test-mode console. Keep the first browser check
+small (planned-state render, responsive shell, and keyboard interaction), then
+let FND-004 add the backend process and connection states. Collect traces only
+on retries so CI failures remain diagnosable without making every run
+expensive.
 
 ## Validation
 
@@ -58,6 +73,9 @@ safe dependency/build inputs. Make test environment selection visible in CI.
   and a valid contract can be bundled into a reviewable artifact.
 - A deliberately failing check blocks CI and the relevant hook.
 - Test jobs cannot target development resource names or endpoints.
+- The Playwright smoke project starts against test-mode configuration, installs
+  the pinned browser revision, and fails on page errors, console errors, or a
+  broken primary interaction.
 - No tracked file contains a real secret or usable production credential.
 
 ## Documentation Updates
@@ -65,6 +83,9 @@ safe dependency/build inputs. Make test environment selection visible in CI.
 - Create `docs/project-setup/local-development.md`.
 - Document API contract lint and preview commands, linking the operational
   contract instead of duplicating its schemas.
+- Document the Playwright command, test-mode server boundary, browser install
+  policy, and artifact/trace retention without duplicating individual product
+  journeys.
 - Update environment examples and the environment strategy if implementation
   changes the planned precedence.
 - Link development commands from the root README.
@@ -75,8 +96,11 @@ safe dependency/build inputs. Make test environment selection visible in CI.
 - Node dependency-cache strategy.
 - Redocly CLI version and the exact OpenAPI lint ruleset.
 - Whether hooks should run tests or only fast static checks.
+- Browser revision caching and whether the initial Playwright smoke runs on
+  every pull request or only on the required CI workflow after FND-004.
 
 ## Done Criteria
 
 A new contributor can set up, run, and validate both applications using the
-documented workflow, while CI independently enforces the required checks.
+documented workflow, while CI independently enforces the required checks and
+the repository has a repeatable browser-test foundation ready for FND-004.

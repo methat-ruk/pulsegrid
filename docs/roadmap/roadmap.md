@@ -82,12 +82,13 @@ flowchart TD
     classDef complete fill:#DCFCE7,stroke:#15803D,color:#14532D;
     class DOC001 complete;
     class FND001 complete;
+    class FND002 complete;
 ```
 
-FND-001 implementation establishes the backend runtime shell. FND-002 is the
-next independently startable Foundation plan; FND-003 waits for both
-application foundations. FND-004 is the Foundation acceptance gate before the
-first MVP persistence slice begins.
+FND-001 implementation establishes the backend runtime shell, and FND-002
+establishes the frontend runtime shell. FND-003 is the next Foundation plan and
+waits for both application foundations. FND-004 is the Foundation acceptance
+gate before the first MVP persistence slice begins.
 
 ## Milestones
 
@@ -114,12 +115,13 @@ Dependency: D0
 Outcome: The initial Go and Nuxt applications run locally, expose only the
 documented operational API surface, have explicit development/test
 configuration, and are protected by formatting, linting, tests, Git hooks, CI,
-and documented developer commands.
+documented developer commands, and a repeatable browser-test foundation for
+cross-boundary validation.
 
 Plans:
 
 - [FND-001 — Go API foundation](feature-plans/completed/FND-001-go-api-foundation.md)
-- [FND-002 — Nuxt console foundation](feature-plans/planned/FND-002-nuxt-console-foundation.md)
+- [FND-002 — Nuxt console foundation](feature-plans/completed/FND-002-nuxt-console-foundation.md)
 - [FND-003 — Repository quality and local workflow](feature-plans/planned/FND-003-repository-quality-and-local-workflow.md)
 - [FND-004 — Full-stack development integration](feature-plans/planned/FND-004-full-stack-development-integration.md)
 

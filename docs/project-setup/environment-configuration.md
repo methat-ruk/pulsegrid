@@ -29,9 +29,10 @@ Applications will recognize exactly these logical environments:
 | `test` | Automated unit, integration, and end-to-end validation | Isolated test resources only |
 | `production` | Deployed production behavior and production-mode smoke tests | Explicitly configured production resources |
 
-The Go application uses `PULSEGRID_ENV`. The Nuxt application will select its
-native server-only and `NUXT_PUBLIC_*` keys in FND-002; it must map to the same
-three logical environments without exposing backend configuration.
+The Go application uses `PULSEGRID_ENV`. The Nuxt application uses the
+server-only `NUXT_APP_ENV` key implemented by FND-002; it maps to the same
+three logical environments without exposing backend configuration. Its public
+runtime-config object is intentionally empty until a browser consumer exists.
 
 The repository root `.go-version` pins the Go toolchain for goenv. This is a
 developer-tool selection only; the API module remains the source of truth for
@@ -141,13 +142,26 @@ FND-001 introduces only these backend keys under `apps/api/`:
 No database, broker, token, or credential key is introduced until its consumer
 plan begins.
 
+### FND-002 Nuxt keys
+
+FND-002 introduces one server-only application-environment key:
+
+| Key | Development/test behavior | Production behavior |
+| --- | --- | --- |
+| `NUXT_APP_ENV` | Exact enum value; development may load `.env.development`, while tests inject `test` deterministically | Exact value `production` is injected by the runtime; development and test files are not auto-loaded |
+
+Nuxt validates the key during Nitro startup. `runtimeConfig.public` remains
+empty, so this foundation exposes no API origin, credential, or other private
+runtime value to the browser. The first browser-consumed API routing key is
+owned by FND-004.
+
 ## Delivery sequence
 
 1. This documentation foundation defines the policy and plan.
 2. The Go foundation implements typed development/test/production validation
    for the variables it actually uses. (FND-001 complete.)
-3. The Nuxt foundation implements public/private runtime configuration and
-   browser-exposure tests.
+3. The Nuxt foundation implements and validates the server-only
+   `NUXT_APP_ENV` boundary; its public runtime configuration remains empty.
 4. Repository CI supplies the `test` environment explicitly and verifies that
    test configuration cannot target development resources.
 5. PostgreSQL and MQTT plans add their variables and example values when the
@@ -167,7 +181,6 @@ plan begins.
 
 ## Open decisions
 
-- Exact Nuxt server-only and public key names; FND-002 owns this decision.
 - Secret manager and deployment injection mechanism.
 - Per-test database strategy and MQTT namespace isolation.
 

@@ -25,7 +25,8 @@ correctly.
 - Connect the console to the narrow backend readiness response.
 - Add visible connected, unavailable, and retry states without fake product
   data.
-- Add a full-stack smoke test using the same public HTTP boundary as the browser.
+- Consume the FND-003 Playwright Test foundation for a full-stack smoke test
+  using the same public HTTP boundary as the browser.
 - Document how both applications run together in development and test modes.
 
 ## Out of Scope
@@ -35,7 +36,8 @@ correctly.
 
 ## Dependencies
 
-- FND-003. It already requires FND-001 and FND-002.
+- FND-003. It already requires FND-001 and FND-002 and owns the pinned browser
+  test runner, browser installation, and CI execution boundary.
 
 ## Architecture / Boundaries
 
@@ -53,7 +55,8 @@ and rejected origins. Keep production origin and routing decisions open.
 ## Validation
 
 - A clean local run connects the browser console to the Go application.
-- Browser tests cover backend available, unavailable, and retry behavior.
+- Playwright browser tests cover backend available, unavailable, and retry
+  behavior through the public browser boundary.
 - Test mode uses isolated ports/endpoints and cannot fall back to development.
 - No server-only value appears in the browser bundle.
 
@@ -63,11 +66,16 @@ and rejected origins. Keep production origin and routing decisions open.
 - Update development/test environment examples with only consumed URL/origin
   keys.
 - Record the selected local proxy/origin decision.
+- Record the Playwright web-server composition and the first full-stack journey
+  command; keep later product journeys in their own feature plans.
 
 ## Risks / Open Decisions
 
 - Nuxt proxy versus explicit API-origin configuration.
 - Development CORS policy and production routing remain separate decisions.
+- Whether the full-stack smoke starts both processes through Playwright
+  `webServer` entries or uses a repository orchestration command, based on the
+  final local workflow from FND-003.
 
 ## Done Criteria
 

@@ -77,10 +77,10 @@ platform foundation” is not an acceptable PR boundary.
 ### Foundation — completed
 
 - [FND-001 — Go API foundation](completed/FND-001-go-api-foundation.md)
+- [FND-002 — Nuxt console foundation](completed/FND-002-nuxt-console-foundation.md)
 
 ### Foundation — remaining
 
-- [FND-002 — Nuxt console foundation](planned/FND-002-nuxt-console-foundation.md)
 - [FND-003 — Repository quality and local workflow](planned/FND-003-repository-quality-and-local-workflow.md)
 - [FND-004 — Full-stack development integration](planned/FND-004-full-stack-development-integration.md)
 
@@ -124,6 +124,7 @@ platform foundation” is not an acceptable PR boundary.
 | Operational REST/OpenAPI contract | FND-001, then FND-003 | FND-001 documents the health surface; FND-003 adds repository lint and CI authority |
 | Vue/Nuxt project and frontend foundation | FND-002 | Creates the console shell and browser-safe configuration boundary |
 | Repository commands, lint, tests, Git hooks, and CI | FND-003 | Composes real backend/frontend checks after both applications exist |
+| Browser-test runner and CI browser evidence | FND-003; FND-004 consumes it for the first cross-boundary journey | Keeps Playwright setup reusable while domain and connection journeys remain owned by their consuming plans |
 | Frontend-to-backend local connection | FND-004 | Proves HTTP/proxy/origin and failure behavior before domain APIs |
 | Development, test, and production configuration | FND-001 to FND-004, then each consuming feature | Keys are added with their consumers; FND-003 enforces repository/CI policy |
 | PostgreSQL and migrations | MVP-001 | Added with the first concrete organization/device data authority |
