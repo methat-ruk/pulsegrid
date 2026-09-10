@@ -109,7 +109,7 @@ The decision state and adoption trigger for each technology are maintained in
   planned-state shell; it has no backend connection yet.
 - Database, MQTT, and product APIs: not started.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
-  first GitHub run and merge-gate enablement remain pending.
+  first GitHub run passed, while merge-gate enablement remains pending.
 - Production readiness: out of current scope.
 
 Claims in this README should change from planned to implemented only after the

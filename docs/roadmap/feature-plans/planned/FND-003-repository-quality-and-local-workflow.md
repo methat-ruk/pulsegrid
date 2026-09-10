@@ -3,8 +3,8 @@
 Status: In progress
 
 Review state: Implementation plan approved and implementation started against
-repository state on 2026-09-10; GitHub run and merge-gate evidence remain
-pending.
+repository state on 2026-09-10; first GitHub run passed, while merge-gate
+enforcement evidence remains pending.
 
 Branch: `chore/fnd-003-repository-quality-and-local-workflow`
 
@@ -114,7 +114,8 @@ The pre-edit inspection baseline was commit `a2e31cd` on branch
   secret-scanning alerts.
 
 These measurements describe the current local machine, not GitHub-hosted
-runner performance. CI timing remains unverified until the first workflow runs.
+runner performance. The first GitHub-hosted run is now evidence for this
+revision; future runner queue and cache behavior may vary.
 
 ## Implementation Evidence So Far
 
@@ -133,8 +134,16 @@ runner performance. CI timing remains unverified until the first workflow runs.
   by the host's Chromium Mach-port sandbox; this is recorded as environment
   evidence, not a passing test result. The elevated rerun passed.
 - Workflow YAML parsing, action full-SHA/comment policy, required-job count,
-  and absence of a cross-job dependency chain pass locally. GitHub-hosted run
-  timing and branch-protection enforcement remain unverified and approval-gated.
+  and absence of a cross-job dependency chain pass locally. GitHub run
+  `34454150901` for PR #3 passed all 12 jobs; the slowest `browser-smoke` job
+  completed in 1m27s, keeping the observed critical path under two minutes.
+- The preceding run `34452572837` exposed three environment/ordering issues:
+  setup-node's implicit pnpm cache ran before Corepack, Nuxt generated files
+  were missing before lint/Vitest, and hidden OpenAPI artifacts were excluded.
+  It also exposed a real Fiber listener-registration/shutdown race under
+  `-race`. Commit `48a6ac2` fixes these without demoting any check. Branch
+  protection and required-check enforcement remain unverified and
+  approval-gated.
 
 ## Scope
 

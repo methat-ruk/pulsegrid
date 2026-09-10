@@ -1,7 +1,7 @@
 # PulseGrid local development
 
-Status: Local repository workflow implemented; GitHub CI and merge-gate evidence
-remain pending FND-003 validation.
+Status: Local repository workflow implemented; the first GitHub CI run passed,
+while merge-gate enforcement remains pending FND-003 approval.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable until FND-004 introduces
