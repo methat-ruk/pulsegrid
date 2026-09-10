@@ -77,10 +77,10 @@ platform foundation” is not an acceptable PR boundary.
 ### Foundation — completed
 
 - [FND-001 — Go API foundation](completed/FND-001-go-api-foundation.md)
+- [FND-002 — Nuxt console foundation](completed/FND-002-nuxt-console-foundation.md)
 
 ### Foundation — remaining
 
-- [FND-002 — Nuxt console foundation](planned/FND-002-nuxt-console-foundation.md)
 - [FND-003 — Repository quality and local workflow](planned/FND-003-repository-quality-and-local-workflow.md)
 - [FND-004 — Full-stack development integration](planned/FND-004-full-stack-development-integration.md)
 

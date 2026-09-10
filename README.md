@@ -8,9 +8,10 @@ Operate fleets
 ![Status](https://img.shields.io/badge/status-foundation--in--progress-yellow)
 
 > [!IMPORTANT]
-> PulseGrid's documentation foundation is complete and the Go API foundation
-> is implemented. Nuxt, product APIs, dependencies, and the validated
-> repository-wide workflow remain on the roadmap.
+> PulseGrid's documentation foundation, Go API foundation, and Nuxt console
+> foundation are implemented and locally validated. Full-stack integration,
+> product APIs, runtime dependencies, and the validated repository-wide
+> workflow remain on the roadmap.
 
 ## What is PulseGrid?
 
@@ -104,7 +105,9 @@ The decision state and adoption trigger for each technology are maintained in
 - Architecture and technology adoption rules: documented.
 - Dependency-ordered Foundation and MVP plans: documented.
 - Go/Fiber API foundation: implemented and locally validated.
-- Nuxt console, database, MQTT, and product APIs: not started.
+- Nuxt console foundation: implemented and locally validated as a truthful
+  planned-state shell; it has no backend connection yet.
+- Database, MQTT, and product APIs: not started.
 - Repository-wide hooks, CI, and frontend workflow: not started.
 - Production readiness: out of current scope.
 
@@ -129,10 +132,11 @@ and linked feature plans.
 
 ## Development entry points
 
-The Go API foundation is runnable from its application directory. The Nuxt
-console and repository-wide commands will be added by their Foundation plans.
+The Go API foundation and Nuxt console are runnable independently from their
+application directories. Repository-wide commands will be composed by FND-003.
 
 - [Go API development guide](apps/api/README.md)
+- [Nuxt console development guide](apps/web-console/README.md)
 - [API documentation and operational contract](docs/api/README.md)
 - [Environment and configuration strategy](docs/project-setup/environment-configuration.md)
 - [Foundation and MVP feature plans](docs/roadmap/feature-plans/README.md)

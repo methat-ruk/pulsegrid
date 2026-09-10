@@ -20,8 +20,9 @@ Use the following sources according to the active concern:
 - PR-sized work:
   [feature-plan index](../../docs/roadmap/feature-plans/README.md)
 
-Current repository state: documentation foundation complete and FND-001 Go API
-foundation implemented and validated, including its operational OpenAPI
-contract. Nuxt, product APIs, infrastructure, and repository-wide developer
-workflow remain planned. Read the roadmap and the relevant feature plan before
-assuming a planned component is implemented.
+Current repository state: documentation foundation complete; FND-001 Go API and
+FND-002 Nuxt console foundations implemented and validated. The Nuxt console is
+currently a truthful planned-state shell without backend connectivity. Product
+APIs, runtime dependencies, and the repository-wide developer workflow remain
+planned. Read the roadmap and the relevant feature plan before assuming a
+planned component is implemented.

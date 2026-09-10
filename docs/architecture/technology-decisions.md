@@ -24,6 +24,8 @@ or immediately required dependency.
 | --- | --- | --- |
 | Go 1.27 | Selected — Foundation | Current supported Go release for the initial module; pin the toolchain in `go.mod` |
 | goenv | Selected — Foundation | Developer tool that follows the repository `.go-version`; runtime builds remain pinned by the Go module |
+| Node.js 24 LTS | Selected — Foundation | Frontend runtime selected by `.node-version` and the root `engines.node` range |
+| Corepack with pnpm 12 | Selected — Foundation | Root `packageManager` pins one package-manager version for the JavaScript workspace |
 | Fiber v3 | Selected — Foundation | HTTP runtime for the initial Go application |
 | REST and OpenAPI 3.1.0 | Selected — Foundation | Operational HTTP contract for health and future operational endpoints; do not create domain REST CRUD without a concrete consumer |
 | Redocly CLI | Selected — Foundation | Lint, bundle, and render OpenAPI contracts in the repository workflow once the pnpm/CI foundation exists |
@@ -32,6 +34,11 @@ or immediately required dependency.
 | pnpm workspace | Selected — Foundation | One root lockfile and explicit workspace for JavaScript tooling and the Nuxt application |
 | Tailwind CSS v4 and Nuxt UI | Selected — Foundation | UI implementation foundation governed by the UI design system |
 | Iconify | Selected — Foundation | Consistent icon source for the console |
+| Nuxt rendering mode | Selected — Foundation | Nuxt default SSR remains the simplest initial runtime; revisit only when authentication or a proven browser-only dependency requires it |
+| Nuxt ESLint flat config | Selected — Foundation | Application-owned linting and stylistic checks without a second formatter |
+| Vitest and Nuxt Test Utils | Selected — Foundation | Focused unit and Nuxt component/runtime evidence before repository-wide CI composition |
+| Manrope and Noto Sans Thai delivery | Selected — Foundation | Package-managed local font assets avoid third-party font requests |
+| Light theme | Selected — Foundation | Only approved PulseGrid light tokens exist; dark-theme work remains deferred |
 | Apache ECharts | Selected — MVP | Added when the telemetry console has a concrete chart requirement |
 | GraphQL and gqlgen | Selected — MVP | Concrete device and operator API boundary |
 | PostgreSQL | Selected — MVP | Transactional authority and bounded MVP telemetry/state storage |
@@ -69,7 +76,6 @@ consumer or independently owned runtime requires one.
 
 ## Decisions intentionally left open
 
-- Nuxt rendering mode for the authenticated operations console.
 - GraphQL client and client-cache policy.
 - Polling, GraphQL subscriptions, SSE, or WebSocket transport for live UI state.
 - Production identity provider and RBAC model.

@@ -1,8 +1,8 @@
 # FND-002 — Nuxt Console Foundation
 
-Status: Proposed
+Status: Complete
 
-Review state: Reviewed on 2026-09-10; awaiting implementation approval
+Review state: Implemented and validated on 2026-09-10
 
 Branch: `feat/fnd-002-nuxt-console-foundation`
 
@@ -284,10 +284,10 @@ because the Go module does not depend on pnpm or frontend source.
 
 ## Risks / Open Decisions
 
-- Exact dependency patch versions are selected and locked during
-  implementation; their compatibility and generated lockfile are validated in
-  this PR.
-- Visual concept approval is required before browser-visible implementation.
+- Exact dependency patch versions are selected and locked in the workspace
+  lockfile; their compatibility is covered by the application checks below.
+- Desktop and mobile shell concepts were reviewed before browser-visible
+  implementation.
 - Nuxt UI has a broad transitive dependency graph. The PR must use its selected
   primitives intentionally and inspect the resolved production dependency
   surface rather than adding overlapping UI libraries.
@@ -328,10 +328,45 @@ because the Go module does not depend on pnpm or frontend source.
   Docker or deployment infrastructure, repository-wide CI, or speculative
   shared abstraction is included.
 
-## Approval Gate
+## Completion Evidence
 
-Approval of this reviewed plan authorizes dependency installation, visual
-concept generation, and implementation on
-`feat/fnd-002-nuxt-console-foundation` within the boundaries above. Browser-
-visible code begins only after the desktop/mobile concepts are approved. Any
-stop condition listed above requires a revised plan or explicit scope approval.
+- Root workspace pins are present: Node `24.20.0`, pnpm `12.3.4`, and one
+  `pnpm-lock.yaml`. pnpm build-script approval is limited to the required
+  `esbuild`, `unrs-resolver`, and `vue-demi` packages in
+  `pnpm-workspace.yaml`.
+- Nitro runtime imports are backed by the direct `nitropack` dev dependency;
+  the peer-qualified lockfile entry recreates a valid `nitropack/runtime`
+  resolver target under `pnpm install --frozen-lockfile`.
+- The following application checks pass:
+  `corepack pnpm --filter @pulsegrid/web-console lint`, `typecheck`, `test`,
+  and `build`; the test run reports 2 files and 9 tests passed.
+- Production preview starts with `NUXT_APP_ENV=production` and serves the
+  planned-state route. Missing and invalid `NUXT_APP_ENV` both fail Nitro
+  startup with the actionable enum error.
+- Rendered HTML and client assets contain no `NUXT_APP_ENV` or
+  `NUXT_PUBLIC_*` runtime value. The browser payload reports an empty public
+  config object.
+- Browser verification passed at 1440x900, 390x844, and 320px widths. The
+  mobile `Overview` state has a transparent background, zero radius, and a
+  3px `var(--pulse-primary-hover)` dark-teal underline; the desktop sidebar
+  retains its active soft background and left border. No horizontal overflow
+  or browser console warning/error was observed.
+- Tailwind v4 canonical utility forms are used for the error surface:
+  `tracking-label` and `text-pulse-text-muted` are backed by semantic `@theme`
+  tokens instead of arbitrary-value classes.
+- Framework diagnostics are clean in application source: the error page reads
+  Nuxt's non-deprecated `error.status`, the Nitro plugin uses explicit
+  `nitropack/runtime` imports, and Vitest assertions use `toThrow` rather than
+  the deprecated `toThrowError` alias.
+- Workspace diagnostics are documented in `apps/web-console/README.md`:
+  Tailwind v4's intentional `@theme` directive is handled by Zed's
+  `tailwindcss-intellisense-css` language server through the repository
+  `.zed/settings.json`, and the installed workspace package graph resolves
+  Nuxt Test Utils and Vitest type declarations.
+
+## Completion Gate
+
+The reviewed scope was implemented on
+`feat/fnd-002-nuxt-console-foundation`. Required local evidence passed; the
+remaining repository-wide CI, hooks, backend connection, and product behavior
+are intentionally owned by FND-003, FND-004, and the MVP plans.
