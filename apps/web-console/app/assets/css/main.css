@@ -61,6 +61,7 @@ body {
   min-width: 320px;
   margin: 0;
   background: var(--pulse-bg-app);
+  color: var(--pulse-text-primary);
 }
 
 button,
@@ -69,7 +70,7 @@ a {
 }
 
 :focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--pulse-focus) 55%, transparent);
+  outline: 3px solid var(--pulse-primary-hover);
   outline-offset: 3px;
 }
 
@@ -106,6 +107,62 @@ a {
   border-right: 1px solid color-mix(in srgb, var(--pulse-border) 80%, transparent);
   background: var(--pulse-bg-sidebar);
   padding: 32px 16px;
+  transition: width 160ms ease, flex-basis 160ms ease, padding 160ms ease;
+}
+
+.app-sidebar-header {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sidebar-toggle {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--pulse-text-secondary);
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.sidebar-toggle:hover {
+  background: color-mix(in srgb, var(--pulse-primary-soft) 58%, transparent);
+  color: var(--pulse-primary-hover);
+}
+
+.app-sidebar--collapsed {
+  width: 72px;
+  flex-basis: 72px;
+  padding-inline: 12px;
+}
+
+.app-sidebar--collapsed .app-sidebar-header {
+  justify-content: center;
+}
+
+.app-sidebar--collapsed .brand-wordmark,
+.app-sidebar--collapsed .nav-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.app-sidebar--collapsed .app-nav-link {
+  justify-content: center;
+  gap: 0;
+  padding-inline: 0;
 }
 
 .brand {
@@ -240,6 +297,7 @@ a {
 
 .error-page-title {
   margin: 0;
+  color: var(--pulse-text-primary);
   font-size: 32px;
   letter-spacing: -0.035em;
 }
@@ -271,6 +329,11 @@ a {
   .app-sidebar {
     width: 208px;
     flex-basis: 208px;
+  }
+
+  .app-sidebar.app-sidebar--collapsed {
+    width: 72px;
+    flex-basis: 72px;
   }
 
   .app-content {

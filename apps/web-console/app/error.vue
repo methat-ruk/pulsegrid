@@ -1,6 +1,14 @@
 <script setup lang="ts">
 const error = useError()
 
+const pageTitle = computed(() => (
+  error.value?.status === 404
+    ? 'Page not found · PulseGrid Console'
+    : 'Error · PulseGrid Console'
+))
+
+useHead({ title: pageTitle })
+
 const referenceCode = computed(() => {
   const code = error.value?.status
   return typeof code === 'number' && code >= 400 && code < 600 ? code : 500

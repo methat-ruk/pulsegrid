@@ -50,6 +50,9 @@ while keeping the first frontend PR free of invented domain behavior.
   browser-only dependency may trigger a later rendering review.
 - Use application-owned checks now; repository-wide orchestration, hooks, and
   CI remain owned by FND-003.
+- Keep Playwright dependency, browser installation, and committed browser-test
+  infrastructure out of this PR. FND-003 owns the reusable browser-test
+  foundation; FND-004 owns the first browser-to-backend journey.
 - Use the UI design system as the visual authority, but review desktop and
   mobile shell concepts before implementation so layout details are explicit.
 
@@ -125,8 +128,11 @@ while keeping the first frontend PR free of invented domain behavior.
   the formatter/linter for frontend source; do not add a second formatter.
 - Use Vitest, Nuxt Test Utils, Vue Test Utils, and a DOM test environment for
   focused configuration and shell component tests.
+- Keep the light-only theme deterministic by disabling Nuxt UI's color-mode
+  module until an approved dark-theme contract exists.
 - Keep committed browser-to-backend E2E infrastructure out of this PR.
-  FND-004 owns the first automated full-stack browser journey.
+  FND-003 owns the Playwright foundation and FND-004 owns the first automated
+  full-stack browser journey.
 
 ## Out of Scope
 
@@ -141,6 +147,8 @@ while keeping the first frontend PR free of invented domain behavior.
   frontend observability services.
 - Dark theme, localization framework, production hosting, Dockerfile, or
   deployment configuration.
+- Playwright dependency, browser binaries, and committed browser-test
+  configuration; those belong to FND-003 and FND-004.
 - Root aggregate commands, Husky, lint-staged, Redocly, and GitHub Actions;
   these belong to FND-003.
 
@@ -295,8 +303,13 @@ because the Go module does not depend on pnpm or frontend source.
   authentication, protected routing, dark theme, localization, and production
   deployment remain intentionally open until a consuming plan requires them.
 - Mobile navigation is deliberately minimal while only one route exists; the
-  first plan that adds multiple operator destinations must review drawer and
-  focus-management behavior.
+  first plan that adds multiple operator destinations must review a `Menu`
+  button (icon plus visible label), drawer/scrim behavior, focus management,
+  Escape handling, and focus restoration. The desktop sidebar toggle is a
+  local presentation state and is intentionally implemented here.
+- Playwright is recommended for future browser evidence because it can own the
+  web-server lifecycle, responsive browser projects, and retry traces, but its
+  dependency and browser download are deferred to FND-003.
 
 ## Engineering Improvement Review
 
@@ -339,7 +352,7 @@ because the Go module does not depend on pnpm or frontend source.
   resolver target under `pnpm install --frozen-lockfile`.
 - The following application checks pass:
   `corepack pnpm --filter @pulsegrid/web-console lint`, `typecheck`, `test`,
-  and `build`; the test run reports 2 files and 9 tests passed.
+  and `build`; the test run reports 3 files and 10 tests passed.
 - Production preview starts with `NUXT_APP_ENV=production` and serves the
   planned-state route. Missing and invalid `NUXT_APP_ENV` both fail Nitro
   startup with the actionable enum error.
@@ -351,6 +364,12 @@ because the Go module does not depend on pnpm or frontend source.
   3px `var(--pulse-primary-hover)` dark-teal underline; the desktop sidebar
   retains its active soft background and left border. No horizontal overflow
   or browser console warning/error was observed.
+- Post-review corrections are covered by focused evidence: the light-only
+  runtime no longer follows a persisted/system dark class, the error route has
+  a meaningful document title and explicit primary text color, and the
+  desktop/tablet sidebar toggle exposes `Collapse sidebar`/`Expand sidebar`
+  names with synchronized `aria-expanded` state while preserving the mobile
+  compact-header contract.
 - Tailwind v4 canonical utility forms are used for the error surface:
   `tracking-label` and `text-pulse-text-muted` are backed by semantic `@theme`
   tokens instead of arbitrary-value classes.

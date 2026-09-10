@@ -115,7 +115,8 @@ Dependency: D0
 Outcome: The initial Go and Nuxt applications run locally, expose only the
 documented operational API surface, have explicit development/test
 configuration, and are protected by formatting, linting, tests, Git hooks, CI,
-and documented developer commands.
+documented developer commands, and a repeatable browser-test foundation for
+cross-boundary validation.
 
 Plans:
 
