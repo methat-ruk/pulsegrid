@@ -1,9 +1,10 @@
 # FND-003 — Repository Quality and Local Workflow
 
-Status: Planned
+Status: In progress
 
-Review state: Implementation plan revised against repository state on
-2026-09-10; implementation has not started.
+Review state: Implementation plan approved and implementation started against
+repository state on 2026-09-10; GitHub run and merge-gate evidence remain
+pending.
 
 Branch: `chore/fnd-003-repository-quality-and-local-workflow`
 
@@ -114,6 +115,26 @@ The pre-edit inspection baseline was commit `a2e31cd` on branch
 
 These measurements describe the current local machine, not GitHub-hosted
 runner performance. CI timing remains unverified until the first workflow runs.
+
+## Implementation Evidence So Far
+
+- Root scripts, exact Node tooling pins, Redocly configuration, Playwright
+  configuration/tests, Husky/lint-staged, repository-policy helpers, local
+  development documentation, and the independently named workflow are present
+  on this branch.
+- `corepack pnpm install --frozen-lockfile`, `corepack pnpm run check:fast`,
+  and `corepack pnpm run check` pass locally. The full handoff includes Go
+  race tests, Go and Nuxt builds, OpenAPI lint/bundle/static rendering, Node
+  production audit, and reachable Go vulnerability scanning.
+- The staged `sh .husky/pre-commit` path passes with the full implementation
+  staged. A browser smoke run passes all 8 Chromium tests across desktop,
+  tablet, mobile, and 320px widths when the host permits Chromium launch.
+- The first non-elevated macOS browser attempt was blocked before page launch
+  by the host's Chromium Mach-port sandbox; this is recorded as environment
+  evidence, not a passing test result. The elevated rerun passed.
+- Workflow YAML parsing, action full-SHA/comment policy, required-job count,
+  and absence of a cross-job dependency chain pass locally. GitHub-hosted run
+  timing and branch-protection enforcement remain unverified and approval-gated.
 
 ## Scope
 

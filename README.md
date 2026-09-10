@@ -10,8 +10,8 @@ Operate fleets
 > [!IMPORTANT]
 > PulseGrid's documentation foundation, Go API foundation, and Nuxt console
 > foundation are implemented and locally validated. Full-stack integration,
-> product APIs, runtime dependencies, and the validated repository-wide
-> workflow remain on the roadmap.
+> product APIs, runtime dependencies, and final CI merge-gate validation remain
+> on the roadmap.
 
 ## What is PulseGrid?
 
@@ -108,7 +108,8 @@ The decision state and adoption trigger for each technology are maintained in
 - Nuxt console foundation: implemented and locally validated as a truthful
   planned-state shell; it has no backend connection yet.
 - Database, MQTT, and product APIs: not started.
-- Repository-wide hooks, CI, and frontend workflow: not started.
+- Repository-wide hooks, CI, and frontend workflow: implemented locally; the
+  first GitHub run and merge-gate enablement remain pending.
 - Production readiness: out of current scope.
 
 Claims in this README should change from planned to implemented only after the
@@ -132,13 +133,16 @@ and linked feature plans.
 
 ## Development entry points
 
-The Go API foundation and Nuxt console are runnable independently from their
-application directories. Repository-wide commands will be composed by FND-003.
+The Go API foundation and Nuxt console are runnable independently, and the
+repository-wide commands are composed at the root. See the
+[canonical local-development guide](docs/project-setup/local-development.md)
+for setup and validation commands.
 
 - [Go API development guide](apps/api/README.md)
 - [Nuxt console development guide](apps/web-console/README.md)
 - [API documentation and operational contract](docs/api/README.md)
 - [Environment and configuration strategy](docs/project-setup/environment-configuration.md)
+- [Local development workflow](docs/project-setup/local-development.md)
 - [Foundation and MVP feature plans](docs/roadmap/feature-plans/README.md)
 - [UI design system](docs/design/ui-design/ui-design-system.md)
 

@@ -11,7 +11,13 @@ in the shell, entering this repository automatically selects that version.
 
 ## Run locally
 
-From this directory:
+From the repository root, use the canonical composed workflow:
+
+```sh
+corepack pnpm run dev:api
+```
+
+The native command remains available from this directory:
 
 ```sh
 PULSEGRID_ENV=development go run ./cmd/api
@@ -38,6 +44,9 @@ The machine-readable operational contract and response semantics are in the
 implemented by this foundation.
 
 ## Test
+
+Repository-wide setup, fast checks, full pre-CI validation, and dependency
+audits are documented in [the local-development guide](../../docs/project-setup/local-development.md).
 
 ```sh
 PULSEGRID_ENV=test go test ./...
