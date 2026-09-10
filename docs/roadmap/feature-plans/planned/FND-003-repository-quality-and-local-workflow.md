@@ -144,6 +144,11 @@ revision; future runner queue and cache behavior may vary.
   `-race`. Commit `48a6ac2` fixes these without demoting any check. Branch
   protection and required-check enforcement remain unverified and
   approval-gated.
+- Review follow-up commit `e1c6da5` closes the remaining lifecycle publication
+  ordering gap, adds a startup-cancellation readiness assertion, and makes the
+  Node audit reject incomplete or error-shaped reports while preserving the
+  expected low-advisory exit behavior. GitHub run `34456737920` on that commit
+  passed all twelve jobs; `browser-smoke` completed in 55s.
 
 ## Scope
 
