@@ -20,8 +20,28 @@ try {
   process.exit(1)
 }
 
-const advisories = Object.values(report.advisories ?? {})
+const vulnerabilities = report?.metadata?.vulnerabilities
+const severityNames = ['info', 'low', 'moderate', 'high', 'critical']
+const isAuditReport = report && typeof report === 'object' && !Array.isArray(report)
+  && report.advisories && typeof report.advisories === 'object' && !Array.isArray(report.advisories)
+  && vulnerabilities && typeof vulnerabilities === 'object' && !Array.isArray(vulnerabilities)
+  && severityNames.every((severity) => Number.isInteger(vulnerabilities[severity]))
+
+if (!isAuditReport) {
+  console.error('pnpm audit returned an incomplete or error-shaped JSON report; dependency evidence is incomplete')
+  if (result.stderr) process.stderr.write(result.stderr)
+  process.exit(1)
+}
+
+const advisories = Object.values(report.advisories)
 const severityRank = { info: 0, low: 1, moderate: 2, high: 3, critical: 4 }
+
+if (result.signal || (result.status !== 0 && !(result.status === 1 && advisories.length > 0))) {
+  const status = result.signal ? `signal ${result.signal}` : `exit code ${result.status}`
+  console.error(`pnpm audit failed with ${status}; dependency evidence is incomplete`)
+  if (result.stderr) process.stderr.write(result.stderr)
+  process.exit(1)
+}
 
 if (advisories.length === 0) {
   console.log('pnpm audit --prod: no advisories found')

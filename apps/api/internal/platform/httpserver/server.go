@@ -136,9 +136,9 @@ func (s *Server) Listen(ctx context.Context, shutdownTimeout time.Duration) erro
 	readyListener := &readinessListener{
 		Listener: listener,
 		onAccept: func() {
-			close(ready)
 			s.state.Store(lifecycleReady)
 			s.readySignalOnce.Do(func() { close(s.readySignal) })
+			close(ready)
 		},
 	}
 	listenDone := make(chan struct{})

@@ -187,6 +187,9 @@ func TestListenHandlesContextCancellationDuringStartup(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("server did not complete post-shutdown lifecycle")
 	}
+	if server.Ready() {
+		t.Fatal("server became ready after startup cancellation")
+	}
 }
 
 func testConfig() config.Config {
