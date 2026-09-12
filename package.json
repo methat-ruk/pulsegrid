@@ -6,5 +6,48 @@
   "engines": {
     "node": ">=24.11.0 <25",
     "pnpm": ">=12.3.4 <13"
+  },
+  "scripts": {
+    "prepare": "husky",
+    "setup": "NUXT_TELEMETRY_DISABLED=1 pnpm install --frozen-lockfile && pnpm run prepare && go -C apps/api mod download",
+    "setup:browser": "pnpm exec playwright install --only-shell chromium",
+    "dev:api": "PULSEGRID_ENV=development go -C apps/api run ./cmd/api",
+    "dev:web": "pnpm --filter @pulsegrid/web-console dev",
+    "api:format": "node scripts/go-format.mjs --write",
+    "api:format:check": "node scripts/go-format.mjs",
+    "api:lint": "go -C apps/api vet ./...",
+    "api:test": "PULSEGRID_ENV=test go -C apps/api test ./...",
+    "api:test:race": "PULSEGRID_ENV=test go -C apps/api test -race ./...",
+    "api:build": "go -C apps/api build ./...",
+    "api:vuln": "go -C apps/api run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...",
+    "web:lint": "pnpm --filter @pulsegrid/web-console lint",
+    "web:lint:fix": "pnpm --filter @pulsegrid/web-console lint:fix",
+    "web:typecheck": "NUXT_TELEMETRY_DISABLED=1 pnpm --filter @pulsegrid/web-console typecheck",
+    "web:test": "NUXT_TELEMETRY_DISABLED=1 NUXT_APP_ENV=test pnpm --filter @pulsegrid/web-console test",
+    "web:build": "node scripts/build-web.mjs production",
+    "openapi:lint": "pnpm exec redocly lint --config redocly.yaml apps/api/api/openapi/operational.yaml",
+    "openapi:bundle": "pnpm exec redocly bundle --config redocly.yaml apps/api/api/openapi/operational.yaml -o .openapi/operational.yaml",
+    "openapi:html": "pnpm exec redocly build-docs --config redocly.yaml apps/api/api/openapi/operational.yaml --disableGoogleFont -o .openapi/operational.html",
+    "openapi": "pnpm run openapi:lint && pnpm run openapi:bundle && pnpm run openapi:html",
+    "repository-policy": "node scripts/check-repository-policy.mjs",
+    "node:audit": "node scripts/node-audit.mjs",
+    "test:browser": "node scripts/build-web.mjs test && pnpm exec playwright test",
+    "format": "pnpm run api:format && pnpm run web:lint:fix",
+    "format:check": "pnpm run api:format:check && pnpm run web:lint",
+    "lint": "pnpm run api:lint && pnpm run web:lint && pnpm run openapi:lint",
+    "typecheck": "pnpm run web:typecheck",
+    "test": "pnpm run api:test && pnpm run web:test",
+    "test:race": "pnpm run api:test:race",
+    "build": "pnpm run api:build && pnpm run web:build",
+    "audit": "pnpm run node:audit && pnpm run api:vuln",
+    "check:fast": "pnpm run api:format:check && pnpm run lint && pnpm run typecheck && pnpm run test",
+    "check": "pnpm run check:fast && pnpm run test:race && pnpm run build && pnpm run openapi && pnpm run audit && pnpm run test:browser"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@redocly/cli": "2.51.2",
+    "@types/node": "26.5.0",
+    "husky": "9.1.7",
+    "lint-staged": "17.5.0"
   }
 }

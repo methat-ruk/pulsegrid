@@ -19,6 +19,17 @@ Product semantics remain owned by the [product scope](../product/product-scope.m
 and the relevant feature plan. Logical API boundaries remain owned by the
 [system architecture](../architecture/system-architecture.md).
 
+Repository-level contract validation is provided by FND-003:
+
+```sh
+corepack pnpm run openapi:lint
+corepack pnpm run openapi:bundle
+corepack pnpm run openapi:html
+```
+
+The generated bundle and static HTML live in the ignored `.openapi/` directory
+and are review artifacts only; they are not published or served at runtime.
+
 ## API surfaces
 
 | Surface | Protocol | Status | Source of truth |
@@ -91,8 +102,8 @@ curl -i http://127.0.0.1:8080/not-found
 
 Press `Ctrl-C` while the process is running to exercise the draining and
 stopped lifecycle. The repository-wide Redocly lint, bundle, and static-docs
-commands will be added with the pnpm/CI workflow in FND-003; they are not a
-runtime dependency of the API process.
+commands run from the repository root and are not a runtime dependency of the
+API process.
 
 ## Contract rules
 

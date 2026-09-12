@@ -5,7 +5,9 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -61,6 +63,17 @@ type Server struct {
 	stoppedSignalOnce sync.Once
 }
 
+type readinessListener struct {
+	net.Listener
+	onAccept func()
+	once     sync.Once
+}
+
+func (l *readinessListener) Accept() (net.Conn, error) {
+	l.once.Do(l.onAccept)
+	return l.Listener.Accept()
+}
+
 // New creates an HTTP server without starting a listener.
 func New(cfg config.Config, logger *slog.Logger) *Server {
 	if logger == nil {
@@ -85,8 +98,6 @@ func New(cfg config.Config, logger *slog.Logger) *Server {
 	server.app.Get(ReadyPath, server.readinessHandler)
 
 	server.app.Hooks().OnListen(func(data fiber.ListenData) error {
-		server.state.Store(lifecycleReady)
-		server.readySignalOnce.Do(func() { close(server.readySignal) })
 		server.logger.Info("http server ready", "host", data.Host, "port", data.Port)
 		return nil
 	})
@@ -112,14 +123,58 @@ func New(cfg config.Config, logger *slog.Logger) *Server {
 }
 
 // Listen starts serving until the context is cancelled or the listener fails.
-// Fiber owns the stop-admission and bounded-drain sequence through the supplied
-// graceful context and shutdown timeout.
+// It signals readiness only after Fiber has registered the listener, then
+// delegates bounded draining to Fiber after context cancellation.
 func (s *Server) Listen(ctx context.Context, shutdownTimeout time.Duration) error {
-	return s.app.Listen(s.address, fiber.ListenConfig{
+	listener, err := net.Listen("tcp4", s.address)
+	if err != nil {
+		return fmt.Errorf("failed to listen: %w", err)
+	}
+	defer listener.Close()
+
+	ready := make(chan struct{})
+	readyListener := &readinessListener{
+		Listener: listener,
+		onAccept: func() {
+			s.state.Store(lifecycleReady)
+			s.readySignalOnce.Do(func() { close(s.readySignal) })
+			close(ready)
+		},
+	}
+	listenDone := make(chan struct{})
+	if ctx != nil {
+		go func() {
+			select {
+			case <-ctx.Done():
+				select {
+				case <-ready:
+					s.shutdown(shutdownTimeout)
+				case <-listenDone:
+				}
+			case <-ready:
+				select {
+				case <-ctx.Done():
+					s.shutdown(shutdownTimeout)
+				case <-listenDone:
+				}
+			case <-listenDone:
+			}
+		}()
+	}
+
+	err = s.app.Listener(readyListener, fiber.ListenConfig{
 		DisableStartupMessage: true,
-		GracefulContext:       ctx,
-		ShutdownTimeout:       shutdownTimeout,
 	})
+	close(listenDone)
+	return err
+}
+
+func (s *Server) shutdown(shutdownTimeout time.Duration) {
+	if shutdownTimeout == 0 {
+		_ = s.app.Shutdown()
+		return
+	}
+	_ = s.app.ShutdownWithTimeout(shutdownTimeout)
 }
 
 // Ready reports whether the process is accepting normal traffic.

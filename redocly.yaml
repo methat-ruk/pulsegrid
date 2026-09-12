@@ -1,0 +1,11 @@
+extends:
+  - recommended
+
+apis:
+  operational:
+    root: apps/api/api/openapi/operational.yaml
+
+rules:
+  # PulseGrid has no selected repository or API publication license yet.
+  # Re-enable this rule when a license or publication contract is adopted.
+  info-license: off

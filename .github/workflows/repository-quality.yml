@@ -1,0 +1,361 @@
+name: Repository quality
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NUXT_TELEMETRY_DISABLED: '1'
+
+concurrency:
+  group: fnd-003-quality-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-policy:
+    name: repository-policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Validate repository policy
+        run: node scripts/check-repository-policy.mjs
+
+  api-static:
+    name: api-static
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: .go-version
+          cache: true
+          cache-dependency-path: apps/api/go.sum
+      - name: Check Go formatting
+        run: node scripts/go-format.mjs
+      - name: Verify Go modules
+        run: go -C apps/api mod verify
+      - name: Run Go vet
+        run: go -C apps/api vet ./...
+
+  api-test:
+    name: api-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: .go-version
+          cache: true
+          cache-dependency-path: apps/api/go.sum
+      - name: Run Go tests
+        env:
+          PULSEGRID_ENV: test
+        run: go -C apps/api test ./...
+
+  api-race:
+    name: api-race
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: .go-version
+          cache: true
+          cache-dependency-path: apps/api/go.sum
+      - name: Run Go race tests
+        env:
+          PULSEGRID_ENV: test
+        run: go -C apps/api test -race ./...
+
+  api-vulnerabilities:
+    name: api-vulnerabilities
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: .go-version
+          cache: true
+          cache-dependency-path: apps/api/go.sum
+      - name: Install pinned govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
+      - name: Add Go tools to PATH
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Run reachable vulnerability scan
+        working-directory: apps/api
+        run: govulncheck ./...
+
+  web-lint:
+    name: web-lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Check pnpm version
+        run: test "$(corepack pnpm --version)" = "12.3.4"
+      - name: Resolve pnpm store
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - name: Restore pnpm store
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-
+      - name: Install workspace dependencies
+        run: corepack pnpm install --frozen-lockfile
+      - name: Prepare Nuxt workspace
+        run: NUXT_TELEMETRY_DISABLED=1 corepack pnpm --filter @pulsegrid/web-console exec nuxt prepare
+      - name: Run frontend lint
+        run: corepack pnpm run web:lint
+
+  web-typecheck:
+    name: web-typecheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 7
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Check pnpm version
+        run: test "$(corepack pnpm --version)" = "12.3.4"
+      - name: Resolve pnpm store
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - name: Restore pnpm store
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-
+      - name: Install workspace dependencies
+        run: corepack pnpm install --frozen-lockfile
+      - name: Run frontend typecheck
+        run: corepack pnpm run web:typecheck
+
+  web-test:
+    name: web-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Check pnpm version
+        run: test "$(corepack pnpm --version)" = "12.3.4"
+      - name: Resolve pnpm store
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - name: Restore pnpm store
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-
+      - name: Install workspace dependencies
+        run: corepack pnpm install --frozen-lockfile
+      - name: Prepare Nuxt workspace
+        run: NUXT_TELEMETRY_DISABLED=1 corepack pnpm --filter @pulsegrid/web-console exec nuxt prepare
+      - name: Run frontend tests
+        env:
+          NUXT_APP_ENV: test
+        run: corepack pnpm run web:test
+
+  web-build:
+    name: web-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 9
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Check pnpm version
+        run: test "$(corepack pnpm --version)" = "12.3.4"
+      - name: Resolve pnpm store
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - name: Restore pnpm store
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-
+      - name: Install workspace dependencies
+        run: corepack pnpm install --frozen-lockfile
+      - name: Build frontend in production mode
+        env:
+          NUXT_APP_ENV: production
+        run: corepack pnpm run web:build
+
+  node-dependency-audit:
+    name: node-dependency-audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Check pnpm version
+        run: test "$(corepack pnpm --version)" = "12.3.4"
+      - name: Resolve pnpm store
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - name: Restore pnpm store
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-
+      - name: Install workspace dependencies
+        run: corepack pnpm install --frozen-lockfile
+      - name: Audit production dependencies
+        run: corepack pnpm run node:audit
+
+  openapi-contract:
+    name: openapi-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Check pnpm version
+        run: test "$(corepack pnpm --version)" = "12.3.4"
+      - name: Resolve pnpm store
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - name: Restore pnpm store
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-
+      - name: Install workspace dependencies
+        run: corepack pnpm install --frozen-lockfile
+      - name: Validate and render OpenAPI
+        run: corepack pnpm run openapi
+      - name: Upload OpenAPI review artifacts
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: openapi-review-${{ github.sha }}
+          path: .openapi/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 3
+
+  browser-smoke:
+    name: browser-smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Check pnpm version
+        run: test "$(corepack pnpm --version)" = "12.3.4"
+      - name: Resolve pnpm store
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - name: Restore pnpm store
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-
+      - name: Install workspace dependencies
+        run: corepack pnpm install --frozen-lockfile
+      - name: Install Chromium headless shell and Linux dependencies
+        run: corepack pnpm exec playwright install --with-deps --only-shell chromium
+      - name: Run browser smoke
+        env:
+          NUXT_APP_ENV: test
+        run: corepack pnpm run test:browser
+      - name: Upload Playwright diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-diagnostics-${{ github.sha }}
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: warn
+          retention-days: 3

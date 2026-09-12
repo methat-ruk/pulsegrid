@@ -15,6 +15,9 @@ From the repository root, install the workspace dependencies with:
 corepack pnpm install
 ```
 
+The composed setup, local run modes, fast checks, full pre-CI validation, and
+browser smoke are documented in [the local-development guide](../../docs/project-setup/local-development.md).
+
 ## Environment
 
 The console requires `NUXT_APP_ENV` with one of these values:
@@ -54,6 +57,8 @@ corepack pnpm --filter @pulsegrid/web-console build
 
 Browser verification must cover the planned-state route at desktop, tablet,
 mobile, and 320px widths, including keyboard focus and reduced-motion behavior.
+The repository-root `corepack pnpm run test:browser` command owns the isolated
+test-mode build and server lifecycle for that evidence.
 
 ## Known diagnostics and warnings
 
