@@ -147,4 +147,4 @@ configuration; they do not load development or test dotenv files.
 - [API guide](../../apps/api/README.md)
 - [Web console guide](../../apps/web-console/README.md)
 - [Environment strategy](environment-configuration.md)
-- [FND-003 plan](../roadmap/feature-plans/planned/FND-003-repository-quality-and-local-workflow.md)
+- [FND-003 plan](../roadmap/feature-plans/completed/FND-003-repository-quality-and-local-workflow.md)
