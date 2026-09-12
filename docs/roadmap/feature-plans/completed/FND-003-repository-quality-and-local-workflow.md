@@ -4,8 +4,8 @@ Status: Complete
 
 Review state: Implemented, reviewed, and validated on 2026-09-12. Branch
 protection, required-check enforcement, intentional-failure probes, and
-cold/warm CI timing evidence are complete; PR #3 remains Draft and unmerged by
-explicit request.
+cold/warm CI timing evidence are complete; PR #3 remains open and unmerged
+pending the final merge decision.
 
 Branch: `chore/fnd-003-repository-quality-and-local-workflow`
 
@@ -152,10 +152,15 @@ revision; future runner queue and cache behavior may vary.
   Node audit reject incomplete or error-shaped reports while preserving the
   expected low-advisory exit behavior. GitHub run `34456737920` on that commit
   passed all twelve jobs; `browser-smoke` completed in 55s.
-- The final candidate head `0f9e13e` passed all twelve jobs in
+- The final code-bearing candidate head `0f9e13e` passed all twelve jobs in
   [GitHub run 34456962217](https://github.com/methat-ruk/pulsegrid/actions/runs/34456962217);
   `browser-smoke` completed in 56s. The working tree remained clean after all
   temporary probes were removed.
+- The subsequent closeout-documentation head `c789289` changed only roadmap
+  and local-development documentation and passed all twelve jobs in
+  [GitHub run 34684636319](https://github.com/methat-ruk/pulsegrid/actions/runs/34684636319);
+  `browser-smoke` completed in 60s. Any later documentation-only closeout
+  commit must rerun the same twelve required checks before merge.
 
 
 ## Final Acceptance Evidence — 2026-09-12
