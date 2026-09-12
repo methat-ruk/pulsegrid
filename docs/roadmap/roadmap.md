@@ -83,12 +83,13 @@ flowchart TD
     class DOC001 complete;
     class FND001 complete;
     class FND002 complete;
+    class FND003 complete;
 ```
 
 FND-001 implementation establishes the backend runtime shell, and FND-002
-establishes the frontend runtime shell. FND-003 is the next Foundation plan and
-waits for both application foundations. FND-004 is the Foundation acceptance
-gate before the first MVP persistence slice begins.
+establishes the frontend runtime shell. FND-003 now establishes the repository
+quality and merge-gate boundary. FND-004 remains the Foundation acceptance gate
+before the first MVP persistence slice begins.
 
 ## Milestones
 
@@ -122,7 +123,7 @@ Plans:
 
 - [FND-001 — Go API foundation](feature-plans/completed/FND-001-go-api-foundation.md)
 - [FND-002 — Nuxt console foundation](feature-plans/completed/FND-002-nuxt-console-foundation.md)
-- [FND-003 — Repository quality and local workflow](feature-plans/planned/FND-003-repository-quality-and-local-workflow.md)
+- [FND-003 — Repository quality and local workflow](feature-plans/completed/FND-003-repository-quality-and-local-workflow.md)
 - [FND-004 — Full-stack development integration](feature-plans/planned/FND-004-full-stack-development-integration.md)
 
 ### M1 — Device registry

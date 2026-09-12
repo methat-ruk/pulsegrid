@@ -1,10 +1,11 @@
 # FND-003 — Repository Quality and Local Workflow
 
-Status: In progress
+Status: Complete
 
-Review state: Implementation plan approved and implementation started against
-repository state on 2026-09-10; first GitHub run passed, while merge-gate
-enforcement evidence remains pending.
+Review state: Implemented, reviewed, and validated on 2026-09-12. Branch
+protection, required-check enforcement, intentional-failure probes, and
+cold/warm CI timing evidence are complete; PR #3 remains Draft and unmerged by
+explicit request.
 
 Branch: `chore/fnd-003-repository-quality-and-local-workflow`
 
@@ -87,9 +88,11 @@ The pre-edit inspection baseline was commit `a2e31cd` on branch
   implementation changes. There were no GitHub Actions workflows, Husky hooks,
   lint-staged configuration, Redocly dependency, or Playwright dependency in
   the repository.
-- `main` has no branch-protection rule or ruleset, and the repository has no
-  workflow-run history. A workflow file alone would therefore not create an
-  authoritative merge boundary.
+- At the pre-edit baseline, `main` had no branch-protection rule or ruleset,
+  and the repository had no workflow-run history; a workflow file alone would
+  therefore not create an authoritative merge boundary. On 2026-09-12,
+  protection was configured and verified with strict required checks, pull
+  requests, administrator enforcement, and force-push/deletion disabled.
 - Go `1.27.1`, Node `24.20.0`, and pnpm `12.3.4` match the repository pins.
 - Current warm native checks pass. Observed local command times were
   approximately 0.5 seconds for Go format inspection, 0.3 seconds for
@@ -141,14 +144,70 @@ revision; future runner queue and cache behavior may vary.
   setup-node's implicit pnpm cache ran before Corepack, Nuxt generated files
   were missing before lint/Vitest, and hidden OpenAPI artifacts were excluded.
   It also exposed a real Fiber listener-registration/shutdown race under
-  `-race`. Commit `48a6ac2` fixes these without demoting any check. Branch
-  protection and required-check enforcement remain unverified and
+  `-race`. Commit `48a6ac2` fixes these without demoting any check. At that point in the implementation sequence, branch
+  protection and required-check enforcement were still unverified and
   approval-gated.
 - Review follow-up commit `e1c6da5` closes the remaining lifecycle publication
   ordering gap, adds a startup-cancellation readiness assertion, and makes the
   Node audit reject incomplete or error-shaped reports while preserving the
   expected low-advisory exit behavior. GitHub run `34456737920` on that commit
   passed all twelve jobs; `browser-smoke` completed in 55s.
+- The final candidate head `0f9e13e` passed all twelve jobs in
+  [GitHub run 34456962217](https://github.com/methat-ruk/pulsegrid/actions/runs/34456962217);
+  `browser-smoke` completed in 56s. The working tree remained clean after all
+  temporary probes were removed.
+
+
+## Final Acceptance Evidence — 2026-09-12
+
+### Merge authority
+
+- `main` protection readback confirms `strict: true` and exactly these twelve
+  required contexts: `repository-policy`, `api-static`, `api-test`,
+  `api-race`, `api-vulnerabilities`, `web-lint`, `web-typecheck`,
+  `web-test`, `web-build`, `node-dependency-audit`,
+  `openapi-contract`, and `browser-smoke`.
+- `enforce_admins: true`, pull requests are required, force-push and deletion
+  are disabled, and no user/team bypass restriction was configured because this
+  is a personal repository.
+- Temporary [probe PR #5](https://github.com/methat-ruk/pulsegrid/pull/5) added a
+  harmless tracked `.env`. Run
+  [34683472783](https://github.com/methat-ruk/pulsegrid/actions/runs/34683472783)
+  failed `repository-policy`, while GitHub reported
+  `mergeStateStatus: BLOCKED`. The probe PR and branch were closed and deleted.
+
+### CI timing
+
+| Run | Cache state | Candidate | Critical job | Critical path |
+| --- | --- | --- | --- | --- |
+| [34684063790](https://github.com/methat-ruk/pulsegrid/actions/runs/34684063790) | Cold cache miss (verified in log) | lockfile-comment probe | `browser-smoke` | 56s |
+| [34454584034](https://github.com/methat-ruk/pulsegrid/actions/runs/34454584034) | Warm | `c211afd` | `browser-smoke` | 56s |
+| [34456737920](https://github.com/methat-ruk/pulsegrid/actions/runs/34456737920) | Warm | `e1c6da5` | `browser-smoke` | 55s |
+| [34456962217](https://github.com/methat-ruk/pulsegrid/actions/runs/34456962217) | Warm cache hit (verified in log) | `0f9e13e` | `browser-smoke` | 56s |
+
+The comparable warm median is 56s, below the approximately two-minute target.
+The cold probe passed all twelve jobs after downloading 992 packages with the
+pnpm store cache empty.
+
+### Intentional-failure matrix
+
+| Gate | Temporary failure probe | Observed result |
+| --- | --- | --- |
+| Go format / `api-static` | Whitespace-only change; `corepack pnpm run api:format:check` | Non-zero; reports the Go file needing formatting |
+| Go assertions / `api-test` | Temporary `t.Fatal` test; `corepack pnpm run api:test` | Non-zero; only the probe test fails |
+| Reachable Go vulnerability / `api-vulnerabilities` | Temporary reachable `ssh.NewServerConn` call | Non-zero; reports GO-2026-6355, GO-2026-6354, and GO-2026-6303 |
+| Frontend lint / `web-lint` | Temporary unused Vue variables | Non-zero ESLint result |
+| Frontend typecheck / `web-typecheck` | Temporary number-to-string assignment | Non-zero TypeScript result |
+| Vitest / `web-test` | Temporary planned-state heading mismatch | One test fails; remaining tests pass |
+| Node production audit | Synthetic moderate advisory JSON from a temporary `pnpm` shim | Non-zero; moderate advisory blocks the gate |
+| OpenAPI / `openapi-contract` | Temporary invalid `openapi: 3.1` value | Non-zero Redocly validation result |
+| Browser / `browser-smoke` | Temporary planned-state heading mismatch | Four render tests fail; keyboard tests remain green |
+| Staged hook | Temporary staged frontend lint error through an isolated Git index | `.husky/pre-commit` exits non-zero and restores the staged state |
+
+All probe files, shims, temporary indexes, branches, and pull requests were
+removed; no probe change remains in the candidate tree. The earlier
+implementation-failure runs remain historical diagnostics and are not counted
+as final-candidate passes.
 
 ## Scope
 
@@ -505,9 +564,8 @@ clean environment.
 - The current low Node advisory, non-reachable Go module findings, and peer
   mismatch need durable dispositions but do not justify an unrelated major
   upgrade or speculative override in this PR.
-- Branch protection is the only remaining approval-gated external mutation.
-  Do not claim authoritative merge enforcement until it is approved, applied,
-  and failure-tested.
+- Branch protection was the remaining approval-gated external mutation; it was
+  approved, applied, read back, and failure-tested on 2026-09-12.
 - Tool versions listed here are the reviewed versions on 2026-09-10. If any
   exact version is unavailable or incompatible at implementation time, stop
   and review the replacement rather than silently selecting `latest`.
