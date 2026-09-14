@@ -60,8 +60,10 @@ corepack pnpm run db:dev:status
 
 If `db:dev:migrate` is upgrading a development volume created by an older
 checkout, follow the [migration preflight and recovery procedure](../../docs/project-setup/local-development.md#migration-preflight-and-recovery)
-before retrying after a constraint failure. The preflight is read-only and
-the migration never rewrites existing device keys or display names implicitly.
+before retrying after a constraint failure. It covers the length and Unicode
+whitespace rules from migrations `003` and `004`. The preflight is read-only
+and the migration never rewrites existing device keys or display names
+implicitly.
 
 `db:dev:up` starts only the loopback PostgreSQL 18.6 Compose service and
 waits for its health check. The development volume is persistent; stopping the

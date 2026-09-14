@@ -100,25 +100,30 @@ checkout, run this read-only preflight from `psql`:
 WITH whitespace(chars) AS (
   VALUES (U&'\0009\000A\000B\000C\000D\0020\0085\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000')
 )
-SELECT 'organizations' AS table_name, id, 'display_name' AS column_name, display_name
+SELECT 'organizations' AS table_name, id, 'display_name' AS column_name,
+       'length_or_unicode_whitespace' AS violation, display_name AS value
 FROM organizations, whitespace
-WHERE char_length(btrim(display_name, whitespace.chars)) = 0
+WHERE char_length(display_name) NOT BETWEEN 1 AND 200
+   OR char_length(btrim(display_name, whitespace.chars)) = 0
 UNION ALL
-SELECT 'devices', id, 'device_key', device_key
+SELECT 'devices', id, 'device_key', 'length_or_unicode_whitespace', device_key
 FROM devices, whitespace
-WHERE device_key <> btrim(device_key, whitespace.chars)
+WHERE char_length(device_key) NOT BETWEEN 1 AND 128
+   OR device_key <> btrim(device_key, whitespace.chars)
 UNION ALL
-SELECT 'devices', id, 'display_name', display_name
+SELECT 'devices', id, 'display_name', 'length_or_unicode_whitespace', display_name
 FROM devices, whitespace
-WHERE char_length(btrim(display_name, whitespace.chars)) = 0;
+WHERE char_length(display_name) NOT BETWEEN 1 AND 200
+   OR char_length(btrim(display_name, whitespace.chars)) = 0;
 ```
 
 An empty result is safe to continue with `corepack pnpm run db:dev:migrate`.
 If rows are returned, stop before retrying the migration. Keep the rows for
 review, choose an explicit valid replacement for each affected `device_key`
-(it is an identity value), and choose a nonblank display name for affected
-display-name rows. Apply those data changes only after confirming the local
-data is disposable or obtaining the appropriate data-owner decision, then
+(1–128 characters with no surrounding Unicode whitespace; it is an identity
+value), and choose a nonblank display name of at most 200 characters for
+affected display-name rows. Apply those data changes only after confirming the
+local data is disposable or obtaining the appropriate data-owner decision, then
 rerun the migration and check its status. Do not use `migrate down`, delete a
 volume, or run a broad Compose teardown as a migration-recovery shortcut.
 
