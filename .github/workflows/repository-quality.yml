@@ -62,9 +62,19 @@ jobs:
         with:
           go-version-file: .go-version
           cache: true
-          cache-dependency-path: apps/api/go.sum
+          cache-dependency-path: |
+            apps/api/go.sum
+            package.json
       - name: Check Go formatting
         run: node scripts/go-format.mjs
+      - name: Run Go modernization checks
+        working-directory: apps/api
+        env:
+          GOFLAGS: -tags=integration
+        run: go run golang.org/x/tools/go/analysis/passes/modernize/cmd/modernize@v0.48.0 -errorsastype -rangeint -waitgroupgo ./...
+      - name: Run Staticcheck
+        working-directory: apps/api
+        run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.0 -tags integration ./...
       - name: Verify Go modules
         run: go -C apps/api mod verify
       - name: Run Go vet

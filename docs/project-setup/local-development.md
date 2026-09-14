@@ -161,6 +161,8 @@ console errors.
 | --- | --- |
 | `corepack pnpm run format` | Apply Go formatting and the existing frontend ESLint fix behavior |
 | `corepack pnpm run format:check` | Check Go formatting and frontend stylistic lint without rewriting |
+| `corepack pnpm run api:modernize` | Check pinned Go modernization analyzers across normal and `integration` build-tagged code |
+| `corepack pnpm run api:staticcheck` | Run the pinned Staticcheck suite across normal and `integration` build-tagged code |
 | `corepack pnpm run lint` | Go vet, frontend lint, and OpenAPI lint |
 | `corepack pnpm run typecheck` | Nuxt/TypeScript typecheck |
 | `corepack pnpm run test` | Go tests and frontend Vitest in explicit test mode |
@@ -168,7 +170,7 @@ console errors.
 | `corepack pnpm run build` | Go compilation and Nuxt production build |
 | `corepack pnpm run openapi` | Lint, bundle, and static HTML rendering into ignored `.openapi/` |
 | `corepack pnpm run audit` | Node production audit and reachable Go vulnerability scan |
-| `corepack pnpm run check:fast` | Fast pre-CI handoff: formatting, lint, typecheck, and ordinary tests |
+| `corepack pnpm run check:fast` | Fast pre-CI handoff: formatting, Go modernization/static analysis, lint, typecheck, and ordinary tests |
 | `corepack pnpm run api:test:integration` | Isolated real-PostgreSQL migration, repository, constraint, and tenant-scope evidence |
 | `corepack pnpm run check` | Full pre-CI handoff, including race, build, OpenAPI, audits, database integration, and browser smoke |
 

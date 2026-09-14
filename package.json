@@ -22,6 +22,8 @@
     "api:format": "node scripts/go-format.mjs --write",
     "api:format:check": "node scripts/go-format.mjs",
     "api:lint": "go -C apps/api vet ./...",
+    "api:modernize": "GOFLAGS=-tags=integration go -C apps/api run golang.org/x/tools/go/analysis/passes/modernize/cmd/modernize@v0.48.0 -errorsastype -rangeint -waitgroupgo ./...",
+    "api:staticcheck": "go -C apps/api run honnef.co/go/tools/cmd/staticcheck@v0.8.0 -tags integration ./...",
     "api:test": "PULSEGRID_ENV=test go -C apps/api test ./...",
     "api:test:race": "PULSEGRID_ENV=test go -C apps/api test -race ./...",
     "api:test:integration": "node scripts/test-api-integration.mjs",
@@ -47,7 +49,7 @@
     "test:race": "pnpm run api:test:race",
     "build": "pnpm run api:build && pnpm run web:build",
     "audit": "pnpm run node:audit && pnpm run api:vuln",
-    "check:fast": "pnpm run api:format:check && pnpm run lint && pnpm run typecheck && pnpm run test",
+    "check:fast": "pnpm run api:format:check && pnpm run api:modernize && pnpm run api:staticcheck && pnpm run lint && pnpm run typecheck && pnpm run test",
     "check": "pnpm run check:fast && pnpm run test:race && pnpm run build && pnpm run openapi && pnpm run audit && pnpm run api:test:integration && pnpm run test:browser"
   },
   "devDependencies": {

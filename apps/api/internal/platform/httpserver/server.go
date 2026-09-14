@@ -28,8 +28,7 @@ const (
 	writeTimeout    = 10 * time.Second
 	idleTimeout     = 60 * time.Second
 
-	lifecycleStarting uint32 = iota
-	lifecycleReady
+	lifecycleReady uint32 = iota + 1
 	lifecycleDraining
 	lifecycleStopped
 )
@@ -232,8 +231,7 @@ func (s *Server) errorHandler(c fiber.Ctx, err error) error {
 	publicCode := "internal_error"
 	publicMessage := "internal server error"
 
-	var fiberError *fiber.Error
-	if errors.As(err, &fiberError) {
+	if fiberError, ok := errors.AsType[*fiber.Error](err); ok {
 		switch fiberError.Code {
 		case http.StatusBadRequest:
 			statusCode = http.StatusBadRequest

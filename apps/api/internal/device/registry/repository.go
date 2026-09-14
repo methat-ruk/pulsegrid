@@ -297,8 +297,7 @@ func mapDatabaseError(err error) error {
 		return ErrNotFound
 	}
 
-	var pgError *pgconn.PgError
-	if errors.As(err, &pgError) {
+	if pgError, ok := errors.AsType[*pgconn.PgError](err); ok {
 		switch pgError.Code {
 		case "23505":
 			return ErrConflict
