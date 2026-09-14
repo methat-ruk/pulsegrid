@@ -124,6 +124,9 @@ importers:
       lint-staged:
         specifier: 17.5.0
         version: 17.5.0
+      yaml:
+        specifier: 2.9.0
+        version: 2.9.0
 
   apps/web-console:
     dependencies:

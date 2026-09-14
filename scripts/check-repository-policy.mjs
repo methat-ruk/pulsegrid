@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
+import { parseDocument } from 'yaml'
 
 const root = process.cwd()
 
@@ -87,10 +88,41 @@ function checkActionPins() {
   }
 }
 
+function checkWorkflowYaml() {
+  for (const file of workflowFiles()) {
+    const relative = path.relative(root, file)
+    const source = readFileSync(file, 'utf8')
+    let document
+    try {
+      document = parseDocument(source, { prettyErrors: false, uniqueKeys: true })
+    } catch (error) {
+      fail(`${relative} could not be parsed as YAML: ${error.message}`)
+      continue
+    }
+
+    for (const diagnostic of [...document.errors, ...document.warnings]) {
+      const line = diagnostic.linePos?.[0]?.line
+      const location = line ? `:${line}` : ''
+      fail(`${relative}${location} has a YAML diagnostic: ${diagnostic.message}`)
+    }
+
+    if (document.errors.length > 0) continue
+    const workflow = document.toJS({ mapAsMap: false })
+    if (!workflow || typeof workflow !== 'object' || Array.isArray(workflow)) {
+      fail(`${relative} must contain a YAML mapping at the document root`)
+      continue
+    }
+    if (!workflow.jobs || typeof workflow.jobs !== 'object' || Array.isArray(workflow.jobs)) {
+      fail(`${relative} must contain a jobs mapping`)
+    }
+  }
+}
+
 const files = trackedFiles()
 checkEnvironmentFiles(files)
 checkLockfiles(files)
 checkToolchainPins()
+checkWorkflowYaml()
 checkActionPins()
 
 if (process.exitCode) process.exit(process.exitCode)
