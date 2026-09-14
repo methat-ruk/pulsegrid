@@ -109,7 +109,7 @@ Plans:
 
 ### F0 — Executable repository foundation
 
-Status: In progress
+Status: Complete
 
 Dependency: D0
 
@@ -124,7 +124,7 @@ Plans:
 - [FND-001 — Go API foundation](feature-plans/completed/FND-001-go-api-foundation.md)
 - [FND-002 — Nuxt console foundation](feature-plans/completed/FND-002-nuxt-console-foundation.md)
 - [FND-003 — Repository quality and local workflow](feature-plans/completed/FND-003-repository-quality-and-local-workflow.md)
-- [FND-004 — Full-stack development integration](feature-plans/planned/FND-004-full-stack-development-integration.md)
+- [FND-004 — Full-stack development integration](feature-plans/completed/FND-004-full-stack-development-integration.md)
 
 ### M1 — Device registry
 

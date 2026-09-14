@@ -1,6 +1,12 @@
 # FND-004 — Full-Stack Development Integration
 
-Status: Implementation in progress; local validation complete, CI evidence pending
+Status: Complete
+
+Review state: Implemented, reviewed, and validated on 2026-09-14. The final
+candidate is commit `1b72111`; required CI run `34798900239` passed all twelve
+contexts, with `browser-smoke` completing in 1m12s. A preceding review-fix run
+completed the same browser job in 1m23s. Local frontend tests passed 27/27 and
+the targeted browser readiness run passed 11/11.
 
 Branch: `feat/fnd-004-full-stack-development-integration`
 
@@ -209,7 +215,7 @@ Browser (same origin, relative GET /api/operational/ready)
 | Real full-stack composition | Playwright starts the built Nuxt test server; its fixture starts the real Go test binary; the browser requests the same-origin route; resulting ready state is backed by actual Go `/health/ready`, not a mocked network response |
 | Degraded/recovery UI | Playwright stops the real Go child process, verifies the browser becomes unavailable after a check, restarts Go, and verifies manual retry → ready through the unchanged Nuxt route. Focused route tests separately cover malformed/slow/redirect responses. |
 | Runtime and artifact safety | Development manual stop/restart check; test port-conflict/teardown check; production build remains green; backend-origin sentinel absent from HTML, hydration payload, and client assets |
-| Regression and CI | Existing browser viewport/keyboard/console assertions remain meaningful; `check:fast`, `check`, all twelve required CI contexts, and cold/warm timing observations are reviewed on the final candidate |
+| Regression and CI | Existing browser viewport/keyboard/console assertions remain meaningful; local focused checks and all twelve required CI contexts passed on the final candidate; successive PR timing observations remained below the approximately two-minute browser critical-path target |
 
 ## Documentation Updates
 
