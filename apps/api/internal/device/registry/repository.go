@@ -273,7 +273,9 @@ func validateOrganization(slug string, displayName string) error {
 	if !utf8.ValidString(displayName) {
 		return fmt.Errorf("%w: organization display name", ErrInvalidInput)
 	}
-	if size := utf8.RuneCountInString(strings.TrimSpace(displayName)); size < minTextSize || size > maxNameSize {
+	displayNameSize := utf8.RuneCountInString(displayName)
+	trimmedDisplayNameSize := utf8.RuneCountInString(strings.TrimSpace(displayName))
+	if displayNameSize < minTextSize || displayNameSize > maxNameSize || trimmedDisplayNameSize < minTextSize {
 		return fmt.Errorf("%w: organization display name", ErrInvalidInput)
 	}
 	return nil
@@ -286,7 +288,9 @@ func validateDeviceInput(input CreateDeviceInput) error {
 	if !utf8.ValidString(input.DisplayName) {
 		return fmt.Errorf("%w: device display name", ErrInvalidInput)
 	}
-	if size := utf8.RuneCountInString(strings.TrimSpace(input.DisplayName)); size < minTextSize || size > maxNameSize {
+	displayNameSize := utf8.RuneCountInString(input.DisplayName)
+	trimmedDisplayNameSize := utf8.RuneCountInString(strings.TrimSpace(input.DisplayName))
+	if displayNameSize < minTextSize || displayNameSize > maxNameSize || trimmedDisplayNameSize < minTextSize {
 		return fmt.Errorf("%w: device display name", ErrInvalidInput)
 	}
 	return nil

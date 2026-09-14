@@ -1,12 +1,17 @@
 # MVP-001 — Tenant and Device Persistence
 
-Status: In Progress
+Status: Complete
+
+Review state: Implemented, reviewed, and validated on 2026-09-14. The final
+candidate includes the display-name boundary fixes, aligned local database URL
+precedence and password decoding, and real-PostgreSQL seed idempotency
+evidence. Required CI checks must remain green on the final PR head.
 
 Branch: `feat/mvp-001-tenant-device-persistence`
 
 Intended PR: One persistence-foundation PR. Implementation follows the
-reviewed and approved plan; completion remains blocked on final validation and
-post-implementation review.
+reviewed and approved plan; final validation and post-implementation review
+are complete for the current candidate.
 
 Milestone: M1 — Device registry
 
@@ -263,6 +268,19 @@ No OpenAPI or browser contract is added.
   requires workload evidence.
 - **Scope effect:** original persistence outcome becomes testable without
   adding a product API or changing FND-004 health behavior.
+
+## Review follow-up completed
+
+- Go and SQL validation now enforce the 1–200 character limit on the stored
+  display-name value while still rejecting blank trimmed values.
+- The new constraint is delivered as migration `003` so the already-applied
+  whitespace migration remains immutable and existing databases receive the
+  fix through the normal forward migration path.
+- The local Compose helper consumes the same process-over-dotenv database URL
+  precedence as Go and decodes URL-escaped credentials before passing the
+  password to PostgreSQL.
+- Real-PostgreSQL integration evidence covers repeatable organization seeding,
+  changed-seed-name conflicts, and 201-character display-name rejection.
 
 ## Done Criteria
 

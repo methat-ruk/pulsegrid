@@ -53,18 +53,19 @@ if (result.error) {
 process.exit(result.status ?? 1)
 
 function loadDevelopmentCredentials() {
-  let contents
-  try {
-    contents = readFileSync(`${rootDirectory}/${dotenvPath}`, 'utf8')
-  } catch {
-    console.error(`missing ${dotenvPath}; copy apps/api/.env.development.example first`)
-    process.exit(1)
+  let rawUrl = process.env.PULSEGRID_DATABASE_URL
+  if (rawUrl === undefined) {
+    let contents
+    try {
+      contents = readFileSync(`${rootDirectory}/${dotenvPath}`, 'utf8')
+    } catch {
+      console.error(`missing ${dotenvPath}; copy apps/api/.env.development.example first`)
+      process.exit(1)
+    }
+    rawUrl = parseDotenv(contents).PULSEGRID_DATABASE_URL
   }
-
-  const values = parseDotenv(contents)
-  const rawUrl = values.PULSEGRID_DATABASE_URL
   if (!rawUrl) {
-    console.error(`${dotenvPath} must define PULSEGRID_DATABASE_URL`)
+    console.error('PULSEGRID_DATABASE_URL must be set')
     process.exit(1)
   }
 
@@ -76,15 +77,28 @@ function loadDevelopmentCredentials() {
     process.exit(1)
   }
 
-  if (parsed.hostname !== '127.0.0.1' || parsed.port !== '5432' || parsed.pathname !== '/pulsegrid_dev' || parsed.search !== '?sslmode=disable') {
+  if (parsed.hostname !== '127.0.0.1' || parsed.port !== '5432' || parsed.pathname !== '/pulsegrid_dev' || parsed.search !== '?sslmode=disable' || parsed.hash !== '') {
     console.error(`${dotenvPath} must target 127.0.0.1:5432/pulsegrid_dev with sslmode=disable`)
     process.exit(1)
   }
-  if (!parsed.password || parsed.password === 'CHANGE_ME') {
-    console.error(`${dotenvPath} must contain a disposable database password, not CHANGE_ME`)
+  let username
+  let password
+  try {
+    username = decodeURIComponent(parsed.username)
+    password = decodeURIComponent(parsed.password)
+  } catch {
+    console.error(`${dotenvPath} contains invalid encoded database credentials`)
     process.exit(1)
   }
-  return { password: parsed.password }
+  if (username !== 'pulsegrid') {
+    console.error('PULSEGRID_DATABASE_URL must use the pulsegrid local user')
+    process.exit(1)
+  }
+  if (!password || password === 'CHANGE_ME') {
+    console.error('PULSEGRID_DATABASE_URL must contain a disposable database password, not CHANGE_ME')
+    process.exit(1)
+  }
+  return { password }
 }
 
 function parseDotenv(contents) {

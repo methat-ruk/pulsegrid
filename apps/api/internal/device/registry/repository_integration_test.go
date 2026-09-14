@@ -103,6 +103,29 @@ func TestRepositoryTenantIsolationAndKeysetPagination(t *testing.T) {
 	}
 }
 
+func TestEnsureOrganizationIsIdempotent(t *testing.T) {
+	repository, cleanup := integrationRepository(t)
+	defer cleanup()
+	slug := "integration-seed-" + strings.ReplaceAll(uuid.NewString(), "-", "")
+	ctx := context.Background()
+
+	firstID, err := repository.EnsureOrganization(ctx, slug, "Seed Organization")
+	if err != nil {
+		t.Fatalf("first seed = %v", err)
+	}
+	secondID, err := repository.EnsureOrganization(ctx, slug, "Seed Organization")
+	if err != nil {
+		t.Fatalf("repeat seed = %v", err)
+	}
+	if secondID != firstID {
+		t.Fatalf("repeat seed id = %s, want %s", secondID, firstID)
+	}
+	if _, err := repository.EnsureOrganization(ctx, slug, "Changed Organization"); !errors.Is(err, ErrConflict) {
+		t.Fatalf("seed with changed display name = %v, want ErrConflict", err)
+	}
+	cleanupOrganizations(t, repository, firstID)
+}
+
 func TestRepositoryConcurrentDuplicateDeviceKey(t *testing.T) {
 	repository, cleanup := integrationRepository(t)
 	defer cleanup()
@@ -178,11 +201,27 @@ func TestDatabaseConstraintsRejectInvalidRows(t *testing.T) {
 	}
 
 	_, err = repository.pool.Exec(context.Background(), `
+		INSERT INTO devices (organization_id, device_key, display_name)
+		VALUES ($1, $2, $3)
+	`, orgID, "long-display-name", strings.Repeat("a", maxNameSize+1))
+	if err == nil || !strings.Contains(err.Error(), "devices_display_name_nonblank") {
+		t.Fatalf("long device display name error = %v, want devices_display_name_nonblank", err)
+	}
+
+	_, err = repository.pool.Exec(context.Background(), `
 		INSERT INTO organizations (slug, display_name)
 		VALUES ($1, $2)
 	`, "tab-only-name", "\t")
 	if err == nil || !strings.Contains(err.Error(), "organizations_display_name_nonblank") {
 		t.Fatalf("tab-only organization name error = %v, want organizations_display_name_nonblank", err)
+	}
+
+	_, err = repository.pool.Exec(context.Background(), `
+		INSERT INTO organizations (slug, display_name)
+		VALUES ($1, $2)
+	`, "long-display-name", strings.Repeat("a", maxNameSize+1))
+	if err == nil || !strings.Contains(err.Error(), "organizations_display_name_nonblank") {
+		t.Fatalf("long organization display name error = %v, want organizations_display_name_nonblank", err)
 	}
 
 	_, err = repository.pool.Exec(context.Background(), `

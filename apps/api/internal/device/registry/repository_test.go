@@ -2,6 +2,7 @@ package registry
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -26,6 +27,8 @@ func TestValidateOrganization(t *testing.T) {
 		{name: "uppercase slug", slug: "Pulsegrid", displayName: "Pulsegrid", wantErr: true},
 		{name: "leading hyphen", slug: "-pulsegrid", displayName: "Pulsegrid", wantErr: true},
 		{name: "blank name", slug: "pulsegrid", displayName: "   ", wantErr: true},
+		{name: "display name too long", slug: "pulsegrid", displayName: strings.Repeat("a", maxNameSize+1), wantErr: true},
+		{name: "trimmed display name too long", slug: "pulsegrid", displayName: " " + strings.Repeat("a", maxNameSize), wantErr: true},
 		{name: "long slug", slug: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", displayName: "Pulsegrid", wantErr: true},
 		{name: "invalid display name encoding", slug: "pulsegrid", displayName: string([]byte{0xff}), wantErr: true},
 	}
@@ -53,6 +56,8 @@ func TestValidateDeviceInput(t *testing.T) {
 		{name: "blank key", input: CreateDeviceInput{DeviceKey: "", DisplayName: "Temperature"}},
 		{name: "surrounding whitespace key", input: CreateDeviceInput{DeviceKey: " sensor-01", DisplayName: "Temperature"}},
 		{name: "blank display name", input: CreateDeviceInput{DeviceKey: "sensor-01", DisplayName: "  "}},
+		{name: "display name too long", input: CreateDeviceInput{DeviceKey: "sensor-01", DisplayName: strings.Repeat("a", maxNameSize+1)}},
+		{name: "trimmed display name too long", input: CreateDeviceInput{DeviceKey: "sensor-01", DisplayName: " " + strings.Repeat("a", maxNameSize)}},
 		{name: "long key", input: CreateDeviceInput{DeviceKey: string(make([]byte, maxDeviceKeySize+1)), DisplayName: "Temperature"}},
 		{name: "invalid key encoding", input: CreateDeviceInput{DeviceKey: string([]byte{0xff}), DisplayName: "Temperature"}},
 	}
