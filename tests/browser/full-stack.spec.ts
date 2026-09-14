@@ -23,6 +23,69 @@ test.describe('full-stack API readiness', () => {
     await expect(page.getByRole('status')).toHaveText('Local API is ready.')
   })
 
+  test('maps a hung readiness request to unavailable with a retry action', async ({ page }) => {
+    await page.route('**/api/operational/ready', async (route) => {
+      await new Promise(resolve => setTimeout(resolve, 4_000))
+      try {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'ready' }),
+        })
+      }
+      catch {
+        // The client timeout is expected to abort this request first.
+      }
+    })
+
+    await page.goto('/')
+    await expect(page.getByRole('status')).toHaveText('Checking the local API…')
+    await expect(page.getByRole('status')).toHaveText('Local API is unavailable.', { timeout: 5_000 })
+    await expect(page.getByRole('button', { name: 'Retry connection' })).toBeVisible()
+  })
+
+  test('does not let an unmounted readiness request update the next page', async ({ page }) => {
+    let releaseFirst!: () => void
+    const firstPending = new Promise<void>((resolve) => {
+      releaseFirst = resolve
+    })
+    let requestCount = 0
+
+    await page.route('**/api/operational/ready', async (route) => {
+      requestCount += 1
+      if (requestCount === 1) {
+        await firstPending
+        try {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ status: 'ready' }),
+          })
+        }
+        catch {
+          // The first page is expected to abort this request during navigation.
+        }
+        return
+      }
+
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'unavailable' }),
+      })
+    })
+
+    await page.goto('/')
+    await expect(page.getByRole('status')).toHaveText('Checking the local API…')
+    await page.goto('about:blank')
+    await page.goto('/')
+    await expect.poll(() => requestCount).toBeGreaterThan(1)
+    await expect(page.getByRole('status')).toHaveText('Local API is unavailable.')
+
+    releaseFirst()
+    await expect(page.getByRole('status')).toHaveText('Local API is unavailable.')
+  })
+
   test('recovers after the Go process is stopped and restarted', async ({ page, apiProcess }) => {
     await page.goto('/')
     await expect(page.getByRole('status')).toHaveText('Local API is ready.')

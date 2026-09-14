@@ -3,6 +3,7 @@ import type { BackendReadiness } from '../../shared/backend-readiness'
 
 type ReadinessState = 'checking' | 'ready' | 'unavailable'
 
+const READINESS_TIMEOUT_MS = 2_000
 const state = ref<ReadinessState>('checking')
 let requestId = 0
 let requestController: AbortController | undefined
@@ -10,12 +11,14 @@ let requestController: AbortController | undefined
 const checkReadiness = async () => {
   const currentRequestId = ++requestId
   requestController?.abort()
-  requestController = new AbortController()
+  const controller = new AbortController()
+  requestController = controller
+  const timeout = setTimeout(() => controller.abort(), READINESS_TIMEOUT_MS)
   state.value = 'checking'
 
   try {
     const result = await $fetch<BackendReadiness>('/api/operational/ready', {
-      signal: requestController.signal,
+      signal: controller.signal,
     })
     if (currentRequestId === requestId) {
       state.value = result.status === 'ready' ? 'ready' : 'unavailable'
@@ -23,6 +26,9 @@ const checkReadiness = async () => {
   }
   catch {
     if (currentRequestId === requestId) state.value = 'unavailable'
+  }
+  finally {
+    clearTimeout(timeout)
   }
 }
 
