@@ -22,6 +22,7 @@ describe('parseBackendOrigin', () => {
 
   it.each([
     '',
+    '   ',
     'http://localhost:8080',
     'https://127.0.0.1:8080',
     'http://127.0.0.1:8080/path',
@@ -34,6 +35,7 @@ describe('parseBackendOrigin', () => {
   it('requires the isolated test origin and keeps production origin private', () => {
     expect(() => parseBackendOrigin('http://127.0.0.1:8080', 'test')).toThrow('18080')
     expect(parseBackendOrigin('', 'production')).toBeUndefined()
+    expect(() => parseBackendOrigin('   ', 'production')).toThrow('NUXT_BACKEND_ORIGIN')
     expect(() => parseBackendOrigin('http://127.0.0.1:8080', 'production')).toThrow('not supported')
   })
 })

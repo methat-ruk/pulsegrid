@@ -5,10 +5,17 @@ export type AppEnvironment = (typeof APP_ENVIRONMENTS)[number]
 const backendOriginError = 'NUXT_BACKEND_ORIGIN must be an HTTP loopback origin with no path, credentials, query, or fragment'
 
 export function parseBackendOrigin(value: unknown, environment: AppEnvironment): string | undefined {
-  if (typeof value !== 'string' || value.trim() === '') {
+  if (typeof value !== 'string') {
     if (environment === 'production') return undefined
     throw new Error(`${backendOriginError}; it is required in ${environment}`)
   }
+
+  if (value === '') {
+    if (environment === 'production') return undefined
+    throw new Error(`${backendOriginError}; it is required in ${environment}`)
+  }
+
+  if (value.trim() === '') throw new Error(backendOriginError)
 
   if (environment === 'production') {
     throw new Error('NUXT_BACKEND_ORIGIN is not supported in production')

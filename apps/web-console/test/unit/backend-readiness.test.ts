@@ -49,4 +49,21 @@ describe('fetchBackendReadiness', () => {
   it('maps a refused connection to unavailable', async () => {
     await expect(fetchBackendReadiness('http://127.0.0.1:1')).resolves.toEqual({ status: 'unavailable' })
   })
+
+  it('maps a slow upstream to unavailable within the bounded timeout', async () => {
+    const origin = await startServer(() => {
+      // Deliberately leave the response open so the adapter's timeout is exercised.
+    })
+
+    await expect(fetchBackendReadiness(origin)).resolves.toEqual({ status: 'unavailable' })
+  })
+
+  it('maps an oversized upstream body to unavailable', async () => {
+    const origin = await startServer((_request, response) => {
+      response.setHeader('content-type', 'application/json')
+      response.end('x'.repeat(1_025))
+    })
+
+    await expect(fetchBackendReadiness(origin)).resolves.toEqual({ status: 'unavailable' })
+  })
 })

@@ -1,16 +1,39 @@
 import { once } from 'node:events'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { access } from 'node:fs/promises'
+import { createConnection } from 'node:net'
 import { join } from 'node:path'
 
 import { test as base } from '@playwright/test'
 
-const apiURL = 'http://127.0.0.1:18080/health/ready'
+const apiHost = '127.0.0.1'
+const apiPort = 18080
+const apiURL = `http://${apiHost}:${apiPort}/health/ready`
 const apiBinary = join(process.cwd(), '.output', 'api-test')
 
 export type ApiProcess = {
   start: () => Promise<void>
   stop: () => Promise<void>
+}
+
+export async function assertPortAvailable(): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const socket = createConnection({ host: apiHost, port: apiPort })
+    const timer = setTimeout(() => finish(new Error(`API test port ${apiPort} availability check timed out`)), 500)
+
+    const finish = (error?: Error) => {
+      clearTimeout(timer)
+      socket.destroy()
+      if (error) reject(error)
+      else resolve()
+    }
+
+    socket.once('connect', () => finish(new Error(`API test port ${apiPort} is already in use`)))
+    socket.once('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'ECONNREFUSED') finish()
+      else finish(error)
+    })
+  })
 }
 
 async function waitForAPI(child: ChildProcess): Promise<void> {
@@ -47,6 +70,7 @@ async function createAPIProcess(): Promise<ApiProcess> {
 
   const start = async () => {
     if (child && child.exitCode === null) return
+    await assertPortAvailable()
     child = spawn(apiBinary, [], {
       env: {
         ...process.env,
@@ -58,7 +82,14 @@ async function createAPIProcess(): Promise<ApiProcess> {
       },
       stdio: 'ignore',
     })
-    await waitForAPI(child)
+    try {
+      await waitForAPI(child)
+    }
+    catch (error) {
+      await stopProcess(child)
+      child = undefined
+      throw error
+    }
   }
 
   const stop = async () => {
