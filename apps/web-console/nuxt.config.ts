@@ -16,6 +16,7 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     appEnv: '',
+    backendOrigin: '',
   },
   compatibilityDate: '2025-07-15',
   typescript: {

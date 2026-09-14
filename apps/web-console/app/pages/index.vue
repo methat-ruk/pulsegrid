@@ -12,6 +12,7 @@ useHead({
     >
       PulseGrid Console
     </h1>
+    <ApiReadiness />
     <PlannedState />
   </section>
 </template>

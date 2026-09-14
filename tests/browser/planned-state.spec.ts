@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures'
 
 const viewports = [
   { name: 'desktop', width: 1440, height: 900 },
@@ -24,6 +24,7 @@ for (const viewport of viewports) {
       await expect(page).toHaveTitle('PulseGrid Console')
       await expect(page.getByRole('heading', { name: 'PulseGrid Console' })).toBeVisible()
       await expect(page.getByRole('heading', { name: 'Product data is not connected yet.' })).toBeVisible()
+      await expect(page.getByRole('status')).toHaveText('Local API is ready.')
 
       const dimensions = await page.evaluate(() => ({
         clientWidth: document.documentElement.clientWidth,

@@ -35,6 +35,7 @@ and are review artifacts only; they are not published or served at runtime.
 | Surface | Protocol | Status | Source of truth |
 | --- | --- | --- | --- |
 | Process health | REST/HTTP | Implemented in FND-001 | [`operational.yaml`](../../apps/api/api/openapi/operational.yaml) |
+| Console readiness adapter | Same-origin Nuxt server route | Implemented in FND-004; local process-readiness adapter only | [`ready.get.ts`](../../apps/web-console/server/api/operational/ready.get.ts) and the FND-001 operational contract |
 | Operator product API | GraphQL/gqlgen | Planned for MVP-002 | `apps/api/graph/schema/*.graphqls` when introduced |
 | Device telemetry | MQTT | Planned for MVP-004 onward | AsyncAPI/message schema when a concrete flow exists |
 | Device commands | MQTT | Planned for MVP-011 onward | AsyncAPI/message schema when a concrete flow exists |
@@ -42,8 +43,10 @@ and are review artifacts only; they are not published or served at runtime.
 | Internal synchronous service calls | gRPC/Protobuf | Post-MVP conditional | A flow-specific protobuf contract |
 
 REST is intentionally limited to operational HTTP in the current foundation.
-The console product API will use GraphQL; no parallel REST CRUD API is created
-without a separate consumer and an approved boundary.
+The Nuxt route is a fixed same-origin adapter for the console's local readiness
+indicator; it is not a second product REST API or a generic proxy. The console
+product API will use GraphQL; no parallel REST CRUD API is created without a
+separate consumer and an approved boundary.
 
 ## Current operational contract
 

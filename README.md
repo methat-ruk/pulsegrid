@@ -8,10 +8,10 @@ Operate fleets
 ![Status](https://img.shields.io/badge/status-foundation--in--progress-yellow)
 
 > [!IMPORTANT]
-> PulseGrid's documentation foundation, Go API foundation, and Nuxt console
-> foundation are implemented and locally validated. Full-stack integration,
-> product APIs, runtime dependencies, and final CI merge-gate validation remain
-> on the roadmap.
+> PulseGrid's documentation foundation, Go API foundation, Nuxt console
+> foundation, and FND-004 local readiness integration are implemented and
+> locally validated. Product APIs, runtime dependencies, and production
+> readiness remain on the roadmap.
 
 ## What is PulseGrid?
 
@@ -106,10 +106,11 @@ The decision state and adoption trigger for each technology are maintained in
 - Dependency-ordered Foundation and MVP plans: documented.
 - Go/Fiber API foundation: implemented and locally validated.
 - Nuxt console foundation: implemented and locally validated as a truthful
-  planned-state shell; it has no backend connection yet.
+  planned-state shell with a narrow local readiness adapter to the Go API.
 - Database, MQTT, and product APIs: not started.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
-  first GitHub run passed, while merge-gate enablement remains pending.
+  required checks include browser evidence for the real local API readiness
+  journey.
 - Production readiness: out of current scope.
 
 Claims in this README should change from planned to implemented only after the
@@ -134,7 +135,8 @@ and linked feature plans.
 ## Development entry points
 
 The Go API foundation and Nuxt console are runnable independently, and the
-repository-wide commands are composed at the root. See the
+repository-wide commands are composed at the root. FND-004 also provides an
+isolated full-stack browser smoke with a real Go process. See the
 [canonical local-development guide](docs/project-setup/local-development.md)
 for setup and validation commands.
 
