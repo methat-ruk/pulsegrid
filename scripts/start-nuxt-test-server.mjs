@@ -1,10 +1,16 @@
 import { spawn } from 'node:child_process'
 import process from 'node:process'
 
+if (process.env.NUXT_BACKEND_ORIGIN !== 'http://127.0.0.1:18080') {
+  console.error('NUXT_BACKEND_ORIGIN must be http://127.0.0.1:18080 for browser tests')
+  process.exit(1)
+}
+
 const server = spawn(process.execPath, ['apps/web-console/.output/server/index.mjs'], {
   env: {
     ...process.env,
     NUXT_APP_ENV: 'test',
+    NUXT_BACKEND_ORIGIN: 'http://127.0.0.1:18080',
     NITRO_HOST: '127.0.0.1',
     NITRO_PORT: '4173',
   },

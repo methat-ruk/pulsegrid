@@ -13,9 +13,10 @@ by the [roadmap](../roadmap/roadmap.md).
 ## Current state
 
 The Go/Fiber API foundation is implemented and validated as one modular process
-with lifecycle and health endpoints only. No product API, database schema,
-event contract, frontend runtime, or deployment topology has been implemented
-or validated yet.
+with lifecycle and health endpoints only. The Nuxt console has a local,
+server-only readiness adapter that consumes the fixed `/health/ready` contract;
+no product API, database schema, event contract, or deployment topology has
+been implemented or validated yet.
 
 Architecture diagrams below describe an intended sequence of evolution. They
 must not be read as deployed topology.
@@ -114,7 +115,7 @@ ownership evidence identifies a separate scaling or failure unit.
 | Rules and alerts | Limited threshold definitions, evaluation result, alert lifecycle | General workflow automation |
 | Commands | Command intent, valid state transitions, delivery/ACK/result/timeout state | Device profile or transport-wide policy |
 | API/BFF | GraphQL contract and composition for the console | Direct ownership of domain persistence |
-| Web console | Operator journeys and presentation state | Domain authority or secret-bearing configuration |
+| Web console | Operator journeys, presentation state, and the narrow local readiness adapter | Domain authority, product API authority, or secret-bearing configuration |
 
 Modules may share one PostgreSQL deployment in the MVP, but each module should
 own its tables and write paths. Cross-module behavior should go through narrow

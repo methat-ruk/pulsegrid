@@ -1,12 +1,11 @@
 # PulseGrid local development
 
 Status: Local repository workflow and merge-gate enforcement implemented;
-FND-003 acceptance evidence is recorded. PR #3 remains Draft and unmerged by
-explicit request.
+FND-004 local full-stack readiness flow is implemented and validated.
 
 This is the canonical guide for setting up and validating the repository. The
-Go API and Nuxt console remain independently runnable until FND-004 introduces
-the first full-stack development mode.
+Go API and Nuxt console remain independently runnable, with an opt-in local
+readiness adapter for the first full-stack development feedback loop.
 
 ## Requirements
 
@@ -56,18 +55,25 @@ corepack pnpm run dev:api
 corepack pnpm run dev:web
 ```
 
-The API uses `PULSEGRID_ENV=development` and its existing local listener. The
-console uses its existing `.env.development` contract; copy the reviewed
-example first if the file does not exist:
+The API uses `PULSEGRID_ENV=development` and listens on
+`http://127.0.0.1:8080` by default. The console uses its `.env.development`
+contract; copy the reviewed examples first if the files do not exist:
 
 ```sh
 cp apps/api/.env.development.example apps/api/.env.development
 cp apps/web-console/.env.development.example apps/web-console/.env.development
 ```
 
-Do not add backend URLs, credentials, tokens, or browser-public runtime keys to
-these foundation examples. FND-004 owns the first frontend-to-backend routing
-key.
+`NUXT_BACKEND_ORIGIN` is a server-only development key. It points only to the
+loopback API origin and is consumed by the Nuxt same-origin readiness adapter;
+it is never exposed through `runtimeConfig.public` or forwarded from the
+browser. Do not add credentials, tokens, or other private service URLs to
+frontend examples.
+
+With both processes running, open `http://127.0.0.1:3000` (or the port shown by
+Nuxt). The shell checks `GET /api/operational/ready` and offers a manual Retry
+when the local API is stopped or starting. This adapter covers process
+readiness only; it is not a product API or a generic proxy.
 
 ### Isolated browser smoke
 
@@ -80,9 +86,11 @@ running it:
 corepack pnpm run test:browser
 ```
 
-This smoke covers planned-state rendering, responsive reflow including 320px,
+This smoke builds the API test binary and Nuxt test artifact, starts both in an
+isolated process lifecycle, and covers planned-state rendering, readiness
+success/unavailable/recovery, responsive reflow including 320px,
 horizontal-overflow absence, keyboard navigation, page errors, and browser
-console errors. It does not claim a backend journey.
+console errors.
 
 ## Validation commands
 

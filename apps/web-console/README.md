@@ -1,8 +1,8 @@
 # PulseGrid Web Console
 
-This directory owns the initial Vue/Nuxt console shell. It currently renders a
-truthful planned state and does not connect to a backend or expose product
-domain behavior.
+This directory owns the Vue/Nuxt console shell. It renders a truthful planned
+state and includes a narrow, server-only readiness adapter for the local Go
+API; it does not expose product domain behavior or a generic backend proxy.
 
 ## Requirements
 
@@ -41,8 +41,11 @@ NUXT_APP_ENV=production corepack pnpm --filter @pulsegrid/web-console build
 NUXT_APP_ENV=production corepack pnpm --filter @pulsegrid/web-console preview
 ```
 
-Do not add backend URLs, credentials, tokens, or browser-public runtime keys to
-this foundation. The first API routing key belongs to FND-004.
+`NUXT_BACKEND_ORIGIN` is a private runtime key used only in development and
+test. Development accepts `http://127.0.0.1:8080`; test accepts
+`http://127.0.0.1:18080`. Production rejects the key so a deployment cannot
+silently target a local service. The value remains outside
+`runtimeConfig.public`.
 
 ## Checks
 
@@ -55,10 +58,11 @@ corepack pnpm --filter @pulsegrid/web-console test
 corepack pnpm --filter @pulsegrid/web-console build
 ```
 
-Browser verification must cover the planned-state route at desktop, tablet,
-mobile, and 320px widths, including keyboard focus and reduced-motion behavior.
-The repository-root `corepack pnpm run test:browser` command owns the isolated
-test-mode build and server lifecycle for that evidence.
+Browser verification covers the planned-state route at desktop, tablet,
+mobile, and 320px widths, including keyboard focus and reduced-motion behavior,
+plus the readiness success, unavailable, and recovery states. The repository-
+root `corepack pnpm run test:browser` command owns the isolated test-mode build,
+real Go API process, and server lifecycle for that evidence.
 
 ## Known diagnostics and warnings
 

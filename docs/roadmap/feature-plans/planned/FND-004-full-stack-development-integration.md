@@ -1,6 +1,6 @@
 # FND-004 — Full-Stack Development Integration
 
-Status: Planned
+Status: Implementation in progress; local validation complete, CI evidence pending
 
 Branch: `feat/fnd-004-full-stack-development-integration`
 
@@ -153,7 +153,7 @@ Browser (same origin, relative GET /api/operational/ready)
 5. Keep the real Go process and Nuxt route in the browser success and
    unavailable/retry/recovery tests: stop Go, observe the browser's unavailable
    state after a check, restart Go, and verify a manual retry becomes ready.
-   Use focused Nuxt-route tests for controlled `503`, malformed response,
+   Use focused server-adapter tests for controlled `503`, malformed response,
    redirect, and timeout cases that the normal Go process cannot generate
    reliably. Update the existing planned-state browser assertions for the
    new status without weakening their layout, keyboard, or console checks.
@@ -204,8 +204,8 @@ Browser (same origin, relative GET /api/operational/ready)
 | Guarantee | Required evidence |
 | --- | --- |
 | Origin and configuration isolation | Parser/startup tests for valid development/test origins, missing/invalid values, credentials/path/query/fragment, non-loopback host, test-to-development fallback rejection, and production with no local routing key |
-| Narrow/safe HTTP route | GET-only route tests for `200/ready`, Go `503/not_ready`, refused connection, timeout, redirect, malformed or unexpected response, safe `503` mapping, no-store behavior, no arbitrary header/cookie forwarding, and no leaked upstream details |
-| Browser-visible behavior | Component tests for checking/ready/unavailable/retry and stale-request handling; accessible label/live feedback; planned-product message remains truthful |
+| Narrow/safe HTTP route | Focused server-adapter tests for `200/ready`, Go `503/not_ready`, refused connection, redirect, malformed or unexpected response, bounded body handling, safe unavailable mapping, and no leaked upstream details; the thin Nuxt route sets `no-store` and owns the stable boundary status |
+| Browser-visible behavior | Playwright assertions for checking/ready/unavailable/retry and stale-request-safe manual recovery; accessible label/live feedback; planned-product message remains truthful |
 | Real full-stack composition | Playwright starts the built Nuxt test server; its fixture starts the real Go test binary; the browser requests the same-origin route; resulting ready state is backed by actual Go `/health/ready`, not a mocked network response |
 | Degraded/recovery UI | Playwright stops the real Go child process, verifies the browser becomes unavailable after a check, restarts Go, and verifies manual retry → ready through the unchanged Nuxt route. Focused route tests separately cover malformed/slow/redirect responses. |
 | Runtime and artifact safety | Development manual stop/restart check; test port-conflict/teardown check; production build remains green; backend-origin sentinel absent from HTML, hydration payload, and client assets |

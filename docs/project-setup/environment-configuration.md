@@ -1,6 +1,6 @@
 # Environment and Configuration Strategy
 
-Status: Planning source of truth
+Status: Configuration contract and validation source of truth
 
 ## Purpose
 
@@ -31,8 +31,8 @@ Applications will recognize exactly these logical environments:
 
 The Go application uses `PULSEGRID_ENV`. The Nuxt application uses the
 server-only `NUXT_APP_ENV` key implemented by FND-002; it maps to the same
-three logical environments without exposing backend configuration. Its public
-runtime-config object is intentionally empty until a browser consumer exists.
+three logical environments. FND-004 adds a private `NUXT_BACKEND_ORIGIN` for
+the local readiness adapter; the public runtime-config object remains empty.
 
 The repository root `.go-version` pins the Go toolchain for goenv. This is a
 developer-tool selection only; the API module remains the source of truth for
@@ -150,10 +150,21 @@ FND-002 introduces one server-only application-environment key:
 | --- | --- | --- |
 | `NUXT_APP_ENV` | Exact enum value; development may load `.env.development`, while tests inject `test` deterministically | Exact value `production` is injected by the runtime; development and test files are not auto-loaded |
 
-Nuxt validates the key during Nitro startup. `runtimeConfig.public` remains
-empty, so this foundation exposes no API origin, credential, or other private
-runtime value to the browser. The first browser-consumed API routing key is
-owned by FND-004.
+### FND-004 Nuxt readiness key
+
+| Key | Development | Test | Production |
+| --- | --- | --- | --- |
+| `NUXT_BACKEND_ORIGIN` | Required loopback origin `http://127.0.0.1:8080` when using the local readiness adapter | Required isolated loopback origin `http://127.0.0.1:18080`; never falls back to development | Must be absent; startup rejects it |
+
+The key is private Nitro runtime configuration. The adapter calls only the
+fixed backend path `/health/ready`, accepts only the exact `200`
+`{"status":"ready"}` response, bounds the response and timeout, and maps all
+other outcomes to a generic unavailable state. It does not forward arbitrary
+headers, cookies, credentials, or paths and is not a general REST proxy.
+
+Nuxt validates these keys during Nitro startup. `runtimeConfig.public` remains
+empty, so the browser receives no API origin, credential, or other private
+runtime value.
 
 ## Delivery sequence
 
@@ -162,9 +173,11 @@ owned by FND-004.
    for the variables it actually uses. (FND-001 complete.)
 3. The Nuxt foundation implements and validates the server-only
    `NUXT_APP_ENV` boundary; its public runtime configuration remains empty.
-4. Repository CI supplies the `test` environment explicitly and verifies that
+4. FND-004 adds and validates the private loopback readiness origin and proves
+   test isolation with a real Go process in browser smoke.
+5. Repository CI supplies the `test` environment explicitly and verifies that
    test configuration cannot target development resources.
-5. PostgreSQL and MQTT plans add their variables and example values when the
+6. PostgreSQL and MQTT plans add their variables and example values when the
    dependencies are introduced.
 6. Production hardening defines the deployment secret provider, rotation,
    access controls, and production-mode smoke validation.

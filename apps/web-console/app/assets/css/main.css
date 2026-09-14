@@ -229,6 +229,75 @@ a {
   line-height: 1.1;
 }
 
+.api-readiness {
+  margin-top: 28px;
+  border: 1px solid var(--pulse-border);
+  border-radius: 14px;
+  background: var(--pulse-surface-elevated);
+  box-shadow: var(--pulse-shadow-card);
+  padding: 20px 24px;
+}
+
+.api-readiness-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.api-readiness-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--pulse-primary-soft);
+  color: var(--pulse-primary-hover);
+}
+
+.api-readiness-title,
+.api-readiness-status,
+.api-readiness-description {
+  margin: 0;
+}
+
+.api-readiness-title {
+  color: var(--pulse-text-primary);
+  font-size: 16px;
+  font-weight: 750;
+}
+
+.api-readiness-status {
+  margin-top: 4px;
+  color: var(--pulse-text-primary);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.api-readiness-description {
+  margin-top: 4px;
+  color: var(--pulse-text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.api-readiness-retry {
+  min-height: 40px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--pulse-primary);
+  color: #f7faf8;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.api-readiness-retry:hover {
+  background: var(--pulse-primary-hover);
+}
+
 .planned-state {
   display: flex;
   min-height: 280px;
