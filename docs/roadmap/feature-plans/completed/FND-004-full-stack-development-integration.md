@@ -3,10 +3,10 @@
 Status: Complete
 
 Review state: Implemented, reviewed, and validated on 2026-09-14. The final
-candidate is commit `1b72111`; required CI run `34798900239` passed all twelve
-contexts, with `browser-smoke` completing in 1m12s. A preceding review-fix run
-completed the same browser job in 1m23s. Local frontend tests passed 27/27 and
-the targeted browser readiness run passed 11/11.
+implementation candidate is commit `c8ee6f1`; required CI run `34799483571`
+passed all twelve contexts, with `browser-smoke` completing in 1m22s. Local
+frontend tests passed 27/27 and the full browser suite passed 13/13, including
+bounded client timeout and unmounted stale-response cases.
 
 Branch: `feat/fnd-004-full-stack-development-integration`
 
@@ -211,11 +211,11 @@ Browser (same origin, relative GET /api/operational/ready)
 | --- | --- |
 | Origin and configuration isolation | Parser/startup tests for valid development/test origins, missing/invalid values, credentials/path/query/fragment, non-loopback host, test-to-development fallback rejection, and production with no local routing key |
 | Narrow/safe HTTP route | Focused server-adapter tests for `200/ready`, Go `503/not_ready`, refused connection, redirect, malformed or unexpected response, bounded body handling, safe unavailable mapping, and no leaked upstream details; the thin Nuxt route sets `no-store` and owns the stable boundary status |
-| Browser-visible behavior | Playwright assertions for checking/ready/unavailable/retry and stale-request-safe manual recovery; accessible label/live feedback; planned-product message remains truthful |
+| Browser-visible behavior | Playwright assertions for checking/ready/unavailable/retry, bounded client timeout, and stale-request-safe unmount recovery; accessible label/live feedback; planned-product message remains truthful |
 | Real full-stack composition | Playwright starts the built Nuxt test server; its fixture starts the real Go test binary; the browser requests the same-origin route; resulting ready state is backed by actual Go `/health/ready`, not a mocked network response |
 | Degraded/recovery UI | Playwright stops the real Go child process, verifies the browser becomes unavailable after a check, restarts Go, and verifies manual retry → ready through the unchanged Nuxt route. Focused route tests separately cover malformed/slow/redirect responses. |
 | Runtime and artifact safety | Development manual stop/restart check; test port-conflict/teardown check; production build remains green; backend-origin sentinel absent from HTML, hydration payload, and client assets |
-| Regression and CI | Existing browser viewport/keyboard/console assertions remain meaningful; local focused checks and all twelve required CI contexts passed on the final candidate; successive PR timing observations remained below the approximately two-minute browser critical-path target |
+| Regression and CI | Existing browser viewport/keyboard/console assertions remain meaningful; local frontend checks and all twelve required CI contexts passed on the final candidate; browser critical path remained below the approximately two-minute target |
 
 ## Documentation Updates
 
