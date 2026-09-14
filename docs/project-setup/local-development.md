@@ -11,7 +11,8 @@ readiness adapter for the first full-stack development feedback loop.
 
 - Node `24.20.0` from `.node-version`;
 - pnpm `12.3.4` through Corepack;
-- Go `1.27.1` from `.go-version`.
+- Go `1.27.1` from `.go-version`;
+- Docker Compose with the pinned PostgreSQL image available locally.
 
 Verify the selected versions before setup:
 
@@ -75,6 +76,113 @@ Nuxt). The shell checks `GET /api/operational/ready` and offers a manual Retry
 when the local API is stopped or starting. This adapter covers process
 readiness only; it is not a product API or a generic proxy.
 
+### Local PostgreSQL and persistence tests
+
+MVP-001 keeps database startup explicit and separate from the health-only API.
+Copy the API example, set a disposable password in the ignored file, and run:
+
+```sh
+cp apps/api/.env.development.example apps/api/.env.development
+corepack pnpm run db:dev:up
+corepack pnpm run db:dev:migrate
+corepack pnpm run db:dev:seed
+corepack pnpm run db:dev:status
+```
+
+### Migration preflight and recovery
+
+Migration `004` makes the database whitespace rules match Go's Unicode
+`strings.TrimSpace`. It intentionally does not rewrite existing rows. Before
+applying it to a development volume that may contain data created by an older
+checkout, run this read-only preflight from `psql`:
+
+```sql
+WITH whitespace(chars) AS (
+  VALUES (U&'\0009\000A\000B\000C\000D\0020\0085\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000')
+)
+SELECT 'organizations' AS table_name, id, 'display_name' AS column_name,
+       'length_or_unicode_whitespace' AS violation, display_name AS value
+FROM organizations, whitespace
+WHERE char_length(display_name) NOT BETWEEN 1 AND 200
+   OR char_length(btrim(display_name, whitespace.chars)) = 0
+UNION ALL
+SELECT 'devices', id, 'device_key', 'length_or_unicode_whitespace', device_key
+FROM devices, whitespace
+WHERE char_length(device_key) NOT BETWEEN 1 AND 128
+   OR device_key <> btrim(device_key, whitespace.chars)
+UNION ALL
+SELECT 'devices', id, 'display_name', 'length_or_unicode_whitespace', display_name
+FROM devices, whitespace
+WHERE char_length(display_name) NOT BETWEEN 1 AND 200
+   OR char_length(btrim(display_name, whitespace.chars)) = 0;
+```
+
+An empty result is safe to continue with `corepack pnpm run db:dev:migrate`.
+If rows are returned, stop before retrying the migration. Keep the rows for
+review, choose an explicit valid replacement for each affected `device_key`
+(1–128 characters with no surrounding Unicode whitespace; it is an identity
+value), and choose a nonblank display name of at most 200 characters for
+affected display-name rows. Apply those data changes only after confirming the
+local data is disposable or obtaining the appropriate data-owner decision, then
+rerun the migration and check its status. Do not use `migrate down`, delete a
+volume, or run a broad Compose teardown as a migration-recovery shortcut.
+
+The development service binds only to `127.0.0.1:5432`; `db:dev:stop` stops its
+container without deleting the container or named volume. Use `db:dev:down`
+when the container and Compose network should be removed; it also preserves
+the named volume and its data. The isolated integration workflow owns a
+unique Compose project and the test port `127.0.0.1:15432`:
+
+```sh
+corepack pnpm run api:test:integration
+```
+
+It fails when the test port is already in use, migrates the disposable
+database twice, runs the tagged real-PostgreSQL tests, and removes only its
+own container, volume, and network. Do not use a broad `docker compose down -v`
+in this repository because it can erase development data.
+
+To inspect development data, no host-side `psql` installation is needed—the
+official PostgreSQL image includes the client:
+
+```sh
+corepack pnpm run db:dev:psql
+```
+
+The command resolves the Compose service instead of depending on a generated
+container name. Pass normal `psql` arguments after `--`, for example
+`corepack pnpm run db:dev:psql -- -c '\dt'`. If you use zsh and want shorter
+commands from the repository root, add these optional functions to `~/.zshrc`:
+
+```zsh
+pgdevup() {
+  corepack pnpm run db:dev:up
+}
+
+pgdevstop() {
+  corepack pnpm run db:dev:stop
+}
+
+pgdevdown() {
+  corepack pnpm run db:dev:down
+}
+
+pgdev() {
+  corepack pnpm run db:dev:psql -- "$@"
+}
+```
+
+Use `pgdevup` to start the persistent development database, `pgdev` or
+`pgdev -c '\dt'` to inspect it, `pgdevstop` to stop the service while keeping
+the container and volume, and `pgdevdown` to remove the container and network
+while keeping the volume. A persistent `pgtest` alias is not provided because
+`api:test:integration` deliberately creates a disposable database with a
+random Compose project and removes it after the run.
+
+The repository's Zed settings pass `-tags=integration` to `gopls`, so tagged
+integration files remain navigable without changing the normal no-database Go
+test command. Restart the Go language server after changing this setting.
+
 ### Isolated browser smoke
 
 The browser command builds the console with `NUXT_APP_ENV=test`, starts that
@@ -98,6 +206,8 @@ console errors.
 | --- | --- |
 | `corepack pnpm run format` | Apply Go formatting and the existing frontend ESLint fix behavior |
 | `corepack pnpm run format:check` | Check Go formatting and frontend stylistic lint without rewriting |
+| `corepack pnpm run api:modernize` | Check pinned Go modernization analyzers across normal and `integration` build-tagged code |
+| `corepack pnpm run api:staticcheck` | Run the pinned Staticcheck suite across normal and `integration` build-tagged code |
 | `corepack pnpm run lint` | Go vet, frontend lint, and OpenAPI lint |
 | `corepack pnpm run typecheck` | Nuxt/TypeScript typecheck |
 | `corepack pnpm run test` | Go tests and frontend Vitest in explicit test mode |
@@ -105,8 +215,9 @@ console errors.
 | `corepack pnpm run build` | Go compilation and Nuxt production build |
 | `corepack pnpm run openapi` | Lint, bundle, and static HTML rendering into ignored `.openapi/` |
 | `corepack pnpm run audit` | Node production audit and reachable Go vulnerability scan |
-| `corepack pnpm run check:fast` | Fast pre-CI handoff: formatting, lint, typecheck, and ordinary tests |
-| `corepack pnpm run check` | Full pre-CI handoff, including race, build, OpenAPI, audits, and browser smoke |
+| `corepack pnpm run check:fast` | Fast pre-CI handoff: formatting, Go modernization/static analysis, lint, typecheck, and ordinary tests |
+| `corepack pnpm run api:test:integration` | Isolated real-PostgreSQL migration, repository, constraint, and tenant-scope evidence |
+| `corepack pnpm run check` | Full pre-CI handoff, including race, build, OpenAPI, audits, database integration, and browser smoke |
 
 The pre-commit hook runs only staged Go formatting, staged frontend ESLint,
 staged OpenAPI lint, and the tracked environment-filename policy. Hooks are

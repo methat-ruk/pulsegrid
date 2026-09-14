@@ -81,9 +81,12 @@ platform foundation” is not an acceptable PR boundary.
 - [FND-003 — Repository quality and local workflow](completed/FND-003-repository-quality-and-local-workflow.md)
 - [FND-004 — Full-stack development integration](completed/FND-004-full-stack-development-integration.md)
 
+### MVP — completed
+
+- [MVP-001 — Tenant and device persistence](completed/MVP-001-tenant-device-persistence.md)
+
 ### MVP — Device registry
 
-- [MVP-001 — Tenant and device persistence](planned/MVP-001-tenant-device-persistence.md)
 - [MVP-002 — Device GraphQL API](planned/MVP-002-device-graphql-api.md)
 - [MVP-003 — Device registry console](planned/MVP-003-device-registry-console.md)
 

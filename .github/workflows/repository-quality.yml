@@ -25,6 +25,28 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Check pnpm version
+        run: test "$(corepack pnpm --version)" = "12.3.4"
+      - name: Resolve pnpm store
+        id: pnpm-store
+        shell: bash
+        run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - name: Restore pnpm store
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-
+      - name: Install repository tooling
+        run: corepack pnpm install --frozen-lockfile --ignore-scripts --filter pulsegrid
       - name: Validate repository policy
         run: node scripts/check-repository-policy.mjs
 
@@ -40,9 +62,19 @@ jobs:
         with:
           go-version-file: .go-version
           cache: true
-          cache-dependency-path: apps/api/go.sum
+          cache-dependency-path: |
+            apps/api/go.sum
+            package.json
       - name: Check Go formatting
         run: node scripts/go-format.mjs
+      - name: Run Go modernization checks
+        working-directory: apps/api
+        env:
+          GOFLAGS: -tags=integration
+        run: go run golang.org/x/tools/go/analysis/passes/modernize/cmd/modernize@v0.48.0 -errorsastype -rangeint -waitgroupgo ./...
+      - name: Run Staticcheck
+        working-directory: apps/api
+        run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.0 -tags integration ./...
       - name: Verify Go modules
         run: go -C apps/api mod verify
       - name: Run Go vet
@@ -83,6 +115,59 @@ jobs:
         env:
           PULSEGRID_ENV: test
         run: go -C apps/api test -race ./...
+
+  api-db-integration:
+    name: api-db-integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:18.6@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+        env:
+          POSTGRES_USER: pulsegrid
+          POSTGRES_PASSWORD: pulsegrid-ci
+          POSTGRES_DB: pulsegrid_test
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd "pg_isready -U pulsegrid -d pulsegrid_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: .go-version
+          cache: true
+          cache-dependency-path: apps/api/go.sum
+      - name: Apply migrations
+        env:
+          PULSEGRID_ENV: test
+          PULSEGRID_DATABASE_URL: postgres://pulsegrid:pulsegrid-ci@127.0.0.1:15432/pulsegrid_test?sslmode=disable
+        run: go -C apps/api run ./cmd/db migrate up
+      - name: Verify migration idempotency
+        env:
+          PULSEGRID_ENV: test
+          PULSEGRID_DATABASE_URL: postgres://pulsegrid:pulsegrid-ci@127.0.0.1:15432/pulsegrid_test?sslmode=disable
+        run: go -C apps/api run ./cmd/db migrate up
+      - name: Verify disposable migration recovery
+        env:
+          PULSEGRID_ENV: test
+          PULSEGRID_DATABASE_URL: postgres://pulsegrid:pulsegrid-ci@127.0.0.1:15432/pulsegrid_test?sslmode=disable
+        run: go -C apps/api run ./cmd/db migrate down
+      - name: Reapply migrations after recovery
+        env:
+          PULSEGRID_ENV: test
+          PULSEGRID_DATABASE_URL: postgres://pulsegrid:pulsegrid-ci@127.0.0.1:15432/pulsegrid_test?sslmode=disable
+        run: go -C apps/api run ./cmd/db migrate up
+      - name: Run PostgreSQL integration tests
+        env:
+          PULSEGRID_ENV: test
+          PULSEGRID_DATABASE_URL: postgres://pulsegrid:pulsegrid-ci@127.0.0.1:15432/pulsegrid_test?sslmode=disable
+        run: go -C apps/api test -count=1 -tags integration ./...
 
   api-vulnerabilities:
     name: api-vulnerabilities

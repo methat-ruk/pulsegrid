@@ -137,7 +137,7 @@ tenant-scoped devices through GraphQL and the console.
 
 Plans:
 
-- [MVP-001 — Tenant and device persistence](feature-plans/planned/MVP-001-tenant-device-persistence.md)
+- [MVP-001 — Tenant and device persistence](feature-plans/completed/MVP-001-tenant-device-persistence.md)
 - [MVP-002 — Device GraphQL API](feature-plans/planned/MVP-002-device-graphql-api.md)
 - [MVP-003 — Device registry console](feature-plans/planned/MVP-003-device-registry-console.md)
 
