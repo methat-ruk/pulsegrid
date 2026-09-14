@@ -142,6 +142,16 @@ FND-001 introduces only these backend keys under `apps/api/`:
 No database, broker, token, or credential key is introduced until its consumer
 plan begins.
 
+### MVP-001 PostgreSQL key
+
+MVP-001 adds one server-only database key for migration, seed, and repository
+integration-test commands. It is not required by the current health-only API
+startup; those commands validate and require it at their own boundary.
+
+| Key | Development/test behavior | Production behavior |
+| --- | --- | --- |
+| PULSEGRID_DATABASE_URL | Development points to loopback pulsegrid_dev; test points to the isolated loopback pulsegrid_test port and must never fall back to development | Injected by the deployment secret manager when a production database consumer exists; the tracked production example keeps it blank |
+
 ### FND-002 Nuxt keys
 
 FND-002 introduces one server-only application-environment key:
@@ -177,9 +187,10 @@ runtime value.
    test isolation with a real Go process in browser smoke.
 5. Repository CI supplies the `test` environment explicitly and verifies that
    test configuration cannot target development resources.
-6. PostgreSQL and MQTT plans add their variables and example values when the
-   dependencies are introduced.
-6. Production hardening defines the deployment secret provider, rotation,
+6. MVP-001 adds PostgreSQL configuration and example values with the first
+   persistence consumer; MVP-004 adds MQTT configuration when its broker and
+   simulator are introduced.
+7. Production hardening defines the deployment secret provider, rotation,
    access controls, and production-mode smoke validation.
 
 ## Validation requirements
