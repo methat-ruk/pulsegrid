@@ -89,6 +89,39 @@ corepack pnpm run db:dev:seed
 corepack pnpm run db:dev:status
 ```
 
+### Migration preflight and recovery
+
+Migration `004` makes the database whitespace rules match Go's Unicode
+`strings.TrimSpace`. It intentionally does not rewrite existing rows. Before
+applying it to a development volume that may contain data created by an older
+checkout, run this read-only preflight from `psql`:
+
+```sql
+WITH whitespace(chars) AS (
+  VALUES (U&'\0009\000A\000B\000C\000D\0020\0085\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000')
+)
+SELECT 'organizations' AS table_name, id, 'display_name' AS column_name, display_name
+FROM organizations, whitespace
+WHERE char_length(btrim(display_name, whitespace.chars)) = 0
+UNION ALL
+SELECT 'devices', id, 'device_key', device_key
+FROM devices, whitespace
+WHERE device_key <> btrim(device_key, whitespace.chars)
+UNION ALL
+SELECT 'devices', id, 'display_name', display_name
+FROM devices, whitespace
+WHERE char_length(btrim(display_name, whitespace.chars)) = 0;
+```
+
+An empty result is safe to continue with `corepack pnpm run db:dev:migrate`.
+If rows are returned, stop before retrying the migration. Keep the rows for
+review, choose an explicit valid replacement for each affected `device_key`
+(it is an identity value), and choose a nonblank display name for affected
+display-name rows. Apply those data changes only after confirming the local
+data is disposable or obtaining the appropriate data-owner decision, then
+rerun the migration and check its status. Do not use `migrate down`, delete a
+volume, or run a broad Compose teardown as a migration-recovery shortcut.
+
 The development service binds only to `127.0.0.1:5432`; `db:dev:stop` stops its
 container without deleting the container or named volume. Use `db:dev:down`
 when the container and Compose network should be removed; it also preserves

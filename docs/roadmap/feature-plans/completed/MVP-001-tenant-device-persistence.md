@@ -279,6 +279,9 @@ No OpenAPI or browser contract is added.
 - Migration `004` aligns database-side whitespace checks with Go's Unicode
   `strings.TrimSpace` behavior and adds real-PostgreSQL regression coverage for
   non-breaking-space-only values.
+- The local-development guide now provides a read-only preflight and explicit
+  row-level recovery guidance for older development volumes before applying
+  migration `004`; the migration does not rewrite existing data implicitly.
 - The local Compose helper consumes the same process-over-dotenv database URL
   precedence as Go and decodes URL-escaped credentials before passing the
   password to PostgreSQL.
