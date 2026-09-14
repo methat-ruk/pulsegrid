@@ -203,6 +203,14 @@ func TestDatabaseConstraintsRejectInvalidRows(t *testing.T) {
 	_, err = repository.pool.Exec(context.Background(), `
 		INSERT INTO devices (organization_id, device_key, display_name)
 		VALUES ($1, $2, $3)
+	`, orgID, "\u00a0", "Non-breaking-space device key")
+	if err == nil || !strings.Contains(err.Error(), "devices_key_format") {
+		t.Fatalf("Unicode-whitespace-only device key error = %v, want devices_key_format", err)
+	}
+
+	_, err = repository.pool.Exec(context.Background(), `
+		INSERT INTO devices (organization_id, device_key, display_name)
+		VALUES ($1, $2, $3)
 	`, orgID, "long-display-name", strings.Repeat("a", maxNameSize+1))
 	if err == nil || !strings.Contains(err.Error(), "devices_display_name_nonblank") {
 		t.Fatalf("long device display name error = %v, want devices_display_name_nonblank", err)
@@ -214,6 +222,14 @@ func TestDatabaseConstraintsRejectInvalidRows(t *testing.T) {
 	`, "tab-only-name", "\t")
 	if err == nil || !strings.Contains(err.Error(), "organizations_display_name_nonblank") {
 		t.Fatalf("tab-only organization name error = %v, want organizations_display_name_nonblank", err)
+	}
+
+	_, err = repository.pool.Exec(context.Background(), `
+		INSERT INTO organizations (slug, display_name)
+		VALUES ($1, $2)
+	`, "nbsp-only-name", "\u00a0")
+	if err == nil || !strings.Contains(err.Error(), "organizations_display_name_nonblank") {
+		t.Fatalf("Unicode-whitespace-only organization name error = %v, want organizations_display_name_nonblank", err)
 	}
 
 	_, err = repository.pool.Exec(context.Background(), `

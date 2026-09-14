@@ -276,6 +276,9 @@ No OpenAPI or browser contract is added.
 - The new constraint is delivered as migration `003` so the already-applied
   whitespace migration remains immutable and existing databases receive the
   fix through the normal forward migration path.
+- Migration `004` aligns database-side whitespace checks with Go's Unicode
+  `strings.TrimSpace` behavior and adds real-PostgreSQL regression coverage for
+  non-breaking-space-only values.
 - The local Compose helper consumes the same process-over-dotenv database URL
   precedence as Go and decodes URL-escaped credentials before passing the
   password to PostgreSQL.
