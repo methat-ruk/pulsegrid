@@ -19,6 +19,7 @@
     "db:dev:seed": "PULSEGRID_ENV=development go -C apps/api run ./cmd/db seed",
     "db:dev:psql": "node scripts/db-dev.mjs psql",
     "db:dev:stop": "node scripts/db-dev.mjs stop",
+    "db:dev:down": "node scripts/db-dev.mjs down",
     "api:format": "node scripts/go-format.mjs --write",
     "api:format:check": "node scripts/go-format.mjs",
     "api:lint": "go -C apps/api vet ./...",

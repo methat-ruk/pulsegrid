@@ -10,8 +10,8 @@ const providedArguments = process.argv.slice(3)
 const operationArguments = providedArguments[0] === '--'
   ? providedArguments.slice(1)
   : providedArguments
-if (!['up', 'stop', 'psql'].includes(operation)) {
-  console.error('usage: node scripts/db-dev.mjs <up|stop|psql> [psql args]')
+if (!['up', 'stop', 'down', 'psql'].includes(operation)) {
+  console.error('usage: node scripts/db-dev.mjs <up|stop|down|psql> [psql args]')
   process.exit(2)
 }
 
@@ -25,7 +25,9 @@ const args = operation === 'up'
   ? ['compose', '--profile', 'dev', 'up', '-d', '--wait', 'postgres-dev']
   : operation === 'stop'
     ? ['compose', '--profile', 'dev', 'stop', 'postgres-dev']
-    : [
+    : operation === 'down'
+      ? ['compose', '--profile', 'dev', 'down', '--remove-orphans']
+      : [
         'compose',
         '--profile',
         'dev',

@@ -89,8 +89,10 @@ corepack pnpm run db:dev:seed
 corepack pnpm run db:dev:status
 ```
 
-The development service binds only to `127.0.0.1:5432`; `db:dev:stop` stops it
-without deleting its named volume. The isolated integration workflow owns a
+The development service binds only to `127.0.0.1:5432`; `db:dev:stop` stops its
+container without deleting the container or named volume. Use `db:dev:down`
+when the container and Compose network should be removed; it also preserves
+the named volume and its data. The isolated integration workflow owns a
 unique Compose project and the test port `127.0.0.1:15432`:
 
 ```sh
@@ -123,14 +125,19 @@ pgdevstop() {
   corepack pnpm run db:dev:stop
 }
 
+pgdevdown() {
+  corepack pnpm run db:dev:down
+}
+
 pgdev() {
   corepack pnpm run db:dev:psql -- "$@"
 }
 ```
 
 Use `pgdevup` to start the persistent development database, `pgdev` or
-`pgdev -c '\dt'` to inspect it, and `pgdevstop` to stop the service without
-deleting its volume. A persistent `pgtest` alias is not provided because
+`pgdev -c '\dt'` to inspect it, `pgdevstop` to stop the service while keeping
+the container and volume, and `pgdevdown` to remove the container and network
+while keeping the volume. A persistent `pgtest` alias is not provided because
 `api:test:integration` deliberately creates a disposable database with a
 random Compose project and removes it after the run.
 

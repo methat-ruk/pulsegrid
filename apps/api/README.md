@@ -66,6 +66,16 @@ service does not delete it:
 corepack pnpm run db:dev:stop
 ```
 
+To remove the development container and Compose network while keeping the
+named volume and its data, run:
+
+```sh
+corepack pnpm run db:dev:down
+```
+
+Use `db:dev:up` to recreate the service from the existing volume. Do not add
+`-v` to this command unless intentionally deleting the development database.
+
 To inspect the development tables, use the `psql` client already included in
 the PostgreSQL container; installing `psql` on the host is not required:
 
