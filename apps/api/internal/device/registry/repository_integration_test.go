@@ -36,7 +36,7 @@ func TestRepositoryTenantIsolationAndKeysetPagination(t *testing.T) {
 	if _, err := repository.CreateDevice(ctx, orgB, CreateDeviceInput{DeviceKey: "shared-key", DisplayName: "B shared"}); err != nil {
 		t.Fatalf("same device key in organization B: %v", err)
 	}
-	for index := 0; index < 3; index++ {
+	for index := range 3 {
 		if _, err := repository.CreateDevice(ctx, orgA, CreateDeviceInput{
 			DeviceKey:   fmt.Sprintf("device-%d", index),
 			DisplayName: fmt.Sprintf("A device %d", index),
@@ -112,16 +112,14 @@ func TestRepositoryConcurrentDuplicateDeviceKey(t *testing.T) {
 	const workers = 8
 	errorsCh := make(chan error, workers)
 	var waitGroup sync.WaitGroup
-	for index := 0; index < workers; index++ {
-		waitGroup.Add(1)
-		go func() {
-			defer waitGroup.Done()
+	for range workers {
+		waitGroup.Go(func() {
 			_, err := repository.CreateDevice(context.Background(), orgID, CreateDeviceInput{
 				DeviceKey:   "concurrent-key",
 				DisplayName: "Concurrent device",
 			})
 			errorsCh <- err
-		}()
+		})
 	}
 	waitGroup.Wait()
 	close(errorsCh)
