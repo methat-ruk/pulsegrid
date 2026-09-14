@@ -61,7 +61,8 @@ describe('fetchBackendReadiness', () => {
   it('maps an oversized upstream body to unavailable', async () => {
     const origin = await startServer((_request, response) => {
       response.setHeader('content-type', 'application/json')
-      response.end('x'.repeat(1_025))
+      response.write('x'.repeat(512))
+      setImmediate(() => response.end('x'.repeat(513)))
     })
 
     await expect(fetchBackendReadiness(origin)).resolves.toEqual({ status: 'unavailable' })

@@ -1,6 +1,28 @@
 import { expect, test } from './fixtures'
 
 test.describe('full-stack API readiness', () => {
+  test('shows a bounded checking state while the readiness request is pending', async ({ page }) => {
+    let release!: () => void
+    const pending = new Promise<void>((resolve) => {
+      release = resolve
+    })
+
+    await page.route('**/api/operational/ready', async (route) => {
+      await pending
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'ready' }),
+      })
+    })
+
+    const navigation = page.goto('/')
+    await expect(page.getByRole('status')).toHaveText('Checking the local API…')
+    release()
+    await navigation
+    await expect(page.getByRole('status')).toHaveText('Local API is ready.')
+  })
+
   test('recovers after the Go process is stopped and restarted', async ({ page, apiProcess }) => {
     await page.goto('/')
     await expect(page.getByRole('status')).toHaveText('Local API is ready.')
