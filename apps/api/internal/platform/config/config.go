@@ -74,7 +74,7 @@ func LoadFrom(processEnvironment map[string]string, workingDirectory string, rea
 		return Config{}, errors.New("configuration PULSEGRID_ENV is required")
 	}
 
-	environment, err := parseEnvironment(selectedEnvironment)
+	environment, err := ParseEnvironment(selectedEnvironment)
 	if err != nil {
 		return Config{}, err
 	}
@@ -139,7 +139,9 @@ func parse(values map[string]string, environment Environment) (Config, error) {
 	}, nil
 }
 
-func parseEnvironment(raw string) (Environment, error) {
+// ParseEnvironment validates the logical runtime selected by the operator or
+// runner. Database commands reuse this same environment contract.
+func ParseEnvironment(raw string) (Environment, error) {
 	switch Environment(strings.ToLower(strings.TrimSpace(raw))) {
 	case Development:
 		return Development, nil

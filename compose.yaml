@@ -1,0 +1,40 @@
+name: pulsegrid
+
+services:
+  postgres-dev:
+    image: postgres:18.6@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+    profiles: [dev]
+    environment:
+      POSTGRES_USER: pulsegrid
+      POSTGRES_PASSWORD: ${PULSEGRID_POSTGRES_PASSWORD:?PULSEGRID_POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: pulsegrid_dev
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pulsegrid_dev_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pulsegrid -d pulsegrid_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  postgres-test:
+    image: postgres:18.6@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+    profiles: [test]
+    environment:
+      POSTGRES_USER: pulsegrid
+      POSTGRES_PASSWORD: ${PULSEGRID_POSTGRES_PASSWORD:?PULSEGRID_POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: pulsegrid_test
+    ports:
+      - "127.0.0.1:15432:5432"
+    volumes:
+      - pulsegrid_test_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pulsegrid -d pulsegrid_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  pulsegrid_dev_data:
+  pulsegrid_test_data:

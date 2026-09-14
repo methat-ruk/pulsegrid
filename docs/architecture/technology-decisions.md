@@ -41,9 +41,11 @@ or immediately required dependency.
 | Light theme | Selected — Foundation | Only approved PulseGrid light tokens exist; dark-theme work remains deferred |
 | Apache ECharts | Selected — MVP | Added when the telemetry console has a concrete chart requirement |
 | GraphQL and gqlgen | Selected — MVP | Concrete device and operator API boundary |
-| PostgreSQL | Selected — MVP | Transactional authority and bounded MVP telemetry/state storage |
+| PostgreSQL 18.6 | Selected — MVP | Transactional authority for the MVP-001 organization/device registry; local and CI targets are pinned and isolated |
+| pgx v5 | Selected — MVP | Direct parameterized Go PostgreSQL driver and bounded pool for the registry boundary |
+| Goose v3 SQL migrations | Selected — MVP | Explicit versioned SQL migrations with session locking; migration execution remains outside API startup |
 | MQTT | Selected — MVP | Device telemetry and command transport required by the product loop |
-| Docker Compose | Selected — MVP | Local PostgreSQL and MQTT dependencies when those features begin |
+| Docker Compose | Selected — MVP | Local PostgreSQL dependency for MVP-001; MQTT remains a later feature-owned service |
 | Backend/frontend Dockerfiles | Conditional target | Add when a containerized run, CI, or deployment target will build and exercise the images |
 | MongoDB | Conditional target | Adopt only when heterogeneous profile data and queries justify separate authority |
 | Dedicated time-series storage | Open | Select from measured volume, retention, aggregation, and query patterns |

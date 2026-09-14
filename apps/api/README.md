@@ -43,6 +43,66 @@ The machine-readable operational contract and response semantics are in the
 [OpenAPI contract](api/openapi/operational.yaml). Product-domain APIs are not
 implemented by this foundation.
 
+## Local PostgreSQL (MVP-001)
+
+The health-only API does not open PostgreSQL. Database access is explicit
+through the migration, seed, and integration-test commands below. Create the
+ignored development environment file once and replace `CHANGE_ME` with a
+disposable local password:
+
+```sh
+cp .env.development.example .env.development
+corepack pnpm run db:dev:up
+corepack pnpm run db:dev:migrate
+corepack pnpm run db:dev:seed
+corepack pnpm run db:dev:status
+```
+
+`db:dev:up` starts only the loopback PostgreSQL 18.6 Compose service and
+waits for its health check. The development volume is persistent; stopping the
+service does not delete it:
+
+```sh
+corepack pnpm run db:dev:stop
+```
+
+To inspect the development tables, use the `psql` client already included in
+the PostgreSQL container; installing `psql` on the host is not required:
+
+```sh
+corepack pnpm run db:dev:up
+corepack pnpm run db:dev:psql
+```
+
+The command resolves the Compose service instead of depending on a generated
+container name. Pass normal `psql` arguments after `--`, for example
+`corepack pnpm run db:dev:psql -- -c '\dt'`. Inside `psql`, useful commands are
+`\dt`, `\d organizations`, `\d devices`, and for example:
+
+```sql
+SELECT * FROM organizations;
+SELECT id, organization_id, device_key, display_name, created_at
+FROM devices
+ORDER BY created_at DESC, id DESC;
+```
+
+Exit with `\q`. A persistent `pgtest` alias is intentionally not provided:
+the integration command creates a disposable database with a random Compose
+project and removes it after the run.
+
+The integration command owns a separate disposable Compose project on port
+15432, runs migrations twice, executes the real-PostgreSQL tests, and removes
+only that test project and volume. It refuses to attach to an existing process
+on the test port:
+
+```sh
+corepack pnpm run api:test:integration
+```
+
+No product REST/GraphQL endpoint or runtime database readiness contract is
+introduced by MVP-001. The repository boundary is an internal trusted caller
+surface until a later feature establishes identity-to-organization mapping.
+
 ## Test
 
 Repository-wide setup, fast checks, full pre-CI validation, and dependency

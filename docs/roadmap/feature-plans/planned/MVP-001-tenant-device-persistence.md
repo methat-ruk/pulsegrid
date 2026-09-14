@@ -1,11 +1,12 @@
 # MVP-001 — Tenant and Device Persistence
 
-Status: Planned
+Status: In Progress
 
 Branch: `feat/mvp-001-tenant-device-persistence`
 
-Intended PR: One persistence-foundation PR. Implementation of this revised
-data/infrastructure plan requires approval before execution.
+Intended PR: One persistence-foundation PR. Implementation follows the
+reviewed and approved plan; completion remains blocked on final validation and
+post-implementation review.
 
 Milestone: M1 — Device registry
 
@@ -55,7 +56,7 @@ must exist before MVP-002 exposes product operations.
    volume at the v18 image's supported `/var/lib/postgresql` path. Provide a
    separate disposable test service/profile and Compose project. CI may use a
    native PostgreSQL service container instead of Compose.
-2. Add versioned SQL-only migrations with a pinned Goose CLI. Keep migration
+2. Add versioned SQL-only migrations with a pinned Goose runner/library. Keep migration
    execution explicit and separate from API startup. The initial migration
    creates only `organizations` and `devices`; it contains no seed data.
 3. Add a PostgreSQL driver/pool and Go device-registry persistence boundary.
@@ -205,6 +206,10 @@ report the exception—never drop the real-store gate to make CI look fast.
 Adding a required branch-protection context needs separately approved GitHub
 settings work and verification on the final head. Until then, the new test is
 not an enforced merge gate.
+
+Local evidence after implementation: a warm disposable integration run
+completed in approximately 9 seconds with the pinned image already cached;
+the CI cold/warm measurement remains a PR validation item.
 
 ## Local workflow to document
 

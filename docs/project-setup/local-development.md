@@ -11,7 +11,8 @@ readiness adapter for the first full-stack development feedback loop.
 
 - Node `24.20.0` from `.node-version`;
 - pnpm `12.3.4` through Corepack;
-- Go `1.27.1` from `.go-version`.
+- Go `1.27.1` from `.go-version`;
+- Docker Compose with the pinned PostgreSQL image available locally.
 
 Verify the selected versions before setup:
 
@@ -75,6 +76,68 @@ Nuxt). The shell checks `GET /api/operational/ready` and offers a manual Retry
 when the local API is stopped or starting. This adapter covers process
 readiness only; it is not a product API or a generic proxy.
 
+### Local PostgreSQL and persistence tests
+
+MVP-001 keeps database startup explicit and separate from the health-only API.
+Copy the API example, set a disposable password in the ignored file, and run:
+
+```sh
+cp apps/api/.env.development.example apps/api/.env.development
+corepack pnpm run db:dev:up
+corepack pnpm run db:dev:migrate
+corepack pnpm run db:dev:seed
+corepack pnpm run db:dev:status
+```
+
+The development service binds only to `127.0.0.1:5432`; `db:dev:stop` stops it
+without deleting its named volume. The isolated integration workflow owns a
+unique Compose project and the test port `127.0.0.1:15432`:
+
+```sh
+corepack pnpm run api:test:integration
+```
+
+It fails when the test port is already in use, migrates the disposable
+database twice, runs the tagged real-PostgreSQL tests, and removes only its
+own container, volume, and network. Do not use a broad `docker compose down -v`
+in this repository because it can erase development data.
+
+To inspect development data, no host-side `psql` installation is needed—the
+official PostgreSQL image includes the client:
+
+```sh
+corepack pnpm run db:dev:psql
+```
+
+The command resolves the Compose service instead of depending on a generated
+container name. Pass normal `psql` arguments after `--`, for example
+`corepack pnpm run db:dev:psql -- -c '\dt'`. If you use zsh and want shorter
+commands from the repository root, add these optional functions to `~/.zshrc`:
+
+```zsh
+pgdevup() {
+  corepack pnpm run db:dev:up
+}
+
+pgdevstop() {
+  corepack pnpm run db:dev:stop
+}
+
+pgdev() {
+  corepack pnpm run db:dev:psql -- "$@"
+}
+```
+
+Use `pgdevup` to start the persistent development database, `pgdev` or
+`pgdev -c '\dt'` to inspect it, and `pgdevstop` to stop the service without
+deleting its volume. A persistent `pgtest` alias is not provided because
+`api:test:integration` deliberately creates a disposable database with a
+random Compose project and removes it after the run.
+
+The repository's Zed settings pass `-tags=integration` to `gopls`, so tagged
+integration files remain navigable without changing the normal no-database Go
+test command. Restart the Go language server after changing this setting.
+
 ### Isolated browser smoke
 
 The browser command builds the console with `NUXT_APP_ENV=test`, starts that
@@ -106,7 +169,8 @@ console errors.
 | `corepack pnpm run openapi` | Lint, bundle, and static HTML rendering into ignored `.openapi/` |
 | `corepack pnpm run audit` | Node production audit and reachable Go vulnerability scan |
 | `corepack pnpm run check:fast` | Fast pre-CI handoff: formatting, lint, typecheck, and ordinary tests |
-| `corepack pnpm run check` | Full pre-CI handoff, including race, build, OpenAPI, audits, and browser smoke |
+| `corepack pnpm run api:test:integration` | Isolated real-PostgreSQL migration, repository, constraint, and tenant-scope evidence |
+| `corepack pnpm run check` | Full pre-CI handoff, including race, build, OpenAPI, audits, database integration, and browser smoke |
 
 The pre-commit hook runs only staged Go formatting, staged frontend ESLint,
 staged OpenAPI lint, and the tracked environment-filename policy. Hooks are

@@ -13,11 +13,18 @@
     "setup:browser": "pnpm exec playwright install --only-shell chromium",
     "dev:api": "PULSEGRID_ENV=development go -C apps/api run ./cmd/api",
     "dev:web": "pnpm --filter @pulsegrid/web-console dev",
+    "db:dev:up": "node scripts/db-dev.mjs up",
+    "db:dev:migrate": "PULSEGRID_ENV=development go -C apps/api run ./cmd/db migrate up",
+    "db:dev:status": "PULSEGRID_ENV=development go -C apps/api run ./cmd/db migrate status",
+    "db:dev:seed": "PULSEGRID_ENV=development go -C apps/api run ./cmd/db seed",
+    "db:dev:psql": "node scripts/db-dev.mjs psql",
+    "db:dev:stop": "node scripts/db-dev.mjs stop",
     "api:format": "node scripts/go-format.mjs --write",
     "api:format:check": "node scripts/go-format.mjs",
     "api:lint": "go -C apps/api vet ./...",
     "api:test": "PULSEGRID_ENV=test go -C apps/api test ./...",
     "api:test:race": "PULSEGRID_ENV=test go -C apps/api test -race ./...",
+    "api:test:integration": "node scripts/test-api-integration.mjs",
     "api:build": "go -C apps/api build ./...",
     "api:vuln": "go -C apps/api run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...",
     "web:lint": "pnpm --filter @pulsegrid/web-console lint",
@@ -41,7 +48,7 @@
     "build": "pnpm run api:build && pnpm run web:build",
     "audit": "pnpm run node:audit && pnpm run api:vuln",
     "check:fast": "pnpm run api:format:check && pnpm run lint && pnpm run typecheck && pnpm run test",
-    "check": "pnpm run check:fast && pnpm run test:race && pnpm run build && pnpm run openapi && pnpm run audit && pnpm run test:browser"
+    "check": "pnpm run check:fast && pnpm run test:race && pnpm run build && pnpm run openapi && pnpm run audit && pnpm run api:test:integration && pnpm run test:browser"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
