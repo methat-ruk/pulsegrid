@@ -26,6 +26,10 @@ try {
     exitCode = 1
   } else if (!run('go', ['-C', 'apps/api', 'run', './cmd/db', 'migrate', 'up'], environment, 120_000)) {
     exitCode = 1
+  } else if (!run('go', ['-C', 'apps/api', 'run', './cmd/db', 'migrate', 'down'], environment, 120_000)) {
+    exitCode = 1
+  } else if (!run('go', ['-C', 'apps/api', 'run', './cmd/db', 'migrate', 'up'], environment, 120_000)) {
+    exitCode = 1
   } else if (!run('go', ['-C', 'apps/api', 'test', '-count=1', '-tags', 'integration', './...'], environment, 180_000)) {
     exitCode = 1
   } else {

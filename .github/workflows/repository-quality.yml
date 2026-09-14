@@ -121,6 +121,16 @@ jobs:
           PULSEGRID_ENV: test
           PULSEGRID_DATABASE_URL: postgres://pulsegrid:pulsegrid-ci@127.0.0.1:15432/pulsegrid_test?sslmode=disable
         run: go -C apps/api run ./cmd/db migrate up
+      - name: Verify disposable migration recovery
+        env:
+          PULSEGRID_ENV: test
+          PULSEGRID_DATABASE_URL: postgres://pulsegrid:pulsegrid-ci@127.0.0.1:15432/pulsegrid_test?sslmode=disable
+        run: go -C apps/api run ./cmd/db migrate down
+      - name: Reapply migrations after recovery
+        env:
+          PULSEGRID_ENV: test
+          PULSEGRID_DATABASE_URL: postgres://pulsegrid:pulsegrid-ci@127.0.0.1:15432/pulsegrid_test?sslmode=disable
+        run: go -C apps/api run ./cmd/db migrate up
       - name: Run PostgreSQL integration tests
         env:
           PULSEGRID_ENV: test

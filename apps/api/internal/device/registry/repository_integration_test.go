@@ -166,6 +166,30 @@ func TestDatabaseConstraintsRejectInvalidRows(t *testing.T) {
 	_, err = repository.pool.Exec(context.Background(), `
 		INSERT INTO devices (organization_id, device_key, display_name)
 		VALUES ($1, $2, $3)
+	`, orgID, "\t", "Tab-only device key")
+	if err == nil || !strings.Contains(err.Error(), "devices_key_format") {
+		t.Fatalf("tab-only device key error = %v, want devices_key_format", err)
+	}
+
+	_, err = repository.pool.Exec(context.Background(), `
+		INSERT INTO devices (organization_id, device_key, display_name)
+		VALUES ($1, $2, $3)
+	`, orgID, "\tkey\t", "Tab-wrapped device key")
+	if err == nil || !strings.Contains(err.Error(), "devices_key_format") {
+		t.Fatalf("tab-wrapped device key error = %v, want devices_key_format", err)
+	}
+
+	_, err = repository.pool.Exec(context.Background(), `
+		INSERT INTO organizations (slug, display_name)
+		VALUES ($1, $2)
+	`, "tab-only-name", "\t")
+	if err == nil || !strings.Contains(err.Error(), "organizations_display_name_nonblank") {
+		t.Fatalf("tab-only organization name error = %v, want organizations_display_name_nonblank", err)
+	}
+
+	_, err = repository.pool.Exec(context.Background(), `
+		INSERT INTO devices (organization_id, device_key, display_name)
+		VALUES ($1, $2, $3)
 	`, uuid.New(), "valid-key", "Unknown organization")
 	if err == nil || !strings.Contains(err.Error(), "devices_organization_id_fkey") {
 		t.Fatalf("unknown organization error = %v, want foreign-key violation", err)

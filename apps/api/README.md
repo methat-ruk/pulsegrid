@@ -48,10 +48,10 @@ implemented by this foundation.
 The health-only API does not open PostgreSQL. Database access is explicit
 through the migration, seed, and integration-test commands below. Create the
 ignored development environment file once and replace `CHANGE_ME` with a
-disposable local password:
+disposable local password. Run these commands from the repository root:
 
 ```sh
-cp .env.development.example .env.development
+cp apps/api/.env.development.example apps/api/.env.development
 corepack pnpm run db:dev:up
 corepack pnpm run db:dev:migrate
 corepack pnpm run db:dev:seed
@@ -91,9 +91,9 @@ the integration command creates a disposable database with a random Compose
 project and removes it after the run.
 
 The integration command owns a separate disposable Compose project on port
-15432, runs migrations twice, executes the real-PostgreSQL tests, and removes
-only that test project and volume. It refuses to attach to an existing process
-on the test port:
+15432, applies migrations twice, verifies a disposable `down`/`up` recovery,
+executes the real-PostgreSQL tests, and removes only that test project and
+volume. It refuses to attach to an existing process on the test port:
 
 ```sh
 corepack pnpm run api:test:integration
