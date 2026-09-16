@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"maps"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -135,6 +136,9 @@ func parse(values map[string]string, environment Environment) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	if identityMode == IdentityDevelopment && !isLoopbackHTTPHost(host) {
+		return Config{}, errors.New("configuration PULSEGRID_HTTP_HOST must be an IPv4 loopback address when development identity is enabled")
+	}
 
 	port, err := parsePort(values, environment)
 	if err != nil {
@@ -159,6 +163,11 @@ func parse(values map[string]string, environment Environment) (Config, error) {
 		LogLevel:        logLevel,
 		ShutdownTimeout: shutdownTimeout,
 	}, nil
+}
+
+func isLoopbackHTTPHost(host string) bool {
+	address, err := netip.ParseAddr(host)
+	return err == nil && address.Is4() && address.IsLoopback()
 }
 
 func parseIdentityMode(values map[string]string, environment Environment) (IdentityMode, error) {

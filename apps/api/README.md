@@ -23,8 +23,10 @@ The native command remains available from this directory:
 PULSEGRID_ENV=development go run ./cmd/api
 ```
 
-The default listener is `127.0.0.1:8080`. To use a local dotenv file, copy the
-reviewed example and keep the environment selector explicit:
+The default listener is `127.0.0.1:8080`. When development identity is enabled,
+`PULSEGRID_HTTP_HOST` must remain a literal IPv4 loopback address in `127.0.0.0/8`;
+wildcard, non-loopback, hostname, and IPv6 binds are rejected. To use a local
+dotenv file, copy the reviewed example and keep the environment selector explicit:
 
 ```sh
 cp .env.development.example .env.development

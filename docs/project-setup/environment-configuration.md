@@ -156,7 +156,9 @@ disabled/health-only API path does not require or open it.
 
 MVP-002 adds an explicit server-only identity mode. The safe default is
 `disabled`; development GraphQL is enabled only with the local/test value
-`development` and a seeded `pulsegrid-dev` organization.
+`development`, a literal IPv4 loopback `PULSEGRID_HTTP_HOST` (`127.0.0.0/8`),
+and a seeded `pulsegrid-dev` organization. Wildcard, hostname, non-loopback,
+and IPv6 binds are rejected in this mode.
 
 | Key | Development/test behavior | Production behavior |
 | --- | --- | --- |

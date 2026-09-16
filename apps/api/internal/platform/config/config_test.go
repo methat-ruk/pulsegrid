@@ -55,6 +55,31 @@ func TestLoadFromAcceptsDevelopmentIdentityOnlyOutsideProduction(t *testing.T) {
 		t.Fatalf("identity mode = %q, want %q", got.IdentityMode, IdentityDevelopment)
 	}
 
+	for _, host := range []string{"127.0.0.2", "127.255.255.254"} {
+		got, err := LoadFrom(map[string]string{
+			"PULSEGRID_ENV":           "test",
+			"PULSEGRID_IDENTITY_MODE": "development",
+			"PULSEGRID_HTTP_HOST":     host,
+		}, t.TempDir(), missingDotenv)
+		if err != nil {
+			t.Fatalf("loopback host %q rejected: %v", host, err)
+		}
+		if got.HTTPHost != host {
+			t.Fatalf("loopback host = %q, want %q", got.HTTPHost, host)
+		}
+	}
+
+	for _, host := range []string{"0.0.0.0", "192.0.2.10", "localhost", "::1", "::ffff:127.0.0.1"} {
+		_, err := LoadFrom(map[string]string{
+			"PULSEGRID_ENV":           "test",
+			"PULSEGRID_IDENTITY_MODE": "development",
+			"PULSEGRID_HTTP_HOST":     host,
+		}, t.TempDir(), missingDotenv)
+		if err == nil {
+			t.Fatalf("non-loopback host %q accepted with development identity", host)
+		}
+	}
+
 	_, err = LoadFrom(map[string]string{
 		"PULSEGRID_ENV":              "production",
 		"PULSEGRID_IDENTITY_MODE":    "development",
@@ -97,6 +122,18 @@ func TestLoadFromMergesDotenvWithoutOverridingProcessValues(t *testing.T) {
 	}
 	if got.LogLevel != slog.LevelWarn {
 		t.Fatalf("log level = %v, want warn", got.LogLevel)
+	}
+}
+
+func TestLoadFromRejectsDevelopmentIdentityAfterDotenvMerge(t *testing.T) {
+	_, err := LoadFrom(map[string]string{
+		"PULSEGRID_ENV":           "test",
+		"PULSEGRID_IDENTITY_MODE": "development",
+	}, t.TempDir(), func(string) (map[string]string, error) {
+		return map[string]string{"PULSEGRID_HTTP_HOST": "192.0.2.10"}, nil
+	})
+	if err == nil {
+		t.Fatal("development identity accepted a non-loopback dotenv host")
 	}
 }
 

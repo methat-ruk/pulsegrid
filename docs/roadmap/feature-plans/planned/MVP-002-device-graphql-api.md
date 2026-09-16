@@ -1,12 +1,14 @@
 # MVP-002 — Device GraphQL API
 
-Status: Planned
+Status: Ready for review
 
 Review state: Re-planned and reviewed against the repository, contracts, and
 dependencies on 2026-09-16. Implementation was authorized after that review;
-the working-tree implementation and validation evidence remain subject to the
-same scope and decision gates. The plan started from branch head `1eaf7a2` and
-was committed before implementation as `63bfc26`.
+the implementation and review fixes are complete for this PR scope. The plan's
+evidence map now distinguishes direct tests from code-reviewed lifecycle gaps;
+default-page/final-page success and direct pool-close-order instrumentation
+remain explicitly out of the completed evidence claim. The plan started from
+branch head `1eaf7a2` and was committed before implementation as `63bfc26`.
 
 Branch: `feat/mvp-002-device-graphql-api`
 
@@ -284,10 +286,11 @@ type Mutation {
 ## Runtime and identity decisions
 
 - `PULSEGRID_IDENTITY_MODE=development` is allowed only for
-  `PULSEGRID_ENV=development|test`. It enables `/graphql`, requires the existing
-  environment-correct local/test database URL, and uses the fixed
-  `pulsegrid-dev` organization. Production rejects this mode even if a database
-  URL exists.
+  `PULSEGRID_ENV=development|test`. It enables `/graphql`, requires a literal
+  IPv4 loopback `PULSEGRID_HTTP_HOST` (`127.0.0.0/8`), the existing
+  environment-correct local/test database URL, and the fixed `pulsegrid-dev`
+  organization. Wildcard, hostname, non-loopback, and IPv6 binds are rejected;
+  production rejects this mode even if a database URL exists.
 - `PULSEGRID_IDENTITY_MODE=disabled` mounts no product API and opens no
   database. This keeps current health-only production and browser-smoke
   composition valid without pretending that it serves product traffic.
@@ -367,12 +370,12 @@ use a reviewed same-origin server path or re-plan origin/credential behavior.
 | Guarantee | Evidence and gate |
 | --- | --- |
 | SDL and generated Go agree | Pinned generation command, generated-artifact drift check on a clean checkout, Go build/vet/static checks, and schema contract tests |
-| Contract success and bounds | No-database HTTP/resolver tests cover create/detail/list mapping, defaults, 1/100 bounds, empty/final pages, nullability, time/ID output, cursor round trip, and unknown fields |
-| Stable safe failures | Contract tests cover malformed ID/cursor, zero/over-limit page size, invalid device fields, duplicate conflict, not found, dependency/cancellation error, panic recovery, request ID, and absence of internal detail in response/logs |
-| Tenant authority cannot come from client input | Schema contains no organization field; tests send spoofed tenant headers/variables and verify the fixed context principal; missing principal fails closed |
+| Contract success and bounds | No-database HTTP/resolver tests cover create/detail/list mapping, explicit 1/100 bounds, empty detail, nullability, time/ID output, cursor round trip, and unknown fields; default-page and final-page success cases remain a documented evidence gap |
+| Stable safe failures | Contract tests cover malformed ID/cursor, zero/over-limit page size, invalid device fields, duplicate conflict, not found, panic recovery, request ID, and safe public messages; dependency/cancellation and log-redaction claims remain code-review or runtime evidence rather than direct GraphQL contract assertions |
+| Tenant authority cannot come from client input | Schema contains no organization field; tests send a spoofed tenant header and an unknown tenant input field and verify the fixed context principal; missing principal fails closed |
 | Cross-tenant reads and writes are contained | Real-PostgreSQL HTTP tests use two organizations, other-tenant IDs, list/detail/create, and inspect stored ownership; mock-only tests do not satisfy this guarantee |
 | Abuse is bounded | Tests cover POST-only behavior, unsupported request/response media types, 64 KiB body and 1,000-token parser limits, disabled batching/subscriptions, aliases/fragments/repeated selections, and complexity rejection while one canonical 100-item query remains allowed |
-| Runtime database lifecycle is truthful | Config/composition tests cover disabled mode without DB, enabled missing/invalid DB, absent seed, startup cleanup, dependency-ready/unavailable/recovered states, in-flight cancellation, draining, and pool close order |
+| Runtime database lifecycle is truthful | Config/composition tests cover disabled mode without DB, development-identity loopback binding, readiness dependency-ready/unavailable/recovered states, in-flight cancellation, and draining; startup failure classification is unit-tested, while partial-startup cleanup and pool-close ordering remain code-reviewed rather than directly instrumented |
 | Existing operational and frontend behavior remains stable | Existing HTTP server, OpenAPI, API unit/race, Nuxt, and browser-smoke tests remain green; FND-004 still maps the new 503 readiness reason to generic unavailable |
 | Dependency and generated-code risk is checked | `go mod verify`, build/vet/modernize/staticcheck, `govulncheck`, pinned gqlgen version review, and no unexpected generator/runtime dependency drift |
 

@@ -87,7 +87,9 @@ proxy/cache policy.
 
 ## MVP-002 development GraphQL contract
 
-`POST /graphql` is mounted only when `PULSEGRID_IDENTITY_MODE=development`.
+`POST /graphql` is mounted only when `PULSEGRID_IDENTITY_MODE=development` and
+`PULSEGRID_HTTP_HOST` is a literal IPv4 loopback address (`127.0.0.0/8`).
+Wildcard, hostname, non-loopback, and IPv6 binds are rejected in this mode.
 The process resolves the seeded `pulsegrid-dev` organization before listening;
 missing migrations, seed data, or PostgreSQL fail startup. The request cannot
 select a tenant through an argument, header, cookie, or client state.

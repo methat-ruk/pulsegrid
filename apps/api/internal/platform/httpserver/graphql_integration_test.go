@@ -137,4 +137,52 @@ func TestGraphQLFiberCompositionUsesRealTenantScopedRepository(t *testing.T) {
 	if created.OrganizationID != organizationA || created.DeviceKey != "private-a" {
 		t.Fatalf("created device = %+v", created)
 	}
+
+	requestBody, err = json.Marshal(map[string]string{
+		"query": "query { devices(first: 100) { edges { node { id deviceKey } } } }",
+	})
+	if err != nil {
+		t.Fatalf("encode list query: %v", err)
+	}
+	request = httptest.NewRequest(http.MethodPost, "http://example.test"+GraphQLPath, strings.NewReader(string(requestBody)))
+	request.Header.Set("Content-Type", "application/json")
+	response, err = server.app.Test(request)
+	if err != nil {
+		t.Fatalf("Fiber list request returned error: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("list status = %d", response.StatusCode)
+	}
+	var list struct {
+		Data struct {
+			Devices struct {
+				Edges []struct {
+					Node struct {
+						ID        string `json:"id"`
+						DeviceKey string `json:"deviceKey"`
+					} `json:"node"`
+				} `json:"edges"`
+			} `json:"devices"`
+		} `json:"data"`
+		Errors []any `json:"errors"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&list); err != nil {
+		t.Fatalf("decode list response: %v", err)
+	}
+	if len(list.Errors) != 0 {
+		t.Fatalf("list errors = %+v", list.Errors)
+	}
+	foundCreated := false
+	for _, edge := range list.Data.Devices.Edges {
+		if edge.Node.ID == deviceB.ID.String() {
+			t.Fatalf("list exposed organization B device %s", deviceB.ID)
+		}
+		if edge.Node.ID == createdID.String() && edge.Node.DeviceKey == "private-a" {
+			foundCreated = true
+		}
+	}
+	if !foundCreated {
+		t.Fatalf("list did not include organization A device %s: %+v", createdID, list.Data.Devices.Edges)
+	}
 }
