@@ -40,7 +40,7 @@ or immediately required dependency.
 | Manrope and Noto Sans Thai delivery | Selected — Foundation | Package-managed local font assets avoid third-party font requests |
 | Light theme | Selected — Foundation | Only approved PulseGrid light tokens exist; dark-theme work remains deferred |
 | Apache ECharts | Selected — MVP | Added when the telemetry console has a concrete chart requirement |
-| GraphQL and gqlgen | Selected — MVP | Concrete device and operator API boundary |
+| GraphQL and gqlgen | Selected — MVP | Concrete device and operator API boundary; MVP-002 pins gqlgen `v0.17.95` and keeps the SDL as source of truth |
 | PostgreSQL 18.6 | Selected — MVP | Transactional authority for the MVP-001 organization/device registry; local and CI targets are pinned and isolated |
 | pgx v5 | Selected — MVP | Direct parameterized Go PostgreSQL driver and bounded pool for the registry boundary |
 | Goose v3 SQL migrations | Selected — MVP | Explicit versioned SQL migrations with session locking; migration execution remains outside API startup |

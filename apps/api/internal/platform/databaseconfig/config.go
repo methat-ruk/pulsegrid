@@ -5,6 +5,7 @@ package databaseconfig
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -177,8 +178,6 @@ func environmentFromOS() map[string]string {
 
 func cloneValues(values map[string]string) map[string]string {
 	clone := make(map[string]string, len(values))
-	for key, value := range values {
-		clone[key] = value
-	}
+	maps.Copy(clone, values)
 	return clone
 }

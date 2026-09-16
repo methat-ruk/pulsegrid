@@ -77,6 +77,8 @@ jobs:
         run: go run honnef.co/go/tools/cmd/staticcheck@v0.8.0 -tags integration ./...
       - name: Verify Go modules
         run: go -C apps/api mod verify
+      - name: Verify GraphQL generated files
+        run: go -C apps/api generate ./graph && git diff --exit-code -- apps/api/graph/generated.go apps/api/graph/model/models_gen.go apps/api/graph/device.resolvers.go
       - name: Run Go vet
         run: go -C apps/api vet ./...
 
@@ -166,6 +168,7 @@ jobs:
       - name: Run PostgreSQL integration tests
         env:
           PULSEGRID_ENV: test
+          PULSEGRID_IDENTITY_MODE: development
           PULSEGRID_DATABASE_URL: postgres://pulsegrid:pulsegrid-ci@127.0.0.1:15432/pulsegrid_test?sslmode=disable
         run: go -C apps/api test -count=1 -tags integration ./...
 
@@ -255,6 +258,8 @@ jobs:
         run: corepack pnpm install --frozen-lockfile
       - name: Run frontend typecheck
         run: corepack pnpm run web:typecheck
+      - name: Run browser fixture typecheck
+        run: corepack pnpm run browser:typecheck
 
   web-test:
     name: web-test

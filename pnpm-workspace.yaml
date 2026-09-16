@@ -1,5 +1,9 @@
 packages:
   - apps/web-console
+# @nuxt/fonts -> fontless currently permits only the vulnerable 0.27 line;
+# keep that transitive edge on the patched esbuild release until upstream widens it.
+overrides:
+  "fontless>esbuild": 0.28.2
 allowBuilds:
   esbuild: true
   unrs-resolver: true

@@ -126,6 +126,28 @@ func TestEnsureOrganizationIsIdempotent(t *testing.T) {
 	cleanupOrganizations(t, repository, firstID)
 }
 
+func TestFindOrganizationBySlugDoesNotCreateOrMutate(t *testing.T) {
+	repository, cleanup := integrationRepository(t)
+	defer cleanup()
+	slug := "integration-lookup-" + strings.ReplaceAll(uuid.NewString(), "-", "")
+	organizationID, err := repository.CreateOrganization(context.Background(), slug, "Integration lookup")
+	if err != nil {
+		t.Fatalf("create lookup organization: %v", err)
+	}
+	defer cleanupOrganizations(t, repository, organizationID)
+
+	foundID, err := repository.FindOrganizationBySlug(context.Background(), slug)
+	if err != nil {
+		t.Fatalf("find organization = %v", err)
+	}
+	if foundID != organizationID {
+		t.Fatalf("found organization id = %s, want %s", foundID, organizationID)
+	}
+	if _, err := repository.FindOrganizationBySlug(context.Background(), "missing-"+slug); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing organization error = %v, want ErrNotFound", err)
+	}
+}
+
 func TestRepositoryConcurrentDuplicateDeviceKey(t *testing.T) {
 	repository, cleanup := integrationRepository(t)
 	defer cleanup()

@@ -3,9 +3,10 @@
 Status: Planned
 
 Review state: Re-planned and reviewed against the repository, contracts, and
-dependencies on 2026-09-16. No implementation has started. The plan is ready
-for implementation from the current clean branch head `1eaf7a2`, subject to
-re-planning if that base or a decision below changes materially.
+dependencies on 2026-09-16. Implementation was authorized after that review;
+the working-tree implementation and validation evidence remain subject to the
+same scope and decision gates. The plan started from branch head `1eaf7a2` and
+was committed before implementation as `63bfc26`.
 
 Branch: `feat/mvp-002-device-graphql-api`
 
@@ -71,8 +72,8 @@ safely.
   The browser fixture starts `cmd/api` in test mode without a database URL.
 - The API index already reserves `apps/api/graph/schema/*.graphqls` as the SDL
   source of truth. The system-architecture current-state paragraph still says
-  no database schema exists and must be corrected when this feature is
-  delivered.
+  no database schema exists; the delivered implementation updates that
+  paragraph to describe the development GraphQL surface.
 
 ## Scope
 

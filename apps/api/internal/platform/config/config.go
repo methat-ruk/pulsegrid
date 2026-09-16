@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net"
 	"os"
 	"path/filepath"
@@ -37,9 +38,24 @@ const (
 	Production Environment = "production"
 )
 
+// IdentityMode controls whether the product API is enabled and how the
+// request tenant is selected. The safe default is disabled; enabling the
+// development identity is an explicit local/test-only choice.
+type IdentityMode string
+
+const (
+	// IdentityDisabled keeps the process health-only and does not open a
+	// database connection.
+	IdentityDisabled IdentityMode = "disabled"
+	// IdentityDevelopment enables the fixed pulsegrid-dev development
+	// principal. It is rejected for production configuration.
+	IdentityDevelopment IdentityMode = "development"
+)
+
 // Config contains only the settings consumed by the API foundation.
 type Config struct {
 	Environment     Environment
+	IdentityMode    IdentityMode
 	HTTPHost        string
 	HTTPPort        int
 	LogLevel        slog.Level
@@ -110,6 +126,11 @@ func readLocalDotenv(path string) (map[string]string, error) {
 }
 
 func parse(values map[string]string, environment Environment) (Config, error) {
+	identityMode, err := parseIdentityMode(values, environment)
+	if err != nil {
+		return Config{}, err
+	}
+
 	host, err := parseHost(values, environment)
 	if err != nil {
 		return Config{}, err
@@ -132,11 +153,31 @@ func parse(values map[string]string, environment Environment) (Config, error) {
 
 	return Config{
 		Environment:     environment,
+		IdentityMode:    identityMode,
 		HTTPHost:        host,
 		HTTPPort:        port,
 		LogLevel:        logLevel,
 		ShutdownTimeout: shutdownTimeout,
 	}, nil
+}
+
+func parseIdentityMode(values map[string]string, environment Environment) (IdentityMode, error) {
+	rawMode := strings.ToLower(strings.TrimSpace(values["PULSEGRID_IDENTITY_MODE"]))
+	if rawMode == "" {
+		return IdentityDisabled, nil
+	}
+
+	switch IdentityMode(rawMode) {
+	case IdentityDisabled:
+		return IdentityDisabled, nil
+	case IdentityDevelopment:
+		if environment == Production {
+			return "", errors.New("configuration PULSEGRID_IDENTITY_MODE development is not allowed in production")
+		}
+		return IdentityDevelopment, nil
+	default:
+		return "", errors.New("configuration PULSEGRID_IDENTITY_MODE must be disabled or development")
+	}
 }
 
 // ParseEnvironment validates the logical runtime selected by the operator or
@@ -247,8 +288,6 @@ func environmentFromOS() map[string]string {
 
 func cloneValues(values map[string]string) map[string]string {
 	clone := make(map[string]string, len(values))
-	for key, value := range values {
-		clone[key] = value
-	}
+	maps.Copy(clone, values)
 	return clone
 }

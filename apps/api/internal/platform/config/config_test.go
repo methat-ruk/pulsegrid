@@ -18,6 +18,9 @@ func TestLoadFromUsesSafeDevelopmentDefaults(t *testing.T) {
 	if got.Environment != Development {
 		t.Fatalf("environment = %q, want %q", got.Environment, Development)
 	}
+	if got.IdentityMode != IdentityDisabled {
+		t.Fatalf("identity mode = %q, want %q", got.IdentityMode, IdentityDisabled)
+	}
 	if got.Address() != "127.0.0.1:8080" {
 		t.Fatalf("address = %q, want 127.0.0.1:8080", got.Address())
 	}
@@ -37,6 +40,31 @@ func TestLoadFromUsesTestDefaults(t *testing.T) {
 
 	if got.HTTPPort != 18080 {
 		t.Fatalf("test port = %d, want 18080", got.HTTPPort)
+	}
+}
+
+func TestLoadFromAcceptsDevelopmentIdentityOnlyOutsideProduction(t *testing.T) {
+	got, err := LoadFrom(map[string]string{
+		"PULSEGRID_ENV":           "test",
+		"PULSEGRID_IDENTITY_MODE": "development",
+	}, t.TempDir(), missingDotenv)
+	if err != nil {
+		t.Fatalf("LoadFrom returned error: %v", err)
+	}
+	if got.IdentityMode != IdentityDevelopment {
+		t.Fatalf("identity mode = %q, want %q", got.IdentityMode, IdentityDevelopment)
+	}
+
+	_, err = LoadFrom(map[string]string{
+		"PULSEGRID_ENV":              "production",
+		"PULSEGRID_IDENTITY_MODE":    "development",
+		"PULSEGRID_HTTP_HOST":        "api.example.test",
+		"PULSEGRID_HTTP_PORT":        "443",
+		"PULSEGRID_LOG_LEVEL":        "info",
+		"PULSEGRID_SHUTDOWN_TIMEOUT": "15s",
+	}, t.TempDir(), missingDotenv)
+	if err == nil {
+		t.Fatal("production accepted development identity mode")
 	}
 }
 

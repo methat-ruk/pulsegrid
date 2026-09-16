@@ -4,8 +4,8 @@ info:
   version: 0.1.0
   description: >-
     Operational HTTP endpoints for the PulseGrid process. This contract does
-    not contain product-domain APIs; those will be introduced through the
-    GraphQL contract when the corresponding MVP feature is implemented.
+    not contain product-domain APIs; the MVP-002 development GraphQL contract
+    is owned by the SDL under apps/api/graph/schema.
 servers:
   - url: http://127.0.0.1:8080
     description: Local development default
@@ -93,6 +93,11 @@ paths:
                   value:
                     status: not_ready
                     reason: draining
+                dependencyUnavailable:
+                  summary: A required runtime dependency is unavailable.
+                  value:
+                    status: not_ready
+                    reason: dependency_unavailable
         '404':
           $ref: '#/components/responses/NotFound'
         '405':
@@ -164,6 +169,7 @@ components:
           enum:
             - starting
             - draining
+            - dependency_unavailable
 
     PublicError:
       type: object
