@@ -76,10 +76,11 @@ Nuxt). The shell checks `GET /api/operational/ready` and offers a manual Retry
 when the local API is stopped or starting. This adapter covers process
 readiness only; it is not a product API or a generic proxy.
 
-### Local PostgreSQL and persistence tests
+### Local PostgreSQL, seed, and development GraphQL
 
-MVP-001 keeps database startup explicit and separate from the health-only API.
-Copy the API example, set a disposable password in the ignored file, and run:
+MVP-002 keeps database setup explicit. Copy the API example, set a disposable
+password in the ignored file, and run migrations and seed before starting the
+development-only GraphQL API:
 
 ```sh
 cp apps/api/.env.development.example apps/api/.env.development
@@ -87,7 +88,13 @@ corepack pnpm run db:dev:up
 corepack pnpm run db:dev:migrate
 corepack pnpm run db:dev:seed
 corepack pnpm run db:dev:status
+corepack pnpm run dev:api
 ```
+
+`PULSEGRID_IDENTITY_MODE=development` resolves only the seeded
+`pulsegrid-dev` organization. The API fails before listening if PostgreSQL,
+migrations, or seed data is unavailable. Use `PULSEGRID_IDENTITY_MODE=disabled`
+for the health-only test/browser process; it does not open a database.
 
 ### Migration preflight and recovery
 
@@ -210,12 +217,14 @@ console errors.
 | `corepack pnpm run api:staticcheck` | Run the pinned Staticcheck suite across normal and `integration` build-tagged code |
 | `corepack pnpm run lint` | Go vet, frontend lint, and OpenAPI lint |
 | `corepack pnpm run typecheck` | Nuxt/TypeScript typecheck |
+| `corepack pnpm run browser:typecheck` | Typecheck Playwright fixtures/specs with the workspace TypeScript SDK |
 | `corepack pnpm run test` | Go tests and frontend Vitest in explicit test mode |
 | `corepack pnpm run test:race` | Go race suite |
 | `corepack pnpm run build` | Go compilation and Nuxt production build |
 | `corepack pnpm run openapi` | Lint, bundle, and static HTML rendering into ignored `.openapi/` |
 | `corepack pnpm run audit` | Node production audit and reachable Go vulnerability scan |
-| `corepack pnpm run check:fast` | Fast pre-CI handoff: formatting, Go modernization/static analysis, lint, typecheck, and ordinary tests |
+| `corepack pnpm run api:generate:check` | Regenerate gqlgen artifacts and fail when committed GraphQL output is stale |
+| `corepack pnpm run check:fast` | Fast pre-CI handoff: formatting, generated-contract drift, Go modernization/static analysis, lint, typecheck, and ordinary tests |
 | `corepack pnpm run api:test:integration` | Isolated real-PostgreSQL migration, repository, constraint, and tenant-scope evidence |
 | `corepack pnpm run check` | Full pre-CI handoff, including race, build, OpenAPI, audits, database integration, and browser smoke |
 
@@ -248,7 +257,9 @@ configuration; they do not load development or test dotenv files.
   upstream diagnostic and is not an authoritative gate.
 - `corepack pnpm run node:audit` keeps low and informational advisories visible
   but blocks moderate, high, and critical production findings. The current
-  low `esbuild` advisory is documented for follow-up.
+  lockfile has no production advisories; the scoped `fontless>esbuild` override
+  keeps its transitive edge on the patched release until upstream widens its
+  dependency range.
 - `govulncheck` may list vulnerabilities in required Go modules that current
   code does not reach. They remain visible and are not reported as reachable
   application vulnerabilities.

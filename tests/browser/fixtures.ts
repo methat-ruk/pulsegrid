@@ -75,6 +75,7 @@ async function createAPIProcess(): Promise<ApiProcess> {
       env: {
         ...process.env,
         PULSEGRID_ENV: 'test',
+        PULSEGRID_IDENTITY_MODE: 'disabled',
         PULSEGRID_HTTP_HOST: '127.0.0.1',
         PULSEGRID_HTTP_PORT: '18080',
         PULSEGRID_LOG_LEVEL: 'error',
@@ -101,7 +102,7 @@ async function createAPIProcess(): Promise<ApiProcess> {
   return { start, stop }
 }
 
-export const test = base.extend<{ apiProcess: ApiProcess }>({
+export const test = base.extend<{}, { apiProcess: ApiProcess }>({
   apiProcess: [async ({}, use) => {
     const api = await createAPIProcess()
     try {

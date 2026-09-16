@@ -144,13 +144,25 @@ plan begins.
 
 ### MVP-001 PostgreSQL key
 
-MVP-001 adds one server-only database key for migration, seed, and repository
-integration-test commands. It is not required by the current health-only API
-startup; those commands validate and require it at their own boundary.
+MVP-001 adds one server-only database key for migration, seed, repository
+integration-test commands, and the MVP-002 development GraphQL startup. The
+disabled/health-only API path does not require or open it.
 
 | Key | Development/test behavior | Production behavior |
 | --- | --- | --- |
 | PULSEGRID_DATABASE_URL | Development points to loopback pulsegrid_dev; test points to the isolated loopback pulsegrid_test port and must never fall back to development | Injected by the deployment secret manager when a production database consumer exists; the tracked production example keeps it blank |
+
+### MVP-002 GraphQL identity mode
+
+MVP-002 adds an explicit server-only identity mode. The safe default is
+`disabled`; development GraphQL is enabled only with the local/test value
+`development`, a literal IPv4 loopback `PULSEGRID_HTTP_HOST` (`127.0.0.0/8`),
+and a seeded `pulsegrid-dev` organization. Wildcard, hostname, non-loopback,
+and IPv6 binds are rejected in this mode.
+
+| Key | Development/test behavior | Production behavior |
+| --- | --- | --- |
+| `PULSEGRID_IDENTITY_MODE` | `disabled` keeps the API health-only; `development` is allowed only with the isolated local/test database and fixed seed mapping | `disabled` only; `development` is rejected |
 
 ### FND-002 Nuxt keys
 
@@ -188,8 +200,9 @@ runtime value.
 5. Repository CI supplies the `test` environment explicitly and verifies that
    test configuration cannot target development resources.
 6. MVP-001 adds PostgreSQL configuration and example values with the first
-   persistence consumer; MVP-004 adds MQTT configuration when its broker and
-   simulator are introduced.
+   persistence consumer; MVP-002 adds the development-only GraphQL identity
+   mode and runtime database readiness; MVP-004 adds MQTT configuration when
+   its broker and simulator are introduced.
 7. Production hardening defines the deployment secret provider, rotation,
    access controls, and production-mode smoke validation.
 

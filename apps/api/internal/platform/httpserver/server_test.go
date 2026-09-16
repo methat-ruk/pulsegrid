@@ -3,7 +3,9 @@ package httpserver
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -13,7 +15,9 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/adaptor"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/config"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/requestcontext"
 )
 
 func TestHealthEndpointsExposeMinimalStates(t *testing.T) {
@@ -61,6 +65,106 @@ func TestHealthEndpointsExposeMinimalStates(t *testing.T) {
 	}
 }
 
+func TestReadinessReportsDependencyUnavailableWithoutChangingLiveness(t *testing.T) {
+	dependencyAvailable := false
+	server := New(testConfig(), slog.New(slog.NewTextHandler(io.Discard, nil)), Options{
+		ReadinessCheck: func(context.Context) error {
+			if !dependencyAvailable {
+				return errors.New("dependency is down")
+			}
+			return nil
+		},
+	})
+	server.state.Store(lifecycleReady)
+
+	response := performRequest(t, server, http.MethodGet, ReadyPath)
+	if response.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("dependency-down readiness status = %d, want %d", response.StatusCode, http.StatusServiceUnavailable)
+	}
+	if body := readBody(t, response); body != `{"status":"not_ready","reason":"dependency_unavailable"}` {
+		t.Fatalf("dependency-down readiness body = %q", body)
+	}
+
+	response = performRequest(t, server, http.MethodGet, LivePath)
+	if response.StatusCode != http.StatusOK || readBody(t, response) != `{"status":"ok"}` {
+		t.Fatalf("liveness changed while dependency was down: status=%d", response.StatusCode)
+	}
+
+	dependencyAvailable = true
+	response = performRequest(t, server, http.MethodGet, ReadyPath)
+	if response.StatusCode != http.StatusOK || readBody(t, response) != `{"status":"ready"}` {
+		t.Fatalf("dependency-up readiness = %d", response.StatusCode)
+	}
+}
+
+func TestGraphQLCompositionBridgesRequestContext(t *testing.T) {
+	type contextProbeKey struct{}
+	server := New(testConfig(), slog.New(slog.NewTextHandler(io.Discard, nil)), Options{
+		GraphQLHandler: http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+			if localContext, ok := adaptor.LocalContextFromHTTPRequest(request); ok {
+				request = request.WithContext(localContext)
+			}
+			tenant, _ := request.Context().Value(contextProbeKey{}).(string)
+			_, hasDeadline := request.Context().Deadline()
+			response.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(response).Encode(map[string]string{
+				"requestId": requestcontext.RequestID(request.Context()),
+				"tenant":    tenant,
+				"deadline":  fmt.Sprint(hasDeadline),
+			})
+		}),
+		ContextEnricher: func(ctx context.Context) context.Context {
+			return context.WithValue(ctx, contextProbeKey{}, "fixed-tenant")
+		},
+	})
+	request := httptest.NewRequest(http.MethodPost, "http://example.test"+GraphQLPath, strings.NewReader(`{}`))
+	request.Header.Set(requestIDHeader, "safe-request-001")
+	response, err := server.app.Test(request)
+	if err != nil {
+		t.Fatalf("app.Test returned error: %v", err)
+	}
+	defer response.Body.Close()
+	var body map[string]string
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode context bridge body: %v", err)
+	}
+	if body["requestId"] != "safe-request-001" || body["tenant"] != "fixed-tenant" || body["deadline"] != "true" {
+		t.Fatalf("context bridge body = %+v", body)
+	}
+}
+
+func TestGraphQLRouteEnforcesBoundedRequestBody(t *testing.T) {
+	handlerCalled := false
+	server := New(testConfig(), slog.New(slog.NewTextHandler(io.Discard, nil)), Options{
+		GraphQLHandler: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+			handlerCalled = true
+		}),
+	})
+	request := httptest.NewRequest(http.MethodPost, "http://example.test"+GraphQLPath, strings.NewReader(strings.Repeat("x", maxBodySize+1)))
+	request.Header.Set("Content-Type", "application/json")
+	response, err := server.app.Test(request)
+	if err != nil {
+		if !strings.Contains(err.Error(), "body size exceeds") {
+			t.Fatalf("oversized request returned unexpected error: %v", err)
+		}
+		if handlerCalled {
+			t.Fatal("oversized request reached GraphQL handler")
+		}
+		return
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized GraphQL status = %d, want %d", response.StatusCode, http.StatusRequestEntityTooLarge)
+	}
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatalf("read oversized response: %v", err)
+	}
+	if handlerCalled || strings.Contains(string(body), strings.Repeat("x", 32)) {
+		t.Fatalf("oversized request reached handler or leaked body: %q", body)
+	}
+}
+
 func TestUnsupportedMethodUsesStableErrorContract(t *testing.T) {
 	server := New(testConfig(), slog.New(slog.NewTextHandler(io.Discard, nil)))
 
@@ -71,6 +175,30 @@ func TestUnsupportedMethodUsesStableErrorContract(t *testing.T) {
 	assertJSONContentType(t, response)
 	if body := readBody(t, response); body != `{"error":{"code":"method_not_allowed","message":"method not allowed"}}` {
 		t.Fatalf("method error body = %q", body)
+	}
+}
+
+func TestDefaultCompositionDoesNotMountGraphQL(t *testing.T) {
+	server := New(testConfig(), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	response := performRequest(t, server, http.MethodPost, GraphQLPath)
+	if response.StatusCode != http.StatusNotFound {
+		t.Fatalf("disabled GraphQL status = %d, want %d", response.StatusCode, http.StatusNotFound)
+	}
+	if body := readBody(t, response); body != `{"error":{"code":"not_found","message":"route not found"}}` {
+		t.Fatalf("disabled GraphQL body = %q", body)
+	}
+}
+
+func TestEnabledGraphQLRejectsNonPostMethods(t *testing.T) {
+	server := New(testConfig(), slog.New(slog.NewTextHandler(io.Discard, nil)), Options{
+		GraphQLHandler: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
+	})
+	response := performRequest(t, server, http.MethodGet, GraphQLPath)
+	if response.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("GraphQL GET status = %d, want %d", response.StatusCode, http.StatusMethodNotAllowed)
+	}
+	if body := readBody(t, response); body != `{"error":{"code":"method_not_allowed","message":"method not allowed"}}` {
+		t.Fatalf("GraphQL GET body = %q", body)
 	}
 }
 

@@ -15,17 +15,21 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/adaptor"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/config"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/requestcontext"
 )
 
 const (
-	LivePath  = "/health/live"
-	ReadyPath = "/health/ready"
+	LivePath    = "/health/live"
+	ReadyPath   = "/health/ready"
+	GraphQLPath = "/graphql"
 
 	requestIDHeader = "X-Request-ID"
 	maxBodySize     = 64 * 1024
 	readTimeout     = 5 * time.Second
 	writeTimeout    = 10 * time.Second
+	requestTimeout  = 9 * time.Second
 	idleTimeout     = 60 * time.Second
 
 	lifecycleReady uint32 = iota + 1
@@ -38,6 +42,14 @@ type requestIDContextKey struct{}
 type statusResponse struct {
 	Status string `json:"status"`
 	Reason string `json:"reason,omitempty"`
+}
+
+// Options composes optional product handlers and dependency probes into the
+// transport without making the platform package depend on product packages.
+type Options struct {
+	GraphQLHandler  http.Handler
+	ContextEnricher func(context.Context) context.Context
+	ReadinessCheck  func(context.Context) error
 }
 
 type errorResponse struct {
@@ -54,6 +66,8 @@ type Server struct {
 	app               *fiber.App
 	address           string
 	logger            *slog.Logger
+	readinessCheck    func(context.Context) error
+	contextEnricher   func(context.Context) context.Context
 	state             atomic.Uint32
 	readySignal       chan struct{}
 	readySignalOnce   sync.Once
@@ -74,16 +88,22 @@ func (l *readinessListener) Accept() (net.Conn, error) {
 }
 
 // New creates an HTTP server without starting a listener.
-func New(cfg config.Config, logger *slog.Logger) *Server {
+func New(cfg config.Config, logger *slog.Logger, options ...Options) *Server {
 	if logger == nil {
 		logger = slog.Default()
 	}
+	var serverOptions Options
+	if len(options) > 0 {
+		serverOptions = options[0]
+	}
 
 	server := &Server{
-		address:       cfg.Address(),
-		logger:        logger,
-		readySignal:   make(chan struct{}),
-		stoppedSignal: make(chan struct{}),
+		address:         cfg.Address(),
+		logger:          logger,
+		readinessCheck:  serverOptions.ReadinessCheck,
+		contextEnricher: serverOptions.ContextEnricher,
+		readySignal:     make(chan struct{}),
+		stoppedSignal:   make(chan struct{}),
 	}
 	server.app = fiber.New(fiber.Config{
 		BodyLimit:    maxBodySize,
@@ -95,6 +115,15 @@ func New(cfg config.Config, logger *slog.Logger) *Server {
 	server.app.Use(server.requestIDMiddleware)
 	server.app.Get(LivePath, server.livenessHandler)
 	server.app.Get(ReadyPath, server.readinessHandler)
+	if serverOptions.GraphQLHandler != nil {
+		server.app.Use(GraphQLPath, func(c fiber.Ctx) error {
+			if c.Path() == GraphQLPath && c.Method() != http.MethodPost {
+				return fiber.NewError(http.StatusMethodNotAllowed, "method not allowed")
+			}
+			return c.Next()
+		})
+		server.app.Post(GraphQLPath, adaptor.HTTPHandlerWithContext(serverOptions.GraphQLHandler))
+	}
 
 	server.app.Hooks().OnListen(func(data fiber.ListenData) error {
 		server.logger.Info("http server ready", "host", data.Host, "port", data.Port)
@@ -200,6 +229,17 @@ func (s *Server) livenessHandler(c fiber.Ctx) error {
 func (s *Server) readinessHandler(c fiber.Ctx) error {
 	switch s.state.Load() {
 	case lifecycleReady:
+		if s.readinessCheck != nil {
+			probeContext, cancel := context.WithTimeout(c.Context(), time.Second)
+			defer cancel()
+			if err := s.readinessCheck(probeContext); err != nil {
+				s.logger.Warn("http server dependency is unavailable", "reason_code", "dependency_unavailable")
+				return c.Status(http.StatusServiceUnavailable).JSON(statusResponse{
+					Status: "not_ready",
+					Reason: "dependency_unavailable",
+				})
+			}
+		}
 		return c.Status(http.StatusOK).JSON(statusResponse{Status: "ready"})
 	case lifecycleDraining:
 		return c.Status(http.StatusServiceUnavailable).JSON(statusResponse{
@@ -222,6 +262,13 @@ func (s *Server) requestIDMiddleware(c fiber.Ctx) error {
 	if requestID != "" {
 		c.Set(requestIDHeader, requestID)
 		c.Locals(requestIDContextKey{}, requestID)
+		requestContext, cancel := context.WithTimeout(c.Context(), requestTimeout)
+		defer cancel()
+		requestContext = requestcontext.WithRequestID(requestContext, requestID)
+		if s.contextEnricher != nil {
+			requestContext = s.contextEnricher(requestContext)
+		}
+		c.SetContext(requestContext)
 	}
 	return c.Next()
 }

@@ -133,6 +133,24 @@ func (r *Repository) EnsureOrganization(ctx context.Context, slug string, displa
 	return id, nil
 }
 
+// FindOrganizationBySlug resolves the fixed identity mapping used by the
+// development API. It never creates or mutates an organization.
+func (r *Repository) FindOrganizationBySlug(ctx context.Context, slug string) (uuid.UUID, error) {
+	if err := validateOrganizationSlug(slug); err != nil {
+		return uuid.Nil, err
+	}
+
+	var id uuid.UUID
+	if err := r.pool.QueryRow(ctx, `
+		SELECT id
+		FROM organizations
+		WHERE slug = $1
+	`, slug).Scan(&id); err != nil {
+		return uuid.Nil, mapDatabaseError(err)
+	}
+	return id, nil
+}
+
 // CreateDevice persists a device under the explicit organization scope.
 func (r *Repository) CreateDevice(ctx context.Context, organizationID uuid.UUID, input CreateDeviceInput) (Device, error) {
 	if organizationID == uuid.Nil {
@@ -267,8 +285,8 @@ func validateCursor(cursor *Cursor) error {
 }
 
 func validateOrganization(slug string, displayName string) error {
-	if !utf8.ValidString(slug) || !slugPattern.MatchString(slug) || utf8.RuneCountInString(slug) > 63 {
-		return fmt.Errorf("%w: organization slug", ErrInvalidInput)
+	if err := validateOrganizationSlug(slug); err != nil {
+		return err
 	}
 	if !utf8.ValidString(displayName) {
 		return fmt.Errorf("%w: organization display name", ErrInvalidInput)
@@ -277,6 +295,13 @@ func validateOrganization(slug string, displayName string) error {
 	trimmedDisplayNameSize := utf8.RuneCountInString(strings.TrimSpace(displayName))
 	if displayNameSize < minTextSize || displayNameSize > maxNameSize || trimmedDisplayNameSize < minTextSize {
 		return fmt.Errorf("%w: organization display name", ErrInvalidInput)
+	}
+	return nil
+}
+
+func validateOrganizationSlug(slug string) error {
+	if !utf8.ValidString(slug) || !slugPattern.MatchString(slug) || utf8.RuneCountInString(slug) > 63 {
+		return fmt.Errorf("%w: organization slug", ErrInvalidInput)
 	}
 	return nil
 }

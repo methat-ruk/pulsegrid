@@ -1,7 +1,7 @@
 # PulseGrid API documentation
 
-Status: Foundation operational contract documented; product APIs are not
-implemented.
+Status: MVP-002 development GraphQL device contract implemented; production
+identity and product expansion remain deferred.
 
 ## Purpose and ownership
 
@@ -22,6 +22,7 @@ and the relevant feature plan. Logical API boundaries remain owned by the
 Repository-level contract validation is provided by FND-003:
 
 ```sh
+corepack pnpm run api:generate:check
 corepack pnpm run openapi:lint
 corepack pnpm run openapi:bundle
 corepack pnpm run openapi:html
@@ -36,7 +37,7 @@ and are review artifacts only; they are not published or served at runtime.
 | --- | --- | --- | --- |
 | Process health | REST/HTTP | Implemented in FND-001 | [`operational.yaml`](../../apps/api/api/openapi/operational.yaml) |
 | Console readiness adapter | Same-origin Nuxt server route | Implemented in FND-004; local process-readiness adapter only | [`ready.get.ts`](../../apps/web-console/server/api/operational/ready.get.ts) and the FND-001 operational contract |
-| Operator product API | GraphQL/gqlgen | Planned for MVP-002 | `apps/api/graph/schema/*.graphqls` when introduced |
+| Operator product API | GraphQL/gqlgen | Implemented for development-only MVP-002 scope | [`device.graphqls`](../../apps/api/graph/schema/device.graphqls) and committed generated artifacts |
 | Device telemetry | MQTT | Planned for MVP-004 onward | AsyncAPI/message schema when a concrete flow exists |
 | Device commands | MQTT | Planned for MVP-011 onward | AsyncAPI/message schema when a concrete flow exists |
 | Durable event distribution | Kafka | Post-MVP conditional | A flow-specific AsyncAPI/message contract |
@@ -84,6 +85,30 @@ details. Authentication and deployment exposure are intentionally not claimed
 by FND-001; deployment work must keep probe access internal and define any
 proxy/cache policy.
 
+## MVP-002 development GraphQL contract
+
+`POST /graphql` is mounted only when `PULSEGRID_IDENTITY_MODE=development` and
+`PULSEGRID_HTTP_HOST` is a literal IPv4 loopback address (`127.0.0.0/8`).
+Wildcard, hostname, non-loopback, and IPv6 binds are rejected in this mode.
+The process resolves the seeded `pulsegrid-dev` organization before listening;
+missing migrations, seed data, or PostgreSQL fail startup. The request cannot
+select a tenant through an argument, header, cookie, or client state.
+
+The endpoint accepts `Content-Type: application/json` and returns
+`application/graphql-response+json`. GET, batching, subscriptions, multipart
+uploads, persisted queries, and playground routes are not enabled. Introspection
+is available only in this explicit development mode. The SDL is the source of
+truth; generated gqlgen files are committed and checked for drift.
+
+The first contract exposes `device`, bounded forward `devices` pagination
+(`first` 1–100 with opaque versioned cursors), and `createDevice`. Device IDs
+are canonical UUID strings and timestamps are UTC RFC3339Nano. Expected resolver
+codes are `BAD_USER_INPUT`, `CONFLICT`, and `INTERNAL_SERVER_ERROR`; parse and
+validation failures use gqlgen's `GRAPHQL_PARSE_FAILED` and
+`GRAPHQL_VALIDATION_FAILED` codes. Errors include a safe request correlation ID
+when one is available and never reveal SQL, credentials, tenant existence, or
+request bodies.
+
 ## Local testing
 
 From `apps/api`:
@@ -92,7 +117,7 @@ From `apps/api`:
 goenv exec go test ./...
 goenv exec go test -race ./...
 goenv exec go vet ./...
-PULSEGRID_ENV=development go run ./cmd/api
+PULSEGRID_ENV=development corepack pnpm run dev:api
 ```
 
 From another terminal:
@@ -116,8 +141,8 @@ API process.
   compatibility-sensitive.
 - Prefer additive changes and deprecation before removal.
 - Keep REST JSON naming consistent with the existing operational contract.
-- Keep GraphQL SDL as the source of truth when MVP-002 introduces the product
-  API; generated gqlgen output is not hand-edited.
+- Keep GraphQL SDL as the source of truth for the MVP-002 product API; generated
+  gqlgen output is not hand-edited.
 - Introduce AsyncAPI only with a concrete MQTT or Kafka producer and consumer.
 - Treat local `curl` commands as onboarding and smoke checks; automated Go and
   CI contract tests remain the authority.

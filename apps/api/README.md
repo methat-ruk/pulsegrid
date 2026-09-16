@@ -1,8 +1,8 @@
 # PulseGrid API
 
-This directory owns the initial Go/Fiber API process. It currently exposes
-only lifecycle and health contracts; product APIs are introduced by later
-feature plans.
+This directory owns the Go/Fiber API process. It exposes lifecycle and health
+contracts in every mode, plus the development-only GraphQL device contract
+when the fixed development identity is explicitly enabled.
 
 ## Requirements
 
@@ -23,13 +23,29 @@ The native command remains available from this directory:
 PULSEGRID_ENV=development go run ./cmd/api
 ```
 
-The default listener is `127.0.0.1:8080`. To use a local dotenv file, copy the
-reviewed example and keep the environment selector explicit:
+The default listener is `127.0.0.1:8080`. When development identity is enabled,
+`PULSEGRID_HTTP_HOST` must remain a literal IPv4 loopback address in `127.0.0.0/8`;
+wildcard, non-loopback, hostname, and IPv6 binds are rejected. To use a local
+dotenv file, copy the reviewed example and keep the environment selector explicit:
 
 ```sh
 cp .env.development.example .env.development
 PULSEGRID_ENV=development go run ./cmd/api
 ```
+
+Development mode requires the seeded `pulsegrid-dev` organization and enables
+`POST /graphql`. Run migrations and seed before starting the API:
+
+```sh
+corepack pnpm run db:dev:up
+corepack pnpm run db:dev:migrate
+corepack pnpm run db:dev:seed
+corepack pnpm run dev:api
+```
+
+The GraphQL transport accepts JSON POST requests only. Test and production
+examples default to `PULSEGRID_IDENTITY_MODE=disabled`, which keeps the API
+health-only and does not open PostgreSQL.
 
 Check the lifecycle endpoints:
 
@@ -40,13 +56,14 @@ curl -i http://127.0.0.1:8080/health/ready
 
 The machine-readable operational contract and response semantics are in the
 [API documentation index](../../docs/api/README.md) and
-[OpenAPI contract](api/openapi/operational.yaml). Product-domain APIs are not
-implemented by this foundation.
+[OpenAPI contract](api/openapi/operational.yaml). The development-only
+GraphQL device contract is documented in the API index; production product
+APIs are not implemented by this foundation.
 
 ## Local PostgreSQL (MVP-001)
 
-The health-only API does not open PostgreSQL. Database access is explicit
-through the migration, seed, and integration-test commands below. Create the
+The disabled/health-only API does not open PostgreSQL. Development GraphQL
+opens it only after explicit setup below. Create the
 ignored development environment file once and replace `CHANGE_ME` with a
 disposable local password. Run these commands from the repository root:
 
@@ -116,9 +133,10 @@ volume. It refuses to attach to an existing process on the test port:
 corepack pnpm run api:test:integration
 ```
 
-No product REST/GraphQL endpoint or runtime database readiness contract is
-introduced by MVP-001. The repository boundary is an internal trusted caller
-surface until a later feature establishes identity-to-organization mapping.
+The repository boundary remains internal. GraphQL uses the fixed development
+organization resolved at startup; it does not accept a tenant identifier from
+the request. Readiness checks PostgreSQL only while GraphQL is enabled, while
+liveness remains process-only.
 
 ## Test
 

@@ -12,11 +12,11 @@ by the [roadmap](../roadmap/roadmap.md).
 
 ## Current state
 
-The Go/Fiber API foundation is implemented and validated as one modular process
-with lifecycle and health endpoints only. The Nuxt console has a local,
-server-only readiness adapter that consumes the fixed `/health/ready` contract;
-no product API, database schema, event contract, or deployment topology has
-been implemented or validated yet.
+The Go/Fiber API is implemented and validated as one modular process with
+lifecycle and health endpoints. MVP-002 adds a development-only GraphQL device
+surface backed by the MVP-001 organization/device registry; the Nuxt console
+still has a local, server-only readiness adapter. Production identity,
+deployment exposure, and later event contracts remain unimplemented.
 
 Architecture diagrams below describe an intended sequence of evolution. They
 must not be read as deployed topology.
@@ -127,8 +127,8 @@ The API strategy is deliberately split by consumer and protocol:
 
 - operational HTTP uses REST and OpenAPI, currently limited to the FND-001
   liveness and readiness endpoints;
-- the operator-facing product API uses GraphQL and gqlgen when MVP-002
-  introduces the first device contract;
+- the operator-facing development product API uses GraphQL and gqlgen for the
+  MVP-002 first device contract;
 - MQTT and any later Kafka flow use flow-specific message contracts, documented
   with AsyncAPI only after a concrete producer and consumer exist;
 - gRPC and Protocol Buffers remain conditional on an independently deployed

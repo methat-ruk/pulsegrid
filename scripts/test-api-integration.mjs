@@ -9,6 +9,7 @@ const databaseUrl = `postgres://pulsegrid:${encodeURIComponent(password)}@127.0.
 const environment = {
   ...process.env,
   PULSEGRID_ENV: 'test',
+  PULSEGRID_IDENTITY_MODE: 'development',
   PULSEGRID_DATABASE_URL: databaseUrl,
   PULSEGRID_POSTGRES_PASSWORD: password,
 }

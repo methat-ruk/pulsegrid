@@ -18,6 +18,9 @@ func TestLoadFromUsesSafeDevelopmentDefaults(t *testing.T) {
 	if got.Environment != Development {
 		t.Fatalf("environment = %q, want %q", got.Environment, Development)
 	}
+	if got.IdentityMode != IdentityDisabled {
+		t.Fatalf("identity mode = %q, want %q", got.IdentityMode, IdentityDisabled)
+	}
 	if got.Address() != "127.0.0.1:8080" {
 		t.Fatalf("address = %q, want 127.0.0.1:8080", got.Address())
 	}
@@ -37,6 +40,56 @@ func TestLoadFromUsesTestDefaults(t *testing.T) {
 
 	if got.HTTPPort != 18080 {
 		t.Fatalf("test port = %d, want 18080", got.HTTPPort)
+	}
+}
+
+func TestLoadFromAcceptsDevelopmentIdentityOnlyOutsideProduction(t *testing.T) {
+	got, err := LoadFrom(map[string]string{
+		"PULSEGRID_ENV":           "test",
+		"PULSEGRID_IDENTITY_MODE": "development",
+	}, t.TempDir(), missingDotenv)
+	if err != nil {
+		t.Fatalf("LoadFrom returned error: %v", err)
+	}
+	if got.IdentityMode != IdentityDevelopment {
+		t.Fatalf("identity mode = %q, want %q", got.IdentityMode, IdentityDevelopment)
+	}
+
+	for _, host := range []string{"127.0.0.2", "127.255.255.254"} {
+		got, err := LoadFrom(map[string]string{
+			"PULSEGRID_ENV":           "test",
+			"PULSEGRID_IDENTITY_MODE": "development",
+			"PULSEGRID_HTTP_HOST":     host,
+		}, t.TempDir(), missingDotenv)
+		if err != nil {
+			t.Fatalf("loopback host %q rejected: %v", host, err)
+		}
+		if got.HTTPHost != host {
+			t.Fatalf("loopback host = %q, want %q", got.HTTPHost, host)
+		}
+	}
+
+	for _, host := range []string{"0.0.0.0", "192.0.2.10", "localhost", "::1", "::ffff:127.0.0.1"} {
+		_, err := LoadFrom(map[string]string{
+			"PULSEGRID_ENV":           "test",
+			"PULSEGRID_IDENTITY_MODE": "development",
+			"PULSEGRID_HTTP_HOST":     host,
+		}, t.TempDir(), missingDotenv)
+		if err == nil {
+			t.Fatalf("non-loopback host %q accepted with development identity", host)
+		}
+	}
+
+	_, err = LoadFrom(map[string]string{
+		"PULSEGRID_ENV":              "production",
+		"PULSEGRID_IDENTITY_MODE":    "development",
+		"PULSEGRID_HTTP_HOST":        "api.example.test",
+		"PULSEGRID_HTTP_PORT":        "443",
+		"PULSEGRID_LOG_LEVEL":        "info",
+		"PULSEGRID_SHUTDOWN_TIMEOUT": "15s",
+	}, t.TempDir(), missingDotenv)
+	if err == nil {
+		t.Fatal("production accepted development identity mode")
 	}
 }
 
@@ -69,6 +122,18 @@ func TestLoadFromMergesDotenvWithoutOverridingProcessValues(t *testing.T) {
 	}
 	if got.LogLevel != slog.LevelWarn {
 		t.Fatalf("log level = %v, want warn", got.LogLevel)
+	}
+}
+
+func TestLoadFromRejectsDevelopmentIdentityAfterDotenvMerge(t *testing.T) {
+	_, err := LoadFrom(map[string]string{
+		"PULSEGRID_ENV":           "test",
+		"PULSEGRID_IDENTITY_MODE": "development",
+	}, t.TempDir(), func(string) (map[string]string, error) {
+		return map[string]string{"PULSEGRID_HTTP_HOST": "192.0.2.10"}, nil
+	})
+	if err == nil {
+		t.Fatal("development identity accepted a non-loopback dotenv host")
 	}
 }
 
