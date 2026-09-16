@@ -1,14 +1,14 @@
 # MVP-002 — Device GraphQL API
 
-Status: Ready for review
+Status: Complete
 
-Review state: Re-planned and reviewed against the repository, contracts, and
-dependencies on 2026-09-16. Implementation was authorized after that review;
-the implementation and review fixes are complete for this PR scope. The plan's
-evidence map now distinguishes direct tests from code-reviewed lifecycle gaps;
-default-page/final-page success and direct pool-close-order instrumentation
-remain explicitly out of the completed evidence claim. The plan started from
-branch head `1eaf7a2` and was committed before implementation as `63bfc26`.
+Review state: Re-planned, implemented, reviewed, and validated on 2026-09-16.
+All review findings are fixed on the merge candidate, local and GitHub checks
+pass, and the outcome is accepted for merge. The evidence map distinguishes
+direct tests from code-reviewed lifecycle gaps; default-page/final-page success
+and direct pool-close-order instrumentation remain explicitly outside the
+completed evidence claim. The plan started from branch head `1eaf7a2` and was
+committed before implementation as `63bfc26`.
 
 Branch: `feat/mvp-002-device-graphql-api`
 
