@@ -771,7 +771,18 @@ Before considering a browser-visible change complete, verify:
 - status does not rely only on color
 - responsive behavior has been checked
 - information density remains readable
-- browser verification has been performed
+- browser-runtime evidence has been selected in proportion to the changed
+  visible behavior and impact
+- automated validation covers the changed guarantees at the lowest faithful
+  boundary, or an explicit no-test decision records the remaining risk
+- real-browser automation is used when the browser boundary is material and it
+  can faithfully exercise the behavior
+- targeted interactive browser verification is performed when automation
+  cannot prove a material visual, responsive, accessibility, or interaction
+  claim
+- console, network, timing, or protocol inspection is performed only when it
+  closes a relevant evidence gap
+- unverified browser behavior and remaining risk are reported
 
 ---
 
