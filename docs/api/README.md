@@ -1,7 +1,8 @@
 # PulseGrid API documentation
 
-Status: MVP-002 development GraphQL device contract implemented; production
-identity and product expansion remain deferred.
+Status: MVP-002 development GraphQL device contract implemented; MVP-003
+console integration is implemented on the feature branch. Production identity
+and product expansion remain deferred.
 
 ## Purpose and ownership
 
@@ -37,6 +38,7 @@ and are review artifacts only; they are not published or served at runtime.
 | --- | --- | --- | --- |
 | Process health | REST/HTTP | Implemented in FND-001 | [`operational.yaml`](../../apps/api/api/openapi/operational.yaml) |
 | Console readiness adapter | Same-origin Nuxt server route | Implemented in FND-004; local process-readiness adapter only | [`ready.get.ts`](../../apps/web-console/server/api/operational/ready.get.ts) and the FND-001 operational contract |
+| Console GraphQL adapter | Same-origin Nuxt server route | Implemented in MVP-003; development/test transport adapter only | [`graphql.post.ts`](../../apps/web-console/server/api/graphql.post.ts) and [`graphql-proxy.ts`](../../apps/web-console/server/utils/graphql-proxy.ts) |
 | Operator product API | GraphQL/gqlgen | Implemented for development-only MVP-002 scope | [`device.graphqls`](../../apps/api/graph/schema/device.graphqls) and committed generated artifacts |
 | Device telemetry | MQTT | Planned for MVP-004 onward | AsyncAPI/message schema when a concrete flow exists |
 | Device commands | MQTT | Planned for MVP-011 onward | AsyncAPI/message schema when a concrete flow exists |
@@ -44,10 +46,11 @@ and are review artifacts only; they are not published or served at runtime.
 | Internal synchronous service calls | gRPC/Protobuf | Post-MVP conditional | A flow-specific protobuf contract |
 
 REST is intentionally limited to operational HTTP in the current foundation.
-The Nuxt route is a fixed same-origin adapter for the console's local readiness
-indicator; it is not a second product REST API or a generic proxy. The console
-product API will use GraphQL; no parallel REST CRUD API is created without a
-separate consumer and an approved boundary.
+The Nuxt routes are fixed same-origin adapters for readiness and the console's
+development GraphQL journey; they are not a second product REST API or a
+generic proxy. The console product API uses the existing GraphQL contract; no
+parallel REST CRUD API is created without a separate consumer and an approved
+boundary.
 
 ## Current operational contract
 
@@ -108,6 +111,22 @@ validation failures use gqlgen's `GRAPHQL_PARSE_FAILED` and
 `GRAPHQL_VALIDATION_FAILED` codes. Errors include a safe request correlation ID
 when one is available and never reveal SQL, credentials, tenant existence, or
 request bodies.
+
+### Console GraphQL adapter
+
+The browser calls only same-origin `POST /api/graphql`. The Nuxt server adapter
+appends the fixed upstream `/graphql` path to the private
+`NUXT_BACKEND_ORIGIN`; it does not forward browser cookies, authorization,
+origin, arbitrary headers, or a client-selected path. Browser requests and
+valid upstream responses use `application/graphql-response+json` and
+`cache-control: no-store`. The adapter bounds request bodies at 64 KiB,
+responses at 256 KiB, and the upstream call at five seconds. It maps missing,
+unreachable, timed-out, oversized, or invalid-media-type upstream responses to
+a safe HTTP 503 GraphQL envelope with code `SERVICE_UNAVAILABLE`; unsupported
+browser media types use 415 and oversized requests use 413. Malformed JSON is
+forwarded so the Go GraphQL parser remains the parsing authority. This route
+does not add authentication, tenant selection, caching, retries, or production
+exposure.
 
 ## Local testing
 

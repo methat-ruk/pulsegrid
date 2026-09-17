@@ -80,16 +80,20 @@ flowchart TD
     MVP012 --> MVP013
 
     classDef complete fill:#DCFCE7,stroke:#15803D,color:#14532D;
+    classDef progress fill:#FEF3C7,stroke:#B45309,color:#78350F;
     class DOC001 complete;
     class FND001 complete;
     class FND002 complete;
     class FND003 complete;
+    class MVP003 progress;
 ```
 
-FND-001 implementation establishes the backend runtime shell, and FND-002
-establishes the frontend runtime shell. FND-003 now establishes the repository
-quality and merge-gate boundary. FND-004 remains the Foundation acceptance gate
-before the first MVP persistence slice begins.
+FND-001 implementation establishes the backend runtime shell, FND-002
+establishes the frontend runtime shell, FND-003 establishes the repository
+quality and merge-gate boundary, and FND-004 proves the first cross-boundary
+process journey. MVP-001 and MVP-002 now provide the persistence and GraphQL
+contract; MVP-003 is the in-progress console journey that closes the first
+operator-visible device-registry slice.
 
 ## Milestones
 
@@ -128,7 +132,7 @@ Plans:
 
 ### M1 — Device registry
 
-Status: Planned
+Status: In progress
 
 Dependency: F0
 
@@ -139,7 +143,7 @@ Plans:
 
 - [MVP-001 — Tenant and device persistence](feature-plans/completed/MVP-001-tenant-device-persistence.md)
 - [MVP-002 — Device GraphQL API](feature-plans/completed/MVP-002-device-graphql-api.md)
-- [MVP-003 — Device registry console](feature-plans/planned/MVP-003-device-registry-console.md)
+- [MVP-003 — Device registry console](feature-plans/planned/MVP-003-device-registry-console.md) (In progress)
 
 ### M2 — Telemetry and current state
 

@@ -408,6 +408,20 @@ jobs:
     name: browser-smoke
     runs-on: ubuntu-24.04
     timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:18.6@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+        env:
+          POSTGRES_USER: pulsegrid
+          POSTGRES_PASSWORD: pulsegrid-browser-ci
+          POSTGRES_DB: pulsegrid_test
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd "pg_isready -U pulsegrid -d pulsegrid_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - name: Checkout
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -444,6 +458,7 @@ jobs:
       - name: Run browser smoke
         env:
           NUXT_APP_ENV: test
+          PULSEGRID_DATABASE_URL: postgres://pulsegrid:pulsegrid-browser-ci@127.0.0.1:15432/pulsegrid_test?sslmode=disable
         run: corepack pnpm run test:browser
       - name: Upload Playwright diagnostics
         if: failure()

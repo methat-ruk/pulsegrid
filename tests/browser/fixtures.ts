@@ -66,6 +66,8 @@ async function stopProcess(child: ChildProcess | undefined): Promise<void> {
 
 async function createAPIProcess(): Promise<ApiProcess> {
   await access(apiBinary)
+  const databaseURL = process.env.PULSEGRID_DATABASE_URL
+  if (!databaseURL) throw new Error('PULSEGRID_DATABASE_URL is required for browser smoke tests')
   let child: ChildProcess | undefined
 
   const start = async () => {
@@ -75,7 +77,8 @@ async function createAPIProcess(): Promise<ApiProcess> {
       env: {
         ...process.env,
         PULSEGRID_ENV: 'test',
-        PULSEGRID_IDENTITY_MODE: 'disabled',
+        PULSEGRID_IDENTITY_MODE: 'development',
+        PULSEGRID_DATABASE_URL: databaseURL,
         PULSEGRID_HTTP_HOST: '127.0.0.1',
         PULSEGRID_HTTP_PORT: '18080',
         PULSEGRID_LOG_LEVEL: 'error',

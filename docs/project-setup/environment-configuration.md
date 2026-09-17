@@ -178,11 +178,16 @@ FND-002 introduces one server-only application-environment key:
 | --- | --- | --- | --- |
 | `NUXT_BACKEND_ORIGIN` | Required loopback origin `http://127.0.0.1:8080` when using the local readiness adapter | Required isolated loopback origin `http://127.0.0.1:18080`; never falls back to development | Must be absent; startup rejects it |
 
-The key is private Nitro runtime configuration. The adapter calls only the
-fixed backend path `/health/ready`, accepts only the exact `200`
+The key is private Nitro runtime configuration. The readiness adapter calls
+only the fixed backend path `/health/ready`, accepts only the exact `200`
 `{"status":"ready"}` response, bounds the response and timeout, and maps all
-other outcomes to a generic unavailable state. It does not forward arbitrary
-headers, cookies, credentials, or paths and is not a general REST proxy.
+other outcomes to a generic unavailable state. MVP-003 also uses the same
+private origin for a fixed `/graphql` product adapter. That adapter accepts
+only JSON requests, forwards no browser authority or arbitrary path, bounds
+request/response bytes and upstream time, preserves valid GraphQL status/body
+responses, and maps upstream transport/media failures to a safe unavailable
+GraphQL envelope. Neither route is a general proxy or a production identity
+boundary.
 
 Nuxt validates these keys during Nitro startup. `runtimeConfig.public` remains
 empty, so the browser receives no API origin, credential, or other private
@@ -201,8 +206,10 @@ runtime value.
    test configuration cannot target development resources.
 6. MVP-001 adds PostgreSQL configuration and example values with the first
    persistence consumer; MVP-002 adds the development-only GraphQL identity
-   mode and runtime database readiness; MVP-004 adds MQTT configuration when
-   its broker and simulator are introduced.
+   mode and runtime database readiness; MVP-003 consumes the existing private
+   origin through a fixed same-origin adapter and does not add a browser-facing
+   origin or credential; MVP-004 adds MQTT configuration when its broker and
+   simulator are introduced.
 7. Production hardening defines the deployment secret provider, rotation,
    access controls, and production-mode smoke validation.
 

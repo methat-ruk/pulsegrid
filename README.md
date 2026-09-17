@@ -5,13 +5,14 @@
 Connect devices · Stream telemetry · Detect conditions · Deliver commands ·
 Operate fleets
 
-![Status](https://img.shields.io/badge/status-foundation--in--progress-yellow)
+![Status](https://img.shields.io/badge/status-device--registry--in--progress-yellow)
 
 > [!IMPORTANT]
 > PulseGrid's documentation foundation, Go API foundation, Nuxt console
-> foundation, and FND-004 local readiness integration are implemented and
-> locally validated. Product APIs, runtime dependencies, and production
-> readiness remain on the roadmap.
+> foundation, MVP-001 persistence, MVP-002 development GraphQL contract, and
+> the MVP-003 device-registry journey are being implemented and locally
+> validated on the feature branch. Production identity, telemetry, and
+> production readiness remain deferred.
 
 ## What is PulseGrid?
 
@@ -99,15 +100,19 @@ The decision state and adoption trigger for each technology are maintained in
 
 ## Project status
 
-**Current phase: Executable repository foundation in progress**
+**Current phase: MVP device registry implementation in progress**
 
 - Product intent and MVP boundary: documented.
 - Architecture and technology adoption rules: documented.
 - Dependency-ordered Foundation and MVP plans: documented.
 - Go/Fiber API foundation: implemented and locally validated.
-- Nuxt console foundation: implemented and locally validated as a truthful
-  planned-state shell with a narrow local readiness adapter to the Go API.
-- Database, MQTT, and product APIs: not started.
+- Tenant/device persistence and the development-only GraphQL device contract:
+  implemented and locally validated.
+- Nuxt console foundation and the MVP-003 device registry journey: in progress;
+  the journey uses a fixed same-origin GraphQL adapter and a real browser/DB
+  smoke path for development/test only.
+- Telemetry, MQTT, production identity, and production readiness: not started
+  or deferred.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
   required checks include browser evidence for the real local API readiness
   journey.
@@ -121,8 +126,8 @@ corresponding behavior has been validated.
 | Stage | Outcome | Status |
 | --- | --- | --- |
 | Documentation foundation | Sources of truth, MVP boundary, roadmap, and PR-sized plans | Complete |
-| Executable repository foundation | Runnable Go and Nuxt shells with configuration, tests, local workflow, and CI | In progress |
-| Device registry | Tenant-scoped device provisioning, list, and detail | Planned |
+| Executable repository foundation | Runnable Go and Nuxt shells with configuration, tests, local workflow, and CI | Complete |
+| Device registry | Tenant-scoped device provisioning, list, and detail | In progress |
 | Telemetry and current state | Simulator-to-console MQTT telemetry flow | Planned |
 | Rules and alerts | A threshold condition creates an investigable alert | Planned |
 | Remote command loop | Command delivery with acknowledgement, result, failure, and timeout | Planned |

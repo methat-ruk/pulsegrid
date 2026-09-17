@@ -1,11 +1,11 @@
 # MVP-003 — Device Registry Console
 
-Status: Planned
+Status: In progress
 
 Review state: Re-planned and reviewed against repository head `c25c160` on
-2026-09-17. No implementation has started. The branch and `main` are aligned,
-the working tree was clean before this plan update, and the existing fast gate
-passed at the reviewed baseline.
+2026-09-17. Implementation was committed as `f07fdec`; local full validation
+and real-browser UX review passed on 2026-09-17. Remote required checks,
+merge acceptance, and lifecycle closeout remain pending.
 
 Branch: `feat/mvp-003-device-registry-console`
 
@@ -64,9 +64,10 @@ states, and a fixed same-origin GraphQL transport.
 
 ## Verified Repository Baseline (2026-09-17)
 
-- `feat/mvp-003-device-registry-console`, local `main`, and `origin/main` all
-  point to `c25c160`; the branch is zero commits ahead/behind `main` and has no
-  implementation diff.
+- Before implementation, `feat/mvp-003-device-registry-console`, local `main`,
+  and `origin/main` all pointed to `c25c160`; the branch was zero commits
+  ahead/behind `main` and had no implementation diff. The reviewed plan was
+  committed as `58e7098` before the implementation changes below.
 - MVP-001 and MVP-002 are merged. The SDL exposes only `devices(first, after)`,
   `device(id)`, and `createDevice(input)` with opaque IDs/cursors, descending
   `(created_at, id)` order, page sizes 1–100, and stable safe error codes.

@@ -39,6 +39,7 @@ or immediately required dependency.
 | Vitest and Nuxt Test Utils | Selected — Foundation | Focused unit and Nuxt component/runtime evidence before repository-wide CI composition |
 | Manrope and Noto Sans Thai delivery | Selected — Foundation | Package-managed local font assets avoid third-party font requests |
 | Light theme | Selected — Foundation | Only approved PulseGrid light tokens exist; dark-theme work remains deferred |
+| Native browser `fetch` with a feature-scoped typed GraphQL client | Selected — MVP | MVP-003 needs one bounded device journey; avoid a cache/SSR/client-runtime dependency until shared cache, polling, or schema-scale evidence justifies it |
 | Apache ECharts | Selected — MVP | Added when the telemetry console has a concrete chart requirement |
 | GraphQL and gqlgen | Selected — MVP | Concrete device and operator API boundary; MVP-002 pins gqlgen `v0.17.95` and keeps the SDL as source of truth |
 | PostgreSQL 18.6 | Selected — MVP | Transactional authority for the MVP-001 organization/device registry; local and CI targets are pinned and isolated |
@@ -78,7 +79,6 @@ consumer or independently owned runtime requires one.
 
 ## Decisions intentionally left open
 
-- GraphQL client and client-cache policy.
 - Polling, GraphQL subscriptions, SSE, or WebSocket transport for live UI state.
 - Production identity provider and RBAC model.
 - MQTT broker product, QoS policy, session behavior, and topic namespace.

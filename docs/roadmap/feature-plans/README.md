@@ -88,7 +88,7 @@ platform foundation” is not an acceptable PR boundary.
 
 ### MVP — Device registry
 
-- [MVP-003 — Device registry console](planned/MVP-003-device-registry-console.md)
+- [MVP-003 — Device registry console](planned/MVP-003-device-registry-console.md) — In progress
 
 ### MVP — Telemetry and current state
 

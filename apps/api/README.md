@@ -45,7 +45,10 @@ corepack pnpm run dev:api
 
 The GraphQL transport accepts JSON POST requests only. Test and production
 examples default to `PULSEGRID_IDENTITY_MODE=disabled`, which keeps the API
-health-only and does not open PostgreSQL.
+health-only and does not open PostgreSQL. The repository browser smoke
+explicitly overrides test mode to `development` against its isolated migrated
+and seeded test database so the real console journey can cross the GraphQL
+boundary.
 
 Check the lifecycle endpoints:
 

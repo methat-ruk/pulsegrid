@@ -13,10 +13,11 @@ by the [roadmap](../roadmap/roadmap.md).
 ## Current state
 
 The Go/Fiber API is implemented and validated as one modular process with
-lifecycle and health endpoints. MVP-002 adds a development-only GraphQL device
-surface backed by the MVP-001 organization/device registry; the Nuxt console
-still has a local, server-only readiness adapter. Production identity,
-deployment exposure, and later event contracts remain unimplemented.
+lifecycle, health, and development-only GraphQL device endpoints. MVP-003 adds
+the first device-registry operator journey and a fixed same-origin Nuxt GraphQL
+transport adapter backed by the MVP-001 organization/device registry.
+Production identity, deployment exposure, and later event contracts remain
+unimplemented.
 
 Architecture diagrams below describe an intended sequence of evolution. They
 must not be read as deployed topology.
@@ -41,7 +42,8 @@ local dependencies required by the product loop.
 ```mermaid
 flowchart LR
     Operator[Operator] --> Console[Vue and Nuxt web console]
-    Console <-->|GraphQL| API[API and BFF]
+    Console -->|same-origin /api/graphql| Adapter[Nuxt transport adapter]
+    Adapter -->|fixed /graphql| API[API and BFF]
 
     subgraph Runtime[Go and Fiber modular monolith]
         API --> Registry[Device registry]
@@ -115,7 +117,7 @@ ownership evidence identifies a separate scaling or failure unit.
 | Rules and alerts | Limited threshold definitions, evaluation result, alert lifecycle | General workflow automation |
 | Commands | Command intent, valid state transitions, delivery/ACK/result/timeout state | Device profile or transport-wide policy |
 | API/BFF | GraphQL contract and composition for the console | Direct ownership of domain persistence |
-| Web console | Operator journeys, presentation state, and the narrow local readiness adapter | Domain authority, product API authority, or secret-bearing configuration |
+| Web console | Operator journeys, presentation state, and narrow same-origin readiness/GraphQL transport adapters | Domain authority, product API authority, tenant selection, or secret-bearing configuration |
 
 Modules may share one PostgreSQL deployment in the MVP, but each module should
 own its tables and write paths. Cross-module behavior should go through narrow
@@ -129,6 +131,9 @@ The API strategy is deliberately split by consumer and protocol:
   liveness and readiness endpoints;
 - the operator-facing development product API uses GraphQL and gqlgen for the
   MVP-002 first device contract;
+- the console reaches that contract through a fixed same-origin Nuxt adapter in
+  MVP-003; the adapter bounds transport and failure behavior but owns no
+  identity, tenant authority, domain validation, cache, or retry policy;
 - MQTT and any later Kafka flow use flow-specific message contracts, documented
   with AsyncAPI only after a concrete producer and consumer exist;
 - gRPC and Protocol Buffers remain conditional on an independently deployed

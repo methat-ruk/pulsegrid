@@ -2,14 +2,14 @@ import { screen } from '@testing-library/vue'
 import { renderSuspended } from '@nuxt/test-utils/runtime'
 import { describe, expect, it } from 'vitest'
 
-import PlannedState from '../../app/components/PlannedState.vue'
+import DeviceRegistryEntryPoint from '../../app/components/DeviceRegistryEntryPoint.vue'
 
-describe('PlannedState', () => {
-  it('renders an honest foundation state without product metrics', async () => {
-    await renderSuspended(PlannedState)
+describe('DeviceRegistryEntryPoint', () => {
+  it('renders the first truthful product workflow entry point', async () => {
+    await renderSuspended(DeviceRegistryEntryPoint)
 
-    expect(screen.getByRole('heading', { name: 'Product data is not connected yet.' })).toBeTruthy()
-    expect(screen.getByText('The console foundation is ready for the first operator workflow.')).toBeTruthy()
-    expect(screen.queryByText(/devices|telemetry|alerts|commands/i)).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Device registry' })).toBeTruthy()
+    expect(screen.getByText('List, provision, and inspect devices in the development registry.')).toBeTruthy()
+    expect(screen.getByRole('link', { name: /open devices/i }).getAttribute('href')).toBe('/devices')
   })
 })
