@@ -13,6 +13,6 @@ useHead({
       PulseGrid Console
     </h1>
     <ApiReadiness />
-    <PlannedState />
+    <DeviceRegistryEntryPoint />
   </section>
 </template>

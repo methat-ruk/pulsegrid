@@ -1,8 +1,9 @@
 # PulseGrid Web Console
 
-This directory owns the Vue/Nuxt console shell. It renders a truthful planned
-state and includes a narrow, server-only readiness adapter for the local Go
-API; it does not expose product domain behavior or a generic backend proxy.
+This directory owns the Vue/Nuxt console shell and the development-only device
+registry journey. It includes two narrow server-only adapters for the local Go
+API: process readiness and the fixed same-origin `/api/graphql` route. It does
+not expose product authority or a generic backend proxy.
 
 ## Requirements
 
@@ -43,9 +44,17 @@ NUXT_APP_ENV=production corepack pnpm --filter @pulsegrid/web-console preview
 
 `NUXT_BACKEND_ORIGIN` is a private runtime key used only in development and
 test. Development accepts `http://127.0.0.1:8080`; test accepts
-`http://127.0.0.1:18080`. Production rejects the key so a deployment cannot
+`http://127.0.0.1:18080`. The server uses only the fixed upstream paths
+`/health/ready` and `/graphql`; it forwards no browser cookies, credentials,
+origin, or arbitrary path. Production rejects the key so a deployment cannot
 silently target a local service. The value remains outside
 `runtimeConfig.public`.
+
+The device pages use a feature-scoped typed client built on native browser
+`fetch`. Requests are same-origin `POST /api/graphql`, use
+`application/graphql-response+json`, opt out of credentials and caching, and
+do not retry or persist a client cache. The route is a development/test
+transport adapter only; the Go GraphQL contract remains the authority.
 
 ## Checks
 
@@ -58,11 +67,14 @@ corepack pnpm --filter @pulsegrid/web-console test
 corepack pnpm --filter @pulsegrid/web-console build
 ```
 
-Browser verification covers the planned-state route at desktop, tablet,
-mobile, and 320px widths, including keyboard focus and reduced-motion behavior,
-plus the readiness success, unavailable, and recovery states. The repository-
-root `corepack pnpm run test:browser` command owns the isolated test-mode build,
-real Go API process, and server lifecycle for that evidence.
+Browser verification covers the overview and device registry at desktop, tablet,
+mobile, and 320px widths, including keyboard focus, mobile-menu containment,
+and reduced-motion behavior. It also covers readiness recovery, real GraphQL
+pagination, create/detail, duplicate conflict, malformed IDs, and API process
+restart. The repository-root `corepack pnpm run test:browser` command owns an
+isolated PostgreSQL migration/seed lifecycle when no database URL is supplied,
+the test-mode build, real Go API process, and server lifecycle for that
+evidence.
 
 ## Known diagnostics and warnings
 

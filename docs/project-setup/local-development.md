@@ -1,7 +1,8 @@
 # PulseGrid local development
 
 Status: Local repository workflow and merge-gate enforcement implemented;
-FND-004 local full-stack readiness flow is implemented and validated.
+FND-004 readiness and the MVP-003 device-registry browser journey are
+implemented and locally validated.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
@@ -66,10 +67,11 @@ cp apps/web-console/.env.development.example apps/web-console/.env.development
 ```
 
 `NUXT_BACKEND_ORIGIN` is a server-only development key. It points only to the
-loopback API origin and is consumed by the Nuxt same-origin readiness adapter;
-it is never exposed through `runtimeConfig.public` or forwarded from the
-browser. Do not add credentials, tokens, or other private service URLs to
-frontend examples.
+loopback API origin and is consumed by the Nuxt same-origin readiness and
+GraphQL adapters; the adapters use only their fixed upstream paths. It is
+never exposed through `runtimeConfig.public` or forwarded from the browser.
+Do not add credentials, tokens, or other private service URLs to frontend
+examples.
 
 With both processes running, open `http://127.0.0.1:3000` (or the port shown by
 Nuxt). The shell checks `GET /api/operational/ready` and offers a manual Retry
@@ -93,8 +95,10 @@ corepack pnpm run dev:api
 
 `PULSEGRID_IDENTITY_MODE=development` resolves only the seeded
 `pulsegrid-dev` organization. The API fails before listening if PostgreSQL,
-migrations, or seed data is unavailable. Use `PULSEGRID_IDENTITY_MODE=disabled`
-for the health-only test/browser process; it does not open a database.
+migrations, or seed data is unavailable. The browser smoke uses the same
+development identity mode against an isolated test database; the health-only
+`disabled` mode remains available for tests that intentionally do not exercise
+the product API.
 
 ### Migration preflight and recovery
 
@@ -201,11 +205,17 @@ running it:
 corepack pnpm run test:browser
 ```
 
-This smoke builds the API test binary and Nuxt test artifact, starts both in an
-isolated process lifecycle, and covers planned-state rendering, readiness
-success/unavailable/recovery, responsive reflow including 320px,
-horizontal-overflow absence, keyboard navigation, page errors, and browser
-console errors.
+This smoke owns an isolated PostgreSQL Compose project when
+`PULSEGRID_DATABASE_URL` is not supplied, runs test migrations and the fixed
+`pulsegrid-dev` seed, then builds the API test binary and Nuxt test artifact.
+It starts both in an isolated process lifecycle and covers the device registry
+through the real browser → Nuxt `/api/graphql` adapter → Go GraphQL →
+PostgreSQL boundary: loading/empty and paginated list, create/detail,
+duplicate conflict, malformed IDs, readiness success/unavailable/recovery,
+responsive reflow including 320px, horizontal-overflow absence, keyboard and
+mobile-menu focus behavior, page errors, and browser console errors. CI
+provides its own pinned PostgreSQL service through `PULSEGRID_DATABASE_URL`,
+while the local runner cleans up only the Compose project it created.
 
 ## Validation commands
 

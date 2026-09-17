@@ -8,7 +8,7 @@ const viewports = [
 ] as const
 
 for (const viewport of viewports) {
-  test.describe(`${viewport.name} planned-state shell`, () => {
+  test.describe(`${viewport.name} console shell`, () => {
     test.use({ viewport: { width: viewport.width, height: viewport.height } })
 
     test('renders without browser errors or horizontal overflow', async ({ page }) => {
@@ -23,7 +23,8 @@ for (const viewport of viewports) {
       await page.goto('/')
       await expect(page).toHaveTitle('PulseGrid Console')
       await expect(page.getByRole('heading', { name: 'PulseGrid Console' })).toBeVisible()
-      await expect(page.getByRole('heading', { name: 'Product data is not connected yet.' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Device registry' })).toBeVisible()
+      await expect(page.getByRole('link', { name: 'Open devices' })).toBeVisible()
       await expect(page.getByRole('status')).toHaveText('Local API is ready.')
 
       const dimensions = await page.evaluate(() => ({
@@ -55,6 +56,20 @@ for (const viewport of viewports) {
         await expect(expandToggle).toHaveAttribute('aria-expanded', 'false')
         await expandToggle.press('Enter')
         await expect(page.getByRole('button', { name: 'Collapse sidebar' })).toHaveAttribute('aria-expanded', 'true')
+      }
+      else {
+        const menuButton = page.getByRole('button', { name: 'Menu' })
+        await menuButton.focus()
+        await menuButton.press('Enter')
+        const menu = page.getByRole('dialog', { name: 'Mobile navigation' })
+        await expect(menu).toBeVisible()
+        await expect(menu.getByRole('link', { name: 'Devices', exact: true })).toBeVisible()
+        await expect(menu.getByRole('button', { name: 'Close navigation' })).toBeFocused()
+        await page.keyboard.press('Tab')
+        await expect(menu.getByRole('link', { name: 'Overview' })).toBeFocused()
+        await page.keyboard.press('Escape')
+        await expect(menu).toBeHidden()
+        await expect(menuButton).toBeFocused()
       }
     })
   })

@@ -1,5 +1,5 @@
 // Command db owns explicit local/test migration and seed operations. The API
-// process deliberately does not open a database in this MVP.
+// process opens a database only when its development identity mode is enabled.
 package main
 
 import (
@@ -51,17 +51,17 @@ func run(args []string) error {
 		if len(args) != 1 {
 			return errors.New("seed does not accept additional arguments")
 		}
-		if configuration.Environment != config.Development {
-			return errors.New("seed is allowed only for the development database")
+		if configuration.Environment != config.Development && configuration.Environment != config.Test {
+			return errors.New("seed is allowed only for development or isolated test databases")
 		}
-		return seedDevelopment(configuration)
+		return seedControlledOrganization(configuration)
 
 	default:
 		return fmt.Errorf("unsupported database command %q (want migrate or seed)", args[0])
 	}
 }
 
-func seedDevelopment(configuration databaseconfig.Config) error {
+func seedControlledOrganization(configuration databaseconfig.Config) error {
 	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
 	defer cancel()
 
