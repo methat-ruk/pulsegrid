@@ -932,6 +932,12 @@ a {
   }
 }
 
+@media (max-width: 360px) {
+  .mobile-nav-state {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
