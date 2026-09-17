@@ -4,9 +4,12 @@ Status: In progress
 
 Review state: Re-planned and reviewed against repository head `c25c160` on
 2026-09-17. Implementation and responsive follow-up fixes are committed as
-`30339c5`, `cb5439d`, and `3206a23`; local and remote required checks plus
-real-browser UX review passed on 2026-09-17. Merge acceptance and lifecycle
-closeout remain pending while this PR is Draft.
+`30339c5`, `cb5439d`, and `3206a23`; post-review transport, validation,
+accessibility, contrast, and retry-safety fixes are committed as `b9e2a14`.
+The final local `corepack pnpm run check` passed on 2026-09-17, including the
+real browser journey; remote required checks for `b9e2a14` are pending after
+push. Merge acceptance and lifecycle closeout remain pending while this PR is
+Draft.
 
 Branch: `feat/mvp-003-device-registry-console`
 
