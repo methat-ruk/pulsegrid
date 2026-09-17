@@ -72,7 +72,7 @@ function handleMobileMenuKeydown(event: KeyboardEvent) {
 
 onMounted(() => document.addEventListener('keydown', handleMobileMenuKeydown))
 onBeforeUnmount(() => document.removeEventListener('keydown', handleMobileMenuKeydown))
-watch(() => route.fullPath, () => {
+watch(() => route.path, () => {
   if (mobileMenuOpen.value) closeMobileMenu(false)
 })
 </script>
