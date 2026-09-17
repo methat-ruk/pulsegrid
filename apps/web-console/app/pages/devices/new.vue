@@ -112,7 +112,6 @@ onBeforeUnmount(() => requestController?.abort())
           name="deviceKey"
           type="text"
           autocomplete="off"
-          maxlength="128"
           :aria-invalid="fieldErrors.deviceKey ? 'true' : undefined"
           :aria-describedby="fieldErrors.deviceKey ? 'device-key-error' : 'device-key-help'"
         >
@@ -140,7 +139,6 @@ onBeforeUnmount(() => requestController?.abort())
           v-model="displayName"
           name="displayName"
           type="text"
-          maxlength="200"
           :aria-invalid="fieldErrors.displayName ? 'true' : undefined"
           :aria-describedby="fieldErrors.displayName ? 'display-name-error' : 'display-name-help'"
         >

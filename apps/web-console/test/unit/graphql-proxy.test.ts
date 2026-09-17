@@ -141,6 +141,36 @@ describe('GraphQL same-origin adapter', () => {
     })
   })
 
+  it('rejects upstream redirects even when the body uses the GraphQL media type', async () => {
+    const backend = await startServer((_request, response) => {
+      response.statusCode = 302
+      response.setHeader('location', 'http://127.0.0.1:9/private')
+      response.setHeader('content-type', 'application/graphql-response+json')
+      response.end('{"data":{"__typename":"Query"}}')
+    })
+    const adapter = await startAdapter(backend)
+    const response = await request(adapter)
+
+    expect(response.status).toBe(503)
+    expect(response.headers.get('location')).toBeNull()
+    expect(await response.json()).toEqual({
+      errors: [{ message: 'device service is unavailable', extensions: { code: 'SERVICE_UNAVAILABLE' } }],
+    })
+  })
+
+  it('maps a slow upstream to the safe unavailable envelope', async () => {
+    const backend = await startServer(() => {
+      // Deliberately leave the response open so the adapter timeout is exercised.
+    })
+    const adapter = await startAdapter(backend)
+    const response = await request(adapter)
+
+    expect(response.status).toBe(503)
+    expect(await response.json()).toEqual({
+      errors: [{ message: 'device service is unavailable', extensions: { code: 'SERVICE_UNAVAILABLE' } }],
+    })
+  }, 10_000)
+
   it('bounds upstream response bodies', async () => {
     const backend = await startServer((_request, response) => {
       response.setHeader('content-type', 'application/graphql-response+json')

@@ -129,6 +129,10 @@ export async function proxyGraphqlRequest(event: GraphqlProxyEvent, backendOrigi
       redirect: 'manual',
       signal: controller.signal,
     })
+    if (response.status >= 300 && response.status < 400) {
+      await sendGraphqlUnavailable(event)
+      return
+    }
     const responseContentType = response.headers.get('content-type')
     if (mediaType(responseContentType ?? undefined) !== GRAPHQL_RESPONSE_MEDIA_TYPE) {
       await sendGraphqlUnavailable(event)

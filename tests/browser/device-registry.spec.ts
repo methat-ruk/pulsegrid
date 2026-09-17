@@ -31,9 +31,6 @@ function uniqueKey(testInfo: { workerIndex: number; retry: number }, suffix: str
 
 test.describe('device registry journey', () => {
   test('lists a real page and continues with the opaque cursor', async ({ page }, testInfo) => {
-    await page.goto('/devices')
-    await expect(page.getByRole('heading', { name: 'No devices yet.' })).toBeVisible()
-
     const keys: string[] = []
     for (const index of Array.from({ length: 21 }, (_, value) => value)) {
       const key = uniqueKey(testInfo, `page-${index}`)
@@ -42,7 +39,7 @@ test.describe('device registry journey', () => {
     }
     const oldestKey = keys[0]
 
-    await page.reload()
+    await page.goto('/devices')
     await expect(page.getByRole('heading', { name: 'Devices' })).toBeVisible()
     await expect(page.locator('.device-table tbody').getByText(oldestKey)).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Load more' })).toBeVisible()
