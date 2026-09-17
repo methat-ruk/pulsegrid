@@ -3,9 +3,10 @@
 Status: In progress
 
 Review state: Re-planned and reviewed against repository head `c25c160` on
-2026-09-17. Implementation was committed as `f07fdec`; local full validation
-and real-browser UX review passed on 2026-09-17. Remote required checks,
-merge acceptance, and lifecycle closeout remain pending.
+2026-09-17. Implementation and responsive follow-up fixes are committed as
+`30339c5`, `cb5439d`, and `3206a23`; local and remote required checks plus
+real-browser UX review passed on 2026-09-17. Merge acceptance and lifecycle
+closeout remain pending while this PR is Draft.
 
 Branch: `feat/mvp-003-device-registry-console`
 
