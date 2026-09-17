@@ -2,7 +2,7 @@
 
 Status: Local repository workflow and merge-gate enforcement implemented;
 FND-004 readiness and the MVP-003 device-registry browser journey are
-implemented on the feature branch and locally validated.
+implemented and locally validated.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local

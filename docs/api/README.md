@@ -1,8 +1,8 @@
 # PulseGrid API documentation
 
-Status: MVP-002 development GraphQL device contract implemented; MVP-003
-console integration is implemented on the feature branch. Production identity
-and product expansion remain deferred.
+Status: MVP-002 development GraphQL device contract and MVP-003 console
+integration are implemented and validated. Production identity and product
+expansion remain deferred.
 
 ## Purpose and ownership
 

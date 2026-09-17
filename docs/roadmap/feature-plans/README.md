@@ -85,10 +85,7 @@ platform foundation” is not an acceptable PR boundary.
 
 - [MVP-001 — Tenant and device persistence](completed/MVP-001-tenant-device-persistence.md)
 - [MVP-002 — Device GraphQL API](completed/MVP-002-device-graphql-api.md)
-
-### MVP — Device registry
-
-- [MVP-003 — Device registry console](planned/MVP-003-device-registry-console.md) — In progress
+- [MVP-003 — Device registry console](completed/MVP-003-device-registry-console.md)
 
 ### MVP — Telemetry and current state
 

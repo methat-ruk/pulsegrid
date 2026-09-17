@@ -1,15 +1,13 @@
 # MVP-003 — Device Registry Console
 
-Status: In progress
+Status: Complete
 
-Review state: Re-planned and reviewed against repository head `c25c160` on
-2026-09-17. Implementation and responsive follow-up fixes are committed as
-`30339c5`, `cb5439d`, and `3206a23`; post-review transport, validation,
-accessibility, contrast, and retry-safety fixes are committed as `b9e2a14`.
-The final local `corepack pnpm run check` passed on 2026-09-17, including the
-real browser journey; remote required checks for `b9e2a14` are pending after
-push. Merge acceptance and lifecycle closeout remain pending while this PR is
-Draft.
+Review state: Final candidate `8c525df` was reviewed on 2026-09-17 after
+implementation and post-review fixes (`b9e2a14`), with no remaining source,
+contract, accessibility, transport, or lifecycle blocker. Local
+`corepack pnpm run check` passed, the real browser journey passed, and all 13
+required GitHub checks passed on the exact head. The candidate is accepted for
+merge; PR #11 remains Draft pending the explicit Ready/merge workflow action.
 
 Branch: `feat/mvp-003-device-registry-console`
 
@@ -97,9 +95,9 @@ states, and a fixed same-origin GraphQL transport.
   `corepack pnpm run check:fast`: GraphQL generation drift, Go format/vet/
   modernize/staticcheck/tests, OpenAPI lint, frontend lint/typecheck/tests, and
   browser fixture typecheck. Frontend tests passed 27/27.
-- The root README is stale: it still reports Foundation in progress and says
-  database and product APIs have not started. MVP-003 closeout must correct
-  that tracked public status rather than repeating it in another source.
+- At planning baseline, the root README reported stale Foundation and product
+  status; the implementation and final closeout update that tracked public
+  status without claiming production readiness.
 
 ## Scope
 
@@ -446,21 +444,17 @@ During implementation:
   pattern not already covered by its navigation, table, form, responsive, and
   accessibility rules.
 
-### Final lifecycle closeout
+### Final lifecycle closeout (completed)
 
-After implementation review and required evidence:
-
-1. Record the final candidate commit, review disposition, and evidence summary
-   in this plan.
-2. Set the plan to `Complete` only when it is accepted for merge with required
-   checks green; move it from `planned/` to `completed/`.
-3. Update the feature-plan index and every inbound plan/roadmap link to the
-   completed path in the same commit.
-4. Mark M1 `Complete` in the roadmap and classify MVP-001, MVP-002, and MVP-003
-   as complete in its dependency graph. Do not change M2 or later milestone
-   status.
-5. Re-run link/repository-policy checks after the move so closeout cannot leave
-   stale `planned/MVP-003...` references.
+- Final candidate `8c525df` records the implementation, review fixes, and
+  documentation update; self-review found no remaining blocker.
+- Local full validation and all 13 required GitHub checks passed on the exact
+  head, including the 17-test real browser smoke journey.
+- This plan is `Complete` and was moved from `planned/` to `completed/`.
+- The feature-plan index and roadmap inbound links now use the completed path.
+- Roadmap M1 and MVP-003 are marked complete; M2 and later milestones remain
+  unchanged and planned.
+- Link and repository-policy checks were rerun after the move.
 
 ## Risks / Open Decisions
 
