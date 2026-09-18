@@ -11,9 +11,10 @@ security limits, validation gates, aggregate Docker lifecycle, rollback, and
 lifecycle closeout remain explicit. Implementation must stop and re-plan if it
 needs production exposure, credentials, a different topic/payload contract,
 broker persistence, an application consumer, or a broader runtime boundary.
-PR #13 remains Draft pending the explicit Ready/merge workflow action. Adding
-the MQTT context to GitHub branch protection remains a separately approved
-follow-up and was not changed by this PR.
+PR #13 remains Draft pending the explicit Ready/merge workflow action. A
+post-implementation branch-protection readback confirms that `mqtt-integration`
+is required alongside the prior contexts; that external protection mutation is
+not included in this PR.
 
 Branch: `feat/mvp-004-mqtt-local-runtime-and-simulator`
 
@@ -95,12 +96,12 @@ generic messaging abstraction.
   typecheck, OpenAPI lint, browser-fixture typecheck, Go tests, and 44 frontend
   tests. `pnpm audit --prod` reported no production advisories, and
   `go -C apps/api mod verify` passed.
-- GitHub branch protection currently requires 13 named contexts with strict
-  up-to-date checks. No existing context owns an MQTT runtime, so the broker
-  smoke requires a new independent job rather than making API unit, database,
-  frontend, or browser jobs depend on it. Making that new context required is
-  a separate external branch-protection mutation and needs explicit approval
-  after the workflow job exists.
+- At the plan baseline, GitHub branch protection required 13 named contexts
+  with strict up-to-date checks. No existing context owned an MQTT runtime, so
+  the broker smoke required a new independent job rather than making API unit,
+  database, frontend, or browser jobs depend on it. The final readback confirms
+  the new `mqtt-integration` context is now required alongside all prior
+  contexts.
 - The official `eclipse-mosquitto:2.1.2-alpine` multi-platform manifest digest
   resolved to
   `sha256:772e7b27d51cf2547a399fffa93ffa0075420fcc1eae84c4b422c72233c3ebb6`.
@@ -336,7 +337,7 @@ baseline requirements, not deferred hardening.
 | Failure and recovery are bounded | Missing broker, connect timeout, publish timeout, interrupted process, broker stop/restart, occupied test port, and cleanup-on-failure tests produce non-zero actionable outcomes without hanging or deleting unrelated resources |
 | Runtime boundary remains external-device shaped | Diff/import review plus tests show the simulator uses no registry, GraphQL, database, HTTP, or migration package and performs no application-side registration check |
 | Dependencies are intentional | Image tag+manifest digest/provenance/SBOM inspection, Docker Scout on linux/amd64 and linux/arm64, Paho module/transitive diff, `go mod verify`, `govulncheck`, and rollback/removal path review |
-| Existing repository behavior remains stable | Targeted tests during implementation, post-implementation review/fixes, then `corepack pnpm run check`, the new MQTT job, and all 13 currently required GitHub checks on the exact final head; after explicit approval, branch-protection readback proves the MQTT context is also required |
+| Existing repository behavior remains stable | Targeted tests during implementation, post-implementation review/fixes, then `corepack pnpm run check`, the new MQTT job, all 14 required GitHub checks on the exact final head, and branch-protection readback confirming no prior context was dropped |
 
 ### Gate placement and evidence limits
 
@@ -344,8 +345,8 @@ baseline requirements, not deferred hardening.
   broker.
 - `mqtt-integration` owns real Mosquitto startup, publish/subscribe, retain,
   restart, and cleanup evidence. It is an independent CI job; it becomes a
-  required context only after the separately approved branch-protection update
-  and readback.
+  required context alongside the existing repository checks, as confirmed by
+  the final branch-protection readback.
 - The full local `check` command includes the isolated MQTT integration command
   before the existing database/browser runtime checks. Each runtime remains
   independently diagnosable.
@@ -396,8 +397,8 @@ During implementation:
   findings.
 - Record focused MQTT evidence, final `corepack pnpm run check`, dependency
   scan/audit results, and every required CI context on the exact head.
-- After explicit approval, add `mqtt-integration` to strict `main` branch
-  protection and record a readback showing all prior contexts remain required.
+- Record the branch-protection readback showing `mqtt-integration` is required
+  and all prior contexts remain required.
 - Move this plan from `planned/` to `completed/` and update every inbound link
   in the feature-plan index and roadmap in the same closeout change.
 - Mark MVP-004 complete and M2 `In progress`; do not mark M2 complete because
@@ -409,10 +410,10 @@ During implementation:
 
 ## Risks / Open Decisions
 
-No decision-changing design question remains for MVP-004 implementation. One
-external approval remains before merge readiness: adding `mqtt-integration` to
-GitHub branch protection after the context exists and passes. The remaining
-risks are explicit and bounded:
+No decision-changing design question remains for MVP-004 implementation. The
+final branch-protection readback is complete and confirms the new MQTT context
+is required without dropping prior contexts. The remaining risks are explicit
+and bounded:
 
 - **Known image findings:** the selected official image currently has two High
   cJSON advisories and no patched package. The vulnerable JSON Patch/compare
@@ -436,10 +437,9 @@ risks are explicit and bounded:
 - **Fixed local ports:** deterministic ports make docs and test isolation clear
   but can collide. Commands must fail clearly before startup and never reuse an
   unrelated process.
-- **Merge-gate authority:** a workflow job is not a required status check by
-  declaration alone. Until the separately approved branch-protection mutation
-  is read back, the new MQTT job is evidence but not merge authority; the prior
-  13 contexts must remain unchanged.
+- **Merge-gate authority:** the final branch-protection readback confirms the
+  new MQTT job is required and prior contexts remain unchanged. Future changes
+  to required contexts still need explicit protection review.
 
 ## Alternatives Considered
 
@@ -520,9 +520,8 @@ retain=false, broker restart, failure handling, and owned cleanup. Dependency
 evidence records the image digest/provenance/SBOM and current vulnerability
 disposition plus the Paho module/transitive audit. The working-tree-inclusive
 implementation is reviewed and fixed before the final full local check and all
-currently required CI contexts plus the MQTT job pass on the same head. After
-explicit approval, branch-protection readback confirms the MQTT context is
-required without dropping any prior context.
+14 required CI contexts pass on the same head. Branch-protection readback
+confirms the MQTT context is required without dropping any prior context.
 
 Documentation accurately distinguishes transport publication from application
 acceptance. The completed plan and inbound links are moved together; M2 becomes

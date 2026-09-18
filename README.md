@@ -11,10 +11,10 @@ Operate fleets
 > PulseGrid's documentation foundation, Go API foundation, Nuxt console
 > foundation, MVP-001 persistence, MVP-002 development GraphQL contract,
 > MVP-003 device-registry journey, and the MVP-004 local MQTT producer fixture
-> are implemented and locally validated. The independent MQTT CI job is defined
-> and passed on the final PR head; adding it to branch protection remains a
-> separately approved action. Telemetry ingestion, production identity, and
-> production readiness remain deferred.
+> are implemented and locally validated. The independent MQTT CI job is defined,
+> passed on the final PR head, and is required by `main` branch protection.
+> Telemetry ingestion, production identity, and production readiness remain
+> deferred.
 
 ## What is PulseGrid?
 
