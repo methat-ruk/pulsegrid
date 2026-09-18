@@ -363,6 +363,31 @@ jobs:
       - name: Audit production dependencies
         run: corepack pnpm run node:audit
 
+  mqtt-integration:
+    name: mqtt-integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: .go-version
+          cache: true
+          cache-dependency-path: apps/api/go.sum
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Check pnpm version
+        run: test "$(corepack pnpm --version)" = "12.3.4"
+      - name: Run isolated MQTT integration
+        run: corepack pnpm run mqtt:test:integration
+
   openapi-contract:
     name: openapi-contract
     runs-on: ubuntu-24.04

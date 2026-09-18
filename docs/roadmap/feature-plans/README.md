@@ -86,10 +86,10 @@ platform foundation” is not an acceptable PR boundary.
 - [MVP-001 — Tenant and device persistence](completed/MVP-001-tenant-device-persistence.md)
 - [MVP-002 — Device GraphQL API](completed/MVP-002-device-graphql-api.md)
 - [MVP-003 — Device registry console](completed/MVP-003-device-registry-console.md)
+- [MVP-004 — MQTT local runtime and simulator](completed/MVP-004-mqtt-local-runtime-and-simulator.md)
 
 ### MVP — Telemetry and current state
 
-- [MVP-004 — MQTT local runtime and simulator](planned/MVP-004-mqtt-local-runtime-and-simulator.md)
 - [MVP-005 — MQTT telemetry ingestion](planned/MVP-005-mqtt-telemetry-ingestion.md)
 - [MVP-006 — Telemetry and current-state projection](planned/MVP-006-telemetry-current-state-projection.md)
 - [MVP-007 — Telemetry and device-state console](planned/MVP-007-telemetry-device-state-console.md)

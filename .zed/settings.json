@@ -14,5 +14,11 @@
         "..."
       ]
     }
+  },
+  "file_types": {
+    "ini": ["**/*.conf"]
+  },
+  "auto_install_extensions": {
+    "ini": true
   }
 }

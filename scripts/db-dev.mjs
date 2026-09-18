@@ -10,37 +10,82 @@ const providedArguments = process.argv.slice(3)
 const operationArguments = providedArguments[0] === '--'
   ? providedArguments.slice(1)
   : providedArguments
-if (!['up', 'stop', 'down', 'psql'].includes(operation)) {
-  console.error('usage: node scripts/db-dev.mjs <up|stop|down|psql> [psql args]')
+const supportedOperations = [
+  'up',
+  'all-up',
+  'stop',
+  'all-stop',
+  'down',
+  'all-down',
+  'all-logs',
+  'all-health',
+  'psql',
+]
+if (!supportedOperations.includes(operation)) {
+  console.error(`usage: node scripts/db-dev.mjs <${supportedOperations.join('|')}> [psql args]`)
   process.exit(2)
 }
 
-const credentials = loadDevelopmentCredentials()
+const credentials = ['up', 'all-up', 'psql'].includes(operation)
+  ? loadDevelopmentCredentials()
+  : { password: process.env.PULSEGRID_POSTGRES_PASSWORD ?? 'compose-unused-placeholder' }
 const environment = {
   ...process.env,
   PULSEGRID_POSTGRES_PASSWORD: credentials.password,
 }
 
-const args = operation === 'up'
-  ? ['compose', '--profile', 'dev', 'up', '-d', '--wait', 'postgres-dev']
-  : operation === 'stop'
-    ? ['compose', '--profile', 'dev', 'stop', 'postgres-dev']
-    : operation === 'down'
-      ? ['compose', '--profile', 'dev', 'down', '--remove-orphans']
-      : [
-        'compose',
-        '--profile',
-        'dev',
-        'exec',
-        ...(process.stdin.isTTY ? [] : ['-T']),
-        'postgres-dev',
-        'psql',
-        '-U',
-        'pulsegrid',
-        '-d',
-        'pulsegrid_dev',
-        ...operationArguments,
-      ]
+const compose = (...composeArguments) => ['compose', '--profile', 'dev', ...composeArguments]
+const argsByOperation = {
+  up: compose('up', '-d', '--wait', 'postgres-dev'),
+  // Compose `up` creates missing containers and starts existing ones.
+  'all-up': compose('up', '-d', '--wait', 'postgres-dev', 'mqtt-dev'),
+  stop: compose('stop', 'postgres-dev'),
+  'all-stop': compose('stop', 'postgres-dev', 'mqtt-dev'),
+  down: compose('rm', '-s', '-f', 'postgres-dev'),
+  'all-down': compose('down', 'postgres-dev', 'mqtt-dev'),
+  'all-logs': compose('logs', '--no-color', '--tail=200', 'postgres-dev', 'mqtt-dev'),
+  'all-health': compose('ps', '--format', 'json', 'postgres-dev', 'mqtt-dev'),
+  psql: compose(
+    'exec',
+    ...(process.stdin.isTTY ? [] : ['-T']),
+    'postgres-dev',
+    'psql',
+    '-U',
+    'pulsegrid',
+    '-d',
+    'pulsegrid_dev',
+    ...operationArguments,
+  ),
+}
+const args = argsByOperation[operation]
+
+if (operation === 'all-health') {
+  const result = spawnSync('docker', args, {
+    cwd: rootDirectory,
+    env: environment,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'inherit'],
+  })
+  if (result.error) {
+    console.error(`unable to run docker compose: ${result.error.message}`)
+    process.exit(1)
+  }
+  const services = parseComposeJSON(result.stdout)
+  const expectedServices = new Set(['postgres-dev', 'mqtt-dev'])
+  const healthyServices = new Set(services
+    .filter((entry) => entry.State === 'running' && entry.Health === 'healthy')
+    .map((entry) => entry.Service))
+  const missing = [...expectedServices].filter((service) => !healthyServices.has(service))
+  for (const service of expectedServices) {
+    const entry = services.find((candidate) => candidate.Service === service)
+    console.log(`${service}: ${entry?.State ?? 'missing'} (${entry?.Health ?? 'unknown'})`)
+  }
+  if (result.status !== 0 || missing.length > 0) {
+    console.error(`services are not running and healthy: ${missing.join(', ') || 'unknown'}`)
+    process.exit(1)
+  }
+  process.exit(0)
+}
 
 const result = spawnSync('docker', args, {
   cwd: rootDirectory,
@@ -118,4 +163,17 @@ function parseDotenv(contents) {
     values[key] = value
   }
   return values
+}
+
+function parseComposeJSON(output) {
+  return output
+    .split(/\r?\n/u)
+    .filter(Boolean)
+    .flatMap((line) => {
+      try {
+        return [JSON.parse(line)]
+      } catch {
+        return []
+      }
+    })
 }

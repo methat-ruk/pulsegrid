@@ -1,10 +1,20 @@
 import { execFileSync, spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
 
-const files = execFileSync('git', ['ls-files', '-z', '--', '*.go'], {
+const files = execFileSync('git', [
+  'ls-files',
+  '-z',
+  '--cached',
+  '--others',
+  '--exclude-standard',
+  '--',
+  '*.go',
+], {
   encoding: 'utf8',
 })
   .split('\0')
   .filter(Boolean)
+  .filter((file) => existsSync(file))
 
 if (files.length === 0) {
   process.exit(0)
