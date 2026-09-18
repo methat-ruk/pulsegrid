@@ -107,7 +107,7 @@ MVP-004 implements an intentionally non-production transport fixture:
   or shared credentials;
 - MQTT 3.1.1, QoS 1, `retain=false`, clean simulator sessions, and the
   versioned topic/payload contract owned by the
-  [MVP-004 plan](../roadmap/feature-plans/planned/MVP-004-mqtt-local-runtime-and-simulator.md);
+  [MVP-004 plan](../roadmap/feature-plans/completed/MVP-004-mqtt-local-runtime-and-simulator.md);
 - Eclipse Paho MQTT Go client v1.5.1 inside a separate simulator command in the
   existing Go module, with no registry, GraphQL, database, or HTTP dependency.
 

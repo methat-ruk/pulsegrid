@@ -28,7 +28,28 @@ const args = operation === 'up'
       ? ['compose', '--profile', 'dev', 'rm', '-s', '-f', 'mqtt-dev']
       : operation === 'logs'
         ? ['compose', '--profile', 'dev', 'logs', '--no-color', '--tail=200', 'mqtt-dev']
-        : ['compose', '--profile', 'dev', 'ps', 'mqtt-dev']
+        : ['compose', '--profile', 'dev', 'ps', '--format', 'json', 'mqtt-dev']
+
+if (operation === 'health') {
+  const result = spawnSync('docker', args, {
+    cwd: rootDirectory,
+    env: environment,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'inherit'],
+  })
+  if (result.error) {
+    console.error(`unable to run docker compose: ${result.error.message}`)
+    process.exit(1)
+  }
+  const services = parseComposeJSON(result.stdout)
+  const service = services.find((entry) => entry.Service === 'mqtt-dev')
+  console.log(`mqtt-dev: ${service?.State ?? 'missing'} (${service?.Health ?? 'unknown'})`)
+  if (result.status !== 0 || service?.State !== 'running' || service?.Health !== 'healthy') {
+    console.error('mqtt-dev is not running and healthy')
+    process.exit(1)
+  }
+  process.exit(0)
+}
 
 const result = spawnSync('docker', args, {
   cwd: rootDirectory,
@@ -63,4 +84,17 @@ function isPortOpen(port) {
     socket.once('error', () => finish(false))
     socket.setTimeout(500, () => finish(false))
   })
+}
+
+function parseComposeJSON(output) {
+  return output
+    .split(/\r?\n/u)
+    .filter(Boolean)
+    .flatMap((line) => {
+      try {
+        return [JSON.parse(line)]
+      } catch {
+        return []
+      }
+    })
 }

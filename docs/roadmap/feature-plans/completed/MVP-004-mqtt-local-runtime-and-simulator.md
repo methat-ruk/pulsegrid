@@ -1,19 +1,19 @@
 # MVP-004 — MQTT Local Runtime and Simulator
 
-Status: In progress
+Status: Complete
 
-Review state: Plan reviewed and revised on 2026-09-18. Implementation started
-after explicit approval and the working-tree candidate passed local unit,
-static, race, build, dependency, Compose, real-broker, PostgreSQL, and browser
-validation on 2026-09-18. The repository baseline, broker and client
-dependencies, MQTT contract, local/test isolation, security limits, validation
-gates, aggregate Docker lifecycle, rollback, and lifecycle closeout remain
-explicit. Implementation must
-stop and re-plan if it needs production exposure, credentials, a different
-topic/payload contract, broker persistence, an application consumer, or a
-broader runtime boundary. The independent MQTT CI context is defined but its
-remote run and any branch-protection mutation remain pending; adding that
-context to GitHub branch protection is a separately approved pre-merge action.
+Review state: Final candidate is reviewed and fixed on 2026-09-18. Local unit,
+static, race, build, dependency, Compose, real-broker, PostgreSQL, browser,
+health-command, and signal-cleanup validation passed; all 14 GitHub checks,
+including `mqtt-integration`, passed on the final PR head. The repository
+baseline, broker and client dependencies, MQTT contract, local/test isolation,
+security limits, validation gates, aggregate Docker lifecycle, rollback, and
+lifecycle closeout remain explicit. Implementation must stop and re-plan if it
+needs production exposure, credentials, a different topic/payload contract,
+broker persistence, an application consumer, or a broader runtime boundary.
+PR #13 remains Draft pending the explicit Ready/merge workflow action. Adding
+the MQTT context to GitHub branch protection remains a separately approved
+follow-up and was not changed by this PR.
 
 Branch: `feat/mvp-004-mqtt-local-runtime-and-simulator`
 
