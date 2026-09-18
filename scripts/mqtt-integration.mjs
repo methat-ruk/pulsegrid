@@ -1,6 +1,9 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
 import net from 'node:net'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const rootDirectory = process.cwd()
 const testPort = 11883
@@ -16,11 +19,20 @@ if (await isPortOpen(testPort)) {
   process.exit(1)
 }
 
+const simulatorDirectory = mkdtempSync(join(tmpdir(), 'pulsegrid-mqtt-'))
+const simulatorBinary = join(simulatorDirectory, 'device-simulator')
 let cleanupStarted = false
 const cleanup = () => {
   if (cleanupStarted) return true
   cleanupStarted = true
-  return run('docker', ['compose', '-p', projectName, '--profile', 'test', 'down', '--remove-orphans'], composeEnvironment, 120_000)
+  const brokerCleaned = run('docker', ['compose', '-p', projectName, '--profile', 'test', 'down', '--remove-orphans'], composeEnvironment, 120_000)
+  try {
+    rmSync(simulatorDirectory, { recursive: true, force: true })
+  } catch (error) {
+    console.error(`unable to remove simulator build directory: ${error.message}`)
+    return false
+  }
+  return brokerCleaned
 }
 
 process.once('SIGINT', () => {
@@ -34,19 +46,24 @@ process.once('SIGTERM', () => {
 
 let exitCode = 1
 try {
-  const started = run('docker', ['compose', '-p', projectName, '--profile', 'test', 'up', '-d', '--wait', 'mqtt-test'], composeEnvironment, 180_000)
-  if (!started) {
-    exitCode = 1
-  } else if (!(await exerciseBroker('initial publish'))) {
-    exitCode = 1
-  } else if (!run('docker', ['compose', '-p', projectName, '--profile', 'test', 'restart', 'mqtt-test'], composeEnvironment, 60_000)) {
-    exitCode = 1
-  } else if (!run('docker', ['compose', '-p', projectName, '--profile', 'test', 'up', '-d', '--wait', 'mqtt-test'], composeEnvironment, 180_000)) {
-    exitCode = 1
-  } else if (!(await exerciseBroker('publish after broker restart'))) {
+  const simulatorBuilt = run('go', ['-C', 'apps/api', 'build', '-o', simulatorBinary, './cmd/device-simulator'], process.env, 180_000)
+  if (!simulatorBuilt) {
     exitCode = 1
   } else {
-    exitCode = 0
+    const started = run('docker', ['compose', '-p', projectName, '--profile', 'test', 'up', '-d', '--wait', 'mqtt-test'], composeEnvironment, 180_000)
+    if (!started) {
+      exitCode = 1
+    } else if (!(await exerciseBroker('initial publish'))) {
+      exitCode = 1
+    } else if (!run('docker', ['compose', '-p', projectName, '--profile', 'test', 'restart', 'mqtt-test'], composeEnvironment, 60_000)) {
+      exitCode = 1
+    } else if (!run('docker', ['compose', '-p', projectName, '--profile', 'test', 'up', '-d', '--wait', 'mqtt-test'], composeEnvironment, 180_000)) {
+      exitCode = 1
+    } else if (!(await exerciseBroker('publish after broker restart'))) {
+      exitCode = 1
+    } else {
+      exitCode = 0
+    }
   }
 } finally {
   if (!cleanup()) exitCode = 1
@@ -67,7 +84,7 @@ async function exerciseBroker(label) {
     PULSEGRID_MQTT_DEVICE_ID: deviceID,
     PULSEGRID_SIMULATOR_TEMPERATURE_CELSIUS: '23.5',
   }
-  const published = run('go', ['-C', 'apps/api', 'run', './cmd/device-simulator'], publisherEnvironment, 30_000)
+  const published = run(simulatorBinary, [], publisherEnvironment, 30_000)
   const received = await subscriber.result
   if (!published) {
     console.error(`${label}: simulator publish failed`)
