@@ -11,7 +11,7 @@ security limits, validation gates, aggregate Docker lifecycle, rollback, and
 lifecycle closeout remain explicit. Implementation must stop and re-plan if it
 needs production exposure, credentials, a different topic/payload contract,
 broker persistence, an application consumer, or a broader runtime boundary.
-PR #13 remains Draft pending the explicit Ready/merge workflow action. A
+PR #13 is Ready for review pending the merge workflow action. A
 post-implementation branch-protection readback confirms that `mqtt-integration`
 is required alongside the prior contexts; that external protection mutation is
 not included in this PR.
