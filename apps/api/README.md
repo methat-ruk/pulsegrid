@@ -63,6 +63,53 @@ The machine-readable operational contract and response semantics are in the
 GraphQL device contract is documented in the API index; production product
 APIs are not implemented by this foundation.
 
+## Local MQTT simulator (MVP-004)
+
+The `device-simulator` is a separate one-shot Go process. It publishes one
+versioned telemetry observation over MQTT and does not import or call the API,
+GraphQL, registry, database, or migration packages. Register a device through
+the development console first, then copy its canonical lowercase UUID into the
+ignored API environment file:
+
+```sh
+cp apps/api/.env.development.example apps/api/.env.development
+# Set PULSEGRID_DATABASE_URL to a disposable local password as documented above.
+# Set PULSEGRID_MQTT_DEVICE_ID to the UUID returned by the device journey.
+corepack pnpm run docker:dev:up
+corepack pnpm run mqtt:simulator
+```
+
+The development broker listens only on `127.0.0.1:1883`. The simulator accepts
+only that exact development endpoint, the fixed `pulsegrid-dev` tenant slug,
+and a finite temperature value. It uses MQTT 3.1.1, QoS 1, `retain=false`, a
+clean session, five-second connect/publish bounds, and a bounded disconnect.
+Successful output reports the topic, logical message ID, timestamp, QoS, and
+retain flag; it does not print the payload or environment values. Any missing
+broker, invalid configuration, timeout, or failed acknowledgement exits
+non-zero without attempting registry or application acceptance.
+
+Stop or remove only the MQTT service; these commands do not remove PostgreSQL
+containers or volumes:
+
+```sh
+corepack pnpm run mqtt:dev:health
+corepack pnpm run mqtt:dev:logs
+corepack pnpm run mqtt:dev:stop
+corepack pnpm run mqtt:dev:down
+```
+
+The isolated real-broker evidence uses port `127.0.0.1:11883`, a unique
+Compose project, a subscriber started before publish, broker restart/recovery,
+and owned cleanup:
+
+```sh
+corepack pnpm run mqtt:test:integration
+```
+
+Broker acknowledgement proves transport delivery to Mosquitto only. It does
+not prove that PulseGrid subscribed, validated, accepted, stored, or displayed
+the message; those boundaries belong to MVP-005 and later plans.
+
 ## Local PostgreSQL (MVP-001)
 
 The disabled/health-only API does not open PostgreSQL. Development GraphQL
@@ -72,7 +119,7 @@ disposable local password. Run these commands from the repository root:
 
 ```sh
 cp apps/api/.env.development.example apps/api/.env.development
-corepack pnpm run db:dev:up
+corepack pnpm run docker:dev:up
 corepack pnpm run db:dev:migrate
 corepack pnpm run db:dev:seed
 corepack pnpm run db:dev:status
@@ -85,19 +132,31 @@ whitespace rules from migrations `003` and `004`. The preflight is read-only
 and the migration never rewrites existing device keys or display names
 implicitly.
 
-`db:dev:up` starts only the loopback PostgreSQL 18.6 Compose service and
-waits for its health check. The development volume is persistent; stopping the
-service does not delete it:
+`docker:dev:up` starts the loopback PostgreSQL 18.6 and Mosquitto Compose
+services together and waits for both health checks. It does not run migrations
+or seed data. Compose creates missing containers and starts existing ones. The
+development volume is persistent; stopping the PostgreSQL service does not
+delete it:
 
 ```sh
 corepack pnpm run db:dev:stop
 ```
 
-To remove the development container and Compose network while keeping the
-named volume and its data, run:
+To remove only the development PostgreSQL container while keeping the named
+volume and its data, run:
 
 ```sh
 corepack pnpm run db:dev:down
+```
+
+To stop or remove the complete local dependency stack, use the aggregate
+commands. `docker:dev:down` does not remove the named PostgreSQL volume:
+
+```sh
+corepack pnpm run docker:dev:health
+corepack pnpm run docker:dev:logs
+corepack pnpm run docker:dev:stop
+corepack pnpm run docker:dev:down
 ```
 
 Use `db:dev:up` to recreate the service from the existing volume. Do not add

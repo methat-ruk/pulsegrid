@@ -10,37 +10,54 @@ const providedArguments = process.argv.slice(3)
 const operationArguments = providedArguments[0] === '--'
   ? providedArguments.slice(1)
   : providedArguments
-if (!['up', 'stop', 'down', 'psql'].includes(operation)) {
-  console.error('usage: node scripts/db-dev.mjs <up|stop|down|psql> [psql args]')
+const supportedOperations = [
+  'up',
+  'all-up',
+  'stop',
+  'all-stop',
+  'down',
+  'all-down',
+  'all-logs',
+  'all-health',
+  'psql',
+]
+if (!supportedOperations.includes(operation)) {
+  console.error(`usage: node scripts/db-dev.mjs <${supportedOperations.join('|')}> [psql args]`)
   process.exit(2)
 }
 
-const credentials = loadDevelopmentCredentials()
+const credentials = ['up', 'all-up', 'psql'].includes(operation)
+  ? loadDevelopmentCredentials()
+  : { password: process.env.PULSEGRID_POSTGRES_PASSWORD ?? 'compose-unused-placeholder' }
 const environment = {
   ...process.env,
   PULSEGRID_POSTGRES_PASSWORD: credentials.password,
 }
 
-const args = operation === 'up'
-  ? ['compose', '--profile', 'dev', 'up', '-d', '--wait', 'postgres-dev']
-  : operation === 'stop'
-    ? ['compose', '--profile', 'dev', 'stop', 'postgres-dev']
-    : operation === 'down'
-      ? ['compose', '--profile', 'dev', 'down', '--remove-orphans']
-      : [
-        'compose',
-        '--profile',
-        'dev',
-        'exec',
-        ...(process.stdin.isTTY ? [] : ['-T']),
-        'postgres-dev',
-        'psql',
-        '-U',
-        'pulsegrid',
-        '-d',
-        'pulsegrid_dev',
-        ...operationArguments,
-      ]
+const compose = (...composeArguments) => ['compose', '--profile', 'dev', ...composeArguments]
+const argsByOperation = {
+  up: compose('up', '-d', '--wait', 'postgres-dev'),
+  // Compose `up` creates missing containers and starts existing ones.
+  'all-up': compose('up', '-d', '--wait', 'postgres-dev', 'mqtt-dev'),
+  stop: compose('stop', 'postgres-dev'),
+  'all-stop': compose('stop', 'postgres-dev', 'mqtt-dev'),
+  down: compose('rm', '-s', '-f', 'postgres-dev'),
+  'all-down': compose('down', 'postgres-dev', 'mqtt-dev'),
+  'all-logs': compose('logs', '--no-color', '--tail=200', 'postgres-dev', 'mqtt-dev'),
+  'all-health': compose('ps', 'postgres-dev', 'mqtt-dev'),
+  psql: compose(
+    'exec',
+    ...(process.stdin.isTTY ? [] : ['-T']),
+    'postgres-dev',
+    'psql',
+    '-U',
+    'pulsegrid',
+    '-d',
+    'pulsegrid_dev',
+    ...operationArguments,
+  ),
+}
+const args = argsByOperation[operation]
 
 const result = spawnSync('docker', args, {
   cwd: rootDirectory,

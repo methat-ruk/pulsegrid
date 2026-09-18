@@ -193,6 +193,27 @@ Nuxt validates these keys during Nitro startup. `runtimeConfig.public` remains
 empty, so the browser receives no API origin, credential, or other private
 runtime value.
 
+### MVP-004 local MQTT simulator keys
+
+MVP-004 adds five server-side simulator keys. They are consumed by the
+standalone `device-simulator` process, not by the API or browser console:
+
+| Key | Development | Test | Production |
+| --- | --- | --- | --- |
+| `PULSEGRID_ENV` | Exact value `development` | Exact value `test` | Rejected by the simulator |
+| `PULSEGRID_MQTT_BROKER_URL` | Exact `mqtt://127.0.0.1:1883` | Exact `mqtt://127.0.0.1:11883` | Rejected; no production broker is selected |
+| `PULSEGRID_MQTT_TENANT_SLUG` | Exact `pulsegrid-dev` | Exact `pulsegrid-dev` | Rejected with simulator production mode |
+| `PULSEGRID_MQTT_DEVICE_ID` | Canonical lowercase UUID copied from the registered-device journey | Canonical lowercase UUID supplied by the isolated test process | Rejected with simulator production mode |
+| `PULSEGRID_SIMULATOR_TEMPERATURE_CELSIUS` | Required finite JSON number | Required finite JSON number | Rejected with simulator production mode |
+
+The simulator rejects non-loopback hosts, unsupported MQTT schemes, URL
+userinfo, paths, queries, fragments, wrong tenant slugs, malformed or nil
+UUIDs, uppercase UUID forms, and non-finite temperatures. Process values have
+precedence over the selected `.env.<environment>` file. The tracked examples
+leave the device UUID blank; a contributor supplies it only in an ignored local
+file or the test process environment. These keys do not make the API depend on
+MQTT, and production identity/TLS/authorization remain a later decision.
+
 ## Delivery sequence
 
 1. This documentation foundation defines the policy and plan.
@@ -208,8 +229,8 @@ runtime value.
    persistence consumer; MVP-002 adds the development-only GraphQL identity
    mode and runtime database readiness; MVP-003 consumes the existing private
    origin through a fixed same-origin adapter and does not add a browser-facing
-   origin or credential; MVP-004 adds MQTT configuration when its broker and
-   simulator are introduced.
+   origin or credential; MVP-004 adds and validates the local MQTT simulator
+   configuration with its broker and simulator consumer.
 7. Production hardening defines the deployment secret provider, rotation,
    access controls, and production-mode smoke validation.
 

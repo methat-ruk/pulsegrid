@@ -67,6 +67,22 @@ flowchart LR
 The modules are logical ownership boundaries inside one Go deployment. They are
 not a commitment to separate services, databases, or repositories.
 
+### MVP-004 local transport fixture
+
+MVP-004 now provides a separate host-run `device-simulator` command and two
+local/test Mosquitto Compose services. The simulator owns only fixture
+configuration, topic construction, telemetry serialization, and a bounded
+QoS-1 publish. Mosquitto owns local MQTT transport and broker acknowledgement.
+Both listeners are published only on loopback (`1883` for development and
+`11883` for isolated tests), keep no broker persistence, and use no retained
+telemetry. The simulator cannot target production or external brokers and does
+not import or call the API, GraphQL, registry, database, or migration boundary.
+
+This is a producer/transport fixture, not an application consumer. MVP-005 owns
+untrusted MQTT input validation, tenant/device resolution, duplicate handling,
+and application acceptance; the API readiness contract remains independent of
+MQTT until that consumer exists.
+
 ## Conditional target architecture
 
 The following diagram preserves the long-term distributed direction. Every

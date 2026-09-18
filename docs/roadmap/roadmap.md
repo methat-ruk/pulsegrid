@@ -147,7 +147,7 @@ Plans:
 
 ### M2 — Telemetry and current state
 
-Status: Planned
+Status: In progress
 
 Dependency: M1
 

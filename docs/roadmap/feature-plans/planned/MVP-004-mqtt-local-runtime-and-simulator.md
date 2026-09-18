@@ -1,17 +1,19 @@
 # MVP-004 — MQTT Local Runtime and Simulator
 
-Status: Planned
+Status: In progress
 
-Review state: Plan reviewed and revised on 2026-09-18. No implementation has
-started. The repository baseline, broker and client dependencies, MQTT
-contract, local/test isolation, security limits, validation gates, rollback,
-and lifecycle closeout are explicit. Implementation must stop and re-plan if
-it needs production exposure, credentials, a different topic/payload contract,
-broker persistence, an application consumer, or a broader runtime boundary.
-Post-revision verdict: the plan conforms to the current project architecture
-and is ready for implementation. Pinned image identity plus advisory re-scan
-is the first dependency admission gate; adding the new MQTT CI context to
-GitHub branch protection remains a separately approved pre-merge action.
+Review state: Plan reviewed and revised on 2026-09-18. Implementation started
+after explicit approval and the working-tree candidate passed local unit,
+static, race, build, dependency, Compose, real-broker, PostgreSQL, and browser
+validation on 2026-09-18. The repository baseline, broker and client
+dependencies, MQTT contract, local/test isolation, security limits, validation
+gates, aggregate Docker lifecycle, rollback, and lifecycle closeout remain
+explicit. Implementation must
+stop and re-plan if it needs production exposure, credentials, a different
+topic/payload contract, broker persistence, an application consumer, or a
+broader runtime boundary. The independent MQTT CI context is defined but its
+remote run and any branch-protection mutation remain pending; adding that
+context to GitHub branch protection is a separately approved pre-merge action.
 
 Branch: `feat/mvp-004-mqtt-local-runtime-and-simulator`
 
@@ -84,8 +86,10 @@ generic messaging abstraction.
   ports, and keep destructive volume removal out of routine lifecycle commands.
 - The selected local toolchain is Node 24.20.0, pnpm 12.3.4, Go 1.27.1, Docker
   Engine 29.7.2 on Docker Desktop/aarch64, and Docker Compose 5.4.0.
-- No MQTT image, client library, simulator command, broker configuration,
-  message schema, MQTT environment key, or MQTT validation job exists.
+- Before implementation, no MQTT image, client library, simulator command,
+  broker configuration, message schema, MQTT environment key, or MQTT
+  validation job existed; the implementation below adds each within the
+  reviewed boundary.
 - `corepack pnpm run check:fast` passed on the baseline: Go formatting,
   generated GraphQL drift, modernization, Staticcheck, vet, frontend lint and
   typecheck, OpenAPI lint, browser-fixture typecheck, Go tests, and 44 frontend
@@ -142,9 +146,11 @@ generic messaging abstraction.
    hosts, unsupported schemes, userinfo, path/query/fragment, wrong fixed
    tenant slug, malformed UUIDs, and non-finite temperature values.
 7. Add explicit root commands for broker development lifecycle, one-shot
-   publish, and isolated MQTT integration validation. Stop/down commands must
-   target only MQTT services or the unique test Compose project and must not
-   remove PostgreSQL volumes.
+   publish, and isolated MQTT integration validation. The aggregate
+   `docker:dev:up|stop|down|logs|health` commands operate PostgreSQL and MQTT
+   together; `up` creates missing containers and waits for both health checks,
+   while `down` preserves the named PostgreSQL volume. Service-specific
+   stop/down commands remain available and must not remove PostgreSQL volumes.
 8. Add unit and real-broker integration evidence, an independent CI job, the
    documentation updates below, post-implementation review, final validation,
    and lifecycle closeout.

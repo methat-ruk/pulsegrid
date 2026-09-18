@@ -1,0 +1,3 @@
+# GitHub Linguist does not infer Mosquitto's generic .conf extension reliably.
+# Treat repository configuration files as INI-like text for code review.
+*.conf linguist-language=INI

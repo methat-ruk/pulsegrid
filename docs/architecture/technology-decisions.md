@@ -48,7 +48,7 @@ or immediately required dependency.
 | MQTT 3.1.1 | Selected — MVP | MVP-004 selects QoS 1, non-retained telemetry over loopback TCP for the first producer fixture; duplicate and untrusted-input handling remain with MVP-005/MVP-006 |
 | Eclipse Mosquitto 2.1.2 | Selected — MVP | Reviewed for the MVP-004 local/test broker and pinned by multi-platform image digest; production broker product/topology remains open |
 | Eclipse Paho MQTT Go client v1.5.1 | Selected — MVP | Reviewed for the separate MVP-004 simulator command and reusable by the later Go ingestion boundary without a generic messaging abstraction |
-| Docker Compose | Selected — MVP | Local PostgreSQL dependency is implemented; reviewed MVP-004 adds isolated loopback-only MQTT development/test services when implementation begins |
+| Docker Compose | Selected — MVP | Local PostgreSQL and the reviewed loopback-only MQTT development/test services are implemented as isolated dependency runtimes |
 | Backend/frontend Dockerfiles | Conditional target | Add when a containerized run, CI, or deployment target will build and exercise the images |
 | MongoDB | Conditional target | Adopt only when heterogeneous profile data and queries justify separate authority |
 | Dedicated time-series storage | Open | Select from measured volume, retention, aggregation, and query patterns |
@@ -98,8 +98,7 @@ decision record at that time rather than a speculative record now.
 
 ## MVP-004 local MQTT decision
 
-The reviewed MVP-004 plan selects an intentionally non-production transport
-fixture before implementation begins:
+MVP-004 implements an intentionally non-production transport fixture:
 
 - official `eclipse-mosquitto:2.1.2-alpine`, pinned by multi-platform digest
   `sha256:772e7b27d51cf2547a399fffa93ffa0075420fcc1eae84c4b422c72233c3ebb6`;
@@ -131,12 +130,17 @@ re-scan, reopen the disposition if digest/provenance/advisory/call graph
 changes, and stop if a finding becomes Critical/reachable or loopback
 containment changes.
 
+The implementation-admission re-scan on 2026-09-18 reproduced the same result
+on linux/arm64 and linux/amd64: 0 Critical, 2 High cJSON findings, with no
+fixed package. The pinned image and source call-path disposition therefore
+remain unchanged and must be revisited if the artifact or advisory changes.
+
 Revisit the selection when production identity/TLS/authorization is planned, a
 non-loopback or shared environment is required, command delivery proves
 different session/delivery needs, a patched image changes the risk decision,
-or broker operations become an owned production capability. This reviewed
-selection is not an implementation-status claim; current state remains owned
-by the roadmap and feature plan.
+or broker operations become an owned production capability. The feature plan
+and current repository state own the implementation status; this record
+preserves the selected boundary and its revisit triggers.
 
 ## Foundation selection evidence
 

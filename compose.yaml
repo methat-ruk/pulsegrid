@@ -35,6 +35,50 @@ services:
       timeout: 5s
       retries: 12
 
+  mqtt-dev:
+    image: eclipse-mosquitto:2.1.2-alpine@sha256:772e7b27d51cf2547a399fffa93ffa0075420fcc1eae84c4b422c72233c3ebb6
+    profiles: [dev]
+    command: ["mosquitto", "-c", "/mosquitto/config/mosquitto.conf"]
+    user: "1883:1883"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    configs:
+      - source: mqtt-mosquitto
+        target: /mosquitto/config/mosquitto.conf
+    ports:
+      - "127.0.0.1:1883:1883"
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_pub -h 127.0.0.1 -p 1883 -i pulsegrid-healthcheck -q 1 -t '$$pulsegrid/health' -m ok >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 2s
+
+  mqtt-test:
+    image: eclipse-mosquitto:2.1.2-alpine@sha256:772e7b27d51cf2547a399fffa93ffa0075420fcc1eae84c4b422c72233c3ebb6
+    profiles: [test]
+    command: ["mosquitto", "-c", "/mosquitto/config/mosquitto.conf"]
+    user: "1883:1883"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    configs:
+      - source: mqtt-mosquitto
+        target: /mosquitto/config/mosquitto.conf
+    ports:
+      - "127.0.0.1:11883:1883"
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_pub -h 127.0.0.1 -p 1883 -i pulsegrid-healthcheck -q 1 -t '$$pulsegrid/health' -m ok >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 2s
+
+configs:
+  mqtt-mosquitto:
+    file: ./docker/mqtt/mosquitto.conf
+
 volumes:
   pulsegrid_dev_data:
   pulsegrid_test_data:

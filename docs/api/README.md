@@ -1,8 +1,9 @@
 # PulseGrid API documentation
 
-Status: MVP-002 development GraphQL device contract and MVP-003 console
-integration are implemented and validated. Production identity and product
-expansion remain deferred.
+Status: MVP-002 development GraphQL device contract, MVP-003 console
+integration, and the MVP-004 local MQTT producer fixture are implemented and
+validated. Platform ingestion, production identity, and product expansion
+remain deferred.
 
 ## Purpose and ownership
 
@@ -40,7 +41,7 @@ and are review artifacts only; they are not published or served at runtime.
 | Console readiness adapter | Same-origin Nuxt server route | Implemented in FND-004; local process-readiness adapter only | [`ready.get.ts`](../../apps/web-console/server/api/operational/ready.get.ts) and the FND-001 operational contract |
 | Console GraphQL adapter | Same-origin Nuxt server route | Implemented in MVP-003; development/test transport adapter only | [`graphql.post.ts`](../../apps/web-console/server/api/graphql.post.ts) and [`graphql-proxy.ts`](../../apps/web-console/server/utils/graphql-proxy.ts) |
 | Operator product API | GraphQL/gqlgen | Implemented for development-only MVP-002 scope | [`device.graphqls`](../../apps/api/graph/schema/device.graphqls) and committed generated artifacts |
-| Device telemetry | MQTT | Planned for MVP-004 onward | AsyncAPI/message schema when a concrete flow exists |
+| Device telemetry | MQTT | MVP-004 producer fixture implemented; platform consumer planned for MVP-005 onward | [MVP-004 telemetry v1 contract](../roadmap/feature-plans/planned/MVP-004-mqtt-local-runtime-and-simulator.md) |
 | Device commands | MQTT | Planned for MVP-011 onward | AsyncAPI/message schema when a concrete flow exists |
 | Durable event distribution | Kafka | Post-MVP conditional | A flow-specific AsyncAPI/message contract |
 | Internal synchronous service calls | gRPC/Protobuf | Post-MVP conditional | A flow-specific protobuf contract |
@@ -51,6 +52,24 @@ development GraphQL journey; they are not a second product REST API or a
 generic proxy. The console product API uses the existing GraphQL contract; no
 parallel REST CRUD API is created without a separate consumer and an approved
 boundary.
+
+## MVP-004 telemetry producer fixture
+
+The local/test `device-simulator` publishes one UTF-8 JSON telemetry observation
+to a loopback Mosquitto broker. The producer contract is:
+
+- topic: `pulsegrid/v1/tenants/{tenantSlug}/devices/{deviceId}/telemetry`;
+- MVP-004 tenant slug: `pulsegrid-dev`;
+- device ID: canonical lowercase UUID copied from the registry journey;
+- MQTT 3.1.1 over TCP, QoS 1, `retain=false`, clean session;
+- payload fields: `schemaVersion` (integer `1`), `messageId` (new UUID),
+  `observedAt` (UTC RFC 3339), and `temperatureCelsius` (finite JSON number).
+
+The broker is local-only and ephemeral. The simulator's PUBACK proves only that
+the broker acknowledged the publish; MQTT QoS 1 can duplicate delivery, and
+the payload is untrusted for the future MVP-005 ingestion boundary. No API
+subscriber, registry lookup, persistence, current-state projection, or console
+telemetry behavior is implemented by this producer fixture.
 
 ## Current operational contract
 

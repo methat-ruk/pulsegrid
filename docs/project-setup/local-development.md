@@ -13,7 +13,8 @@ readiness adapter for the first full-stack development feedback loop.
 - Node `24.20.0` from `.node-version`;
 - pnpm `12.3.4` through Corepack;
 - Go `1.27.1` from `.go-version`;
-- Docker Compose with the pinned PostgreSQL image available locally.
+- Docker Compose with the pinned PostgreSQL and Eclipse Mosquitto images
+  available locally.
 
 Verify the selected versions before setup:
 
@@ -73,6 +74,79 @@ never exposed through `runtimeConfig.public` or forwarded from the browser.
 Do not add credentials, tokens, or other private service URLs to frontend
 examples.
 
+### Local dependency services in one command
+
+After creating `apps/api/.env.development` with a disposable local database
+password, start every development dependency together. The command loads the
+database password for Compose, starts PostgreSQL and Mosquitto in parallel, and
+waits for both health checks:
+
+```sh
+corepack pnpm run docker:dev:up
+corepack pnpm run docker:dev:health
+corepack pnpm run docker:dev:logs
+corepack pnpm run docker:dev:stop
+corepack pnpm run docker:dev:down
+```
+
+It does not run migrations or seed data. Run `db:dev:migrate` and
+`db:dev:seed` before enabling the development GraphQL API. The service-scoped
+stop/down commands remain available when only one dependency should change.
+`docker:dev:up` uses Compose `up`, so it creates missing containers and starts
+existing ones. `docker:dev:stop` stops both containers without removing them;
+`docker:dev:down` removes both containers and their Compose network while
+preserving the named PostgreSQL volume.
+
+### Local MQTT broker and simulator
+
+MVP-004 adds an ephemeral, loopback-only Mosquitto broker and a separate
+one-shot device simulator. The development broker uses `127.0.0.1:1883`; the
+isolated integration broker uses `127.0.0.1:11883`. The broker has no named
+volume, retained telemetry, dashboard, bridge, plugin, TLS, or production
+identity. Its Compose lifecycle is service-scoped so PostgreSQL containers and
+volumes are not removed:
+
+```sh
+corepack pnpm run mqtt:dev:up
+corepack pnpm run mqtt:dev:health
+corepack pnpm run mqtt:dev:logs
+corepack pnpm run mqtt:dev:stop
+corepack pnpm run mqtt:dev:down
+```
+
+To publish one observation, first register a device through the development
+GraphQL/console journey and copy its canonical lowercase UUID into the ignored
+`apps/api/.env.development` file. The simulator accepts only the exact local
+development endpoint and fixed `pulsegrid-dev` tenant; it does not verify
+registry membership or call the API:
+
+```sh
+cp apps/api/.env.development.example apps/api/.env.development
+# Set PULSEGRID_DATABASE_URL and PULSEGRID_MQTT_DEVICE_ID in the ignored file.
+corepack pnpm run docker:dev:up
+corepack pnpm run mqtt:simulator
+```
+
+The command publishes MQTT 3.1.1 QoS 1 with `retain=false`, waits up to five
+seconds for connect and PUBACK, then disconnects within a bounded quiesce
+period. Missing broker, occupied port, invalid configuration, timeout, or
+failed acknowledgement is a non-zero outcome. The output reports only the
+topic, message ID, timestamp, QoS, and retain flag.
+
+Run the real-broker integration evidence with a unique Compose project. It
+starts a subscriber before each publish, validates the exact topic and payload,
+checks that a later subscriber receives no retained message, restarts the
+broker, and removes only its own container/network on success or failure:
+
+```sh
+corepack pnpm run mqtt:test:integration
+```
+
+If `127.0.0.1:1883` or `127.0.0.1:11883` is already occupied, stop the process
+that owns that port or use the service-specific cleanup command. Do not use a
+broad `docker compose down -v` because it can erase development PostgreSQL
+data.
+
 With both processes running, open `http://127.0.0.1:3000` (or the port shown by
 Nuxt). The shell checks `GET /api/operational/ready` and offers a manual Retry
 when the local API is stopped or starting. This adapter covers process
@@ -86,7 +160,7 @@ development-only GraphQL API:
 
 ```sh
 cp apps/api/.env.development.example apps/api/.env.development
-corepack pnpm run db:dev:up
+corepack pnpm run docker:dev:up
 corepack pnpm run db:dev:migrate
 corepack pnpm run db:dev:seed
 corepack pnpm run db:dev:status
@@ -139,9 +213,9 @@ rerun the migration and check its status. Do not use `migrate down`, delete a
 volume, or run a broad Compose teardown as a migration-recovery shortcut.
 
 The development service binds only to `127.0.0.1:5432`; `db:dev:stop` stops its
-container without deleting the container or named volume. Use `db:dev:down`
-when the container and Compose network should be removed; it also preserves
-the named volume and its data. The isolated integration workflow owns a
+container without deleting the container or named volume. Use `db:dev:down` to
+remove only the PostgreSQL container while preserving the named volume and its
+data; it does not stop `mqtt-dev`. The isolated integration workflow owns a
 unique Compose project and the test port `127.0.0.1:15432`:
 
 ```sh
@@ -185,8 +259,8 @@ pgdev() {
 
 Use `pgdevup` to start the persistent development database, `pgdev` or
 `pgdev -c '\dt'` to inspect it, `pgdevstop` to stop the service while keeping
-the container and volume, and `pgdevdown` to remove the container and network
-while keeping the volume. A persistent `pgtest` alias is not provided because
+the container and volume, and `pgdevdown` to remove only the PostgreSQL
+container while keeping the volume. A persistent `pgtest` alias is not provided because
 `api:test:integration` deliberately creates a disposable database with a
 random Compose project and removes it after the run.
 
@@ -236,6 +310,7 @@ while the local runner cleans up only the Compose project it created.
 | `corepack pnpm run api:generate:check` | Regenerate gqlgen artifacts and fail when committed GraphQL output is stale |
 | `corepack pnpm run check:fast` | Fast pre-CI handoff: formatting, generated-contract drift, Go modernization/static analysis, lint, typecheck, and ordinary tests |
 | `corepack pnpm run api:test:integration` | Isolated real-PostgreSQL migration, repository, constraint, and tenant-scope evidence |
+| `corepack pnpm run mqtt:test:integration` | Isolated real-Mosquitto publish/subscribe, QoS 1, no-retain, restart, and cleanup evidence |
 | `corepack pnpm run check` | Full pre-CI handoff, including race, build, OpenAPI, audits, database integration, and browser smoke |
 
 The pre-commit hook runs only staged Go formatting, staged frontend ESLint,
