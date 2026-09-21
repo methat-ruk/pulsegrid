@@ -85,15 +85,20 @@ flowchart TD
     class FND001 complete;
     class FND002 complete;
     class FND003 complete;
+    class FND004 complete;
+    class MVP001 complete;
+    class MVP002 complete;
     class MVP003 complete;
+    class MVP004 complete;
 ```
 
 FND-001 implementation establishes the backend runtime shell, FND-002
 establishes the frontend runtime shell, FND-003 establishes the repository
 quality and merge-gate boundary, and FND-004 proves the first cross-boundary
-process journey. MVP-001 and MVP-002 now provide the persistence and GraphQL
-contract; MVP-003 is the completed console journey that closes the first
-operator-visible device-registry slice.
+process journey. MVP-001 and MVP-002 provide the persistence and GraphQL
+contract; MVP-003 closes the first operator-visible device-registry slice; and
+MVP-004 provides the completed local MQTT transport and simulator fixture for
+the in-progress telemetry milestone.
 
 ## Milestones
 
