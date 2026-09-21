@@ -18,6 +18,7 @@ import (
 const (
 	defaultQueueSize           = 64
 	defaultConnectTimeout      = 5 * time.Second
+	defaultWriteTimeout        = 5 * time.Second
 	defaultSubscribeTimeout    = 5 * time.Second
 	defaultReconnectInterval   = 5 * time.Second
 	defaultSubscribeRetryDelay = 500 * time.Millisecond
@@ -73,6 +74,7 @@ type Config struct {
 	ClientIDPrefix      string
 	QueueSize           int
 	ConnectTimeout      time.Duration
+	WriteTimeout        time.Duration
 	SubscribeTimeout    time.Duration
 	ReconnectInterval   time.Duration
 	SubscribeRetryDelay time.Duration
@@ -86,6 +88,7 @@ func DefaultConfig(brokerURL string) Config {
 		ClientIDPrefix:      defaultClientIDPrefix,
 		QueueSize:           defaultQueueSize,
 		ConnectTimeout:      defaultConnectTimeout,
+		WriteTimeout:        defaultWriteTimeout,
 		SubscribeTimeout:    defaultSubscribeTimeout,
 		ReconnectInterval:   defaultReconnectInterval,
 		SubscribeRetryDelay: defaultSubscribeRetryDelay,
@@ -102,6 +105,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.ConnectTimeout <= 0 {
 		c.ConnectTimeout = defaultConnectTimeout
+	}
+	if c.WriteTimeout <= 0 {
+		c.WriteTimeout = defaultWriteTimeout
 	}
 	if c.SubscribeTimeout <= 0 {
 		c.SubscribeTimeout = defaultSubscribeTimeout
@@ -142,8 +148,9 @@ type Transport struct {
 	clientMu sync.RWMutex
 	client   Client
 
-	admissionMu sync.Mutex
-	accepting   bool
+	connectionStateMu sync.Mutex
+	admissionMu       sync.Mutex
+	accepting         bool
 
 	generation atomic.Uint64
 	ready      atomic.Bool
@@ -211,6 +218,7 @@ func (t *Transport) Start(ctx context.Context) error {
 		SetAutoReconnect(true).
 		SetConnectRetry(false).
 		SetConnectTimeout(t.config.ConnectTimeout).
+		SetWriteTimeout(t.config.WriteTimeout).
 		SetMaxReconnectInterval(t.config.ReconnectInterval).
 		SetKeepAlive(t.config.KeepAlive).
 		SetOnConnectHandler(func(_ mqtt.Client) {
@@ -219,8 +227,7 @@ func (t *Transport) Start(ctx context.Context) error {
 			}
 		}).
 		SetConnectionLostHandler(func(_ mqtt.Client, _ error) {
-			t.ready.Store(false)
-			t.generation.Add(1)
+			t.invalidateConnection()
 			t.logger.Warn("mqtt ingestion disconnected", "reason_code", "mqtt_disconnected")
 		})
 
@@ -266,8 +273,7 @@ func (t *Transport) stop(ctx context.Context) error {
 	t.admissionMu.Lock()
 	t.accepting = false
 	t.admissionMu.Unlock()
-	t.ready.Store(false)
-	t.generation.Add(1)
+	t.invalidateConnection()
 	if t.connectionCancel != nil {
 		t.connectionCancel()
 	}
@@ -275,9 +281,7 @@ func (t *Transport) stop(ctx context.Context) error {
 
 	var cleanupErr error
 	if client := t.currentClient(); client != nil {
-		if token := client.Unsubscribe(ingestion.TelemetryTopicFilter); token != nil {
-			cleanupErr = waitToken(ctx, token, t.config.SubscribeTimeout, ErrSubscribeTimeout, ErrSubscribeFailed)
-		}
+		cleanupErr = unsubscribeWithContext(ctx, client, ingestion.TelemetryTopicFilter, t.config.WriteTimeout)
 		client.Disconnect(quiesceMilliseconds(ctx))
 	}
 
@@ -309,9 +313,33 @@ func (t *Transport) currentClient() Client {
 	return t.client
 }
 
-func (t *Transport) handleConnect(client Client) {
+func (t *Transport) invalidateConnection() {
+	t.connectionStateMu.Lock()
 	t.ready.Store(false)
-	generation := t.generation.Add(1)
+	t.generation.Add(1)
+	t.connectionStateMu.Unlock()
+}
+
+func (t *Transport) beginConnection() uint64 {
+	t.connectionStateMu.Lock()
+	defer t.connectionStateMu.Unlock()
+	t.ready.Store(false)
+	return t.generation.Add(1)
+}
+
+func (t *Transport) commitReady(client Client, generation uint64) bool {
+	t.connectionStateMu.Lock()
+	defer t.connectionStateMu.Unlock()
+	if generation != t.generation.Load() || t.connectionContext == nil || t.connectionContext.Err() != nil || !client.IsConnected() {
+		return false
+	}
+	t.ready.Store(true)
+	t.firstReadyOnce.Do(func() { close(t.firstReady) })
+	return true
+}
+
+func (t *Transport) handleConnect(client Client) {
+	generation := t.beginConnection()
 	go t.subscribeUntilReady(client, generation)
 }
 
@@ -323,8 +351,9 @@ func (t *Transport) subscribeUntilReady(client Client, generation uint64) {
 		token := client.Subscribe(ingestion.TelemetryTopicFilter, 1, t.handleMessage)
 		err := waitToken(t.connectionContext, token, t.config.SubscribeTimeout, ErrSubscribeTimeout, ErrSubscribeFailed)
 		if err == nil {
-			t.ready.Store(true)
-			t.firstReadyOnce.Do(func() { close(t.firstReady) })
+			if t.commitReady(client, generation) {
+				return
+			}
 			return
 		}
 		t.logger.Warn("mqtt ingestion subscription unavailable", "reason_code", "mqtt_subscription_unavailable")
@@ -389,7 +418,7 @@ func (t *Transport) failStart(err error) error {
 	t.admissionMu.Lock()
 	t.accepting = false
 	t.admissionMu.Unlock()
-	t.ready.Store(false)
+	t.invalidateConnection()
 	if t.connectionCancel != nil {
 		t.connectionCancel()
 	}
@@ -427,6 +456,19 @@ func waitToken(ctx context.Context, token Token, timeout time.Duration, timeoutE
 	select {
 	case err := <-result:
 		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func unsubscribeWithContext(ctx context.Context, client Client, topic string, timeout time.Duration) error {
+	tokenChannel := make(chan Token, 1)
+	go func() {
+		tokenChannel <- client.Unsubscribe(topic)
+	}()
+	select {
+	case token := <-tokenChannel:
+		return waitToken(ctx, token, timeout, ErrSubscribeTimeout, ErrSubscribeFailed)
 	case <-ctx.Done():
 		return ctx.Err()
 	}

@@ -91,6 +91,4 @@ components:
               temperatureCelsius: 23.5
       bindings:
         mqtt:
-          payloadFormatIndicator: 1
-          contentType: application/json
           bindingVersion: 0.2.0

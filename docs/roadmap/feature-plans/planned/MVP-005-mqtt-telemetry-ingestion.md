@@ -679,7 +679,11 @@ Evidence on the current working tree:
   disposable cleanup; and
 - author self-review added explicit initial connect/subscribe timeout tests,
   nil-callback protection, fuzz seeds for strict payload decoding, and timeout
-  failure handling in the integration runner.
+  failure handling in the integration runner; PR review follow-up now also
+  synchronizes readiness generation commits, bounds Paho write/unsubscribe
+  shutdown, removes MQTT 5-only AsyncAPI fields, scopes integration assertions
+  to each delivery, restores broker-cap coverage, and adds deterministic drain,
+  saturation, deadline, and missing-device evidence.
 
 The plan remains `In progress` in `planned/` because exact-head CI/PR review and
 any required independent review have not yet occurred. Move it to `completed/`

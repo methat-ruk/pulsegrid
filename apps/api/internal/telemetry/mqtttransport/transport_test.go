@@ -1,8 +1,11 @@
 package mqtttransport
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -13,12 +16,18 @@ import (
 )
 
 type fakeToken struct {
-	err      error
-	complete bool
+	err       error
+	complete  bool
+	afterWait func()
 }
 
-func (t fakeToken) WaitTimeout(time.Duration) bool { return t.complete }
-func (t fakeToken) Error() error                   { return t.err }
+func (t fakeToken) WaitTimeout(time.Duration) bool {
+	if t.afterWait != nil {
+		t.afterWait()
+	}
+	return t.complete
+}
+func (t fakeToken) Error() error { return t.err }
 
 type fakeMessage struct {
 	topic     string
@@ -37,13 +46,17 @@ func (m fakeMessage) Duplicate() bool { return m.duplicate }
 type fakeClient struct {
 	options *mqtt.ClientOptions
 
-	mu                sync.Mutex
-	connected         bool
-	handler           func(Message)
-	connectErr        error
-	subscribeErr      error
-	connectIncomplete bool
-	disconnected      bool
+	mu                 sync.Mutex
+	connected          bool
+	handler            func(Message)
+	connectErr         error
+	subscribeErr       error
+	connectIncomplete  bool
+	afterSubscribe     func()
+	unsubscribeStarted chan struct{}
+	unsubscribeBlock   <-chan struct{}
+	unsubscribeOnce    sync.Once
+	disconnected       bool
 }
 
 func (c *fakeClient) Connect() Token {
@@ -64,15 +77,26 @@ func (c *fakeClient) Connect() Token {
 
 func (c *fakeClient) Subscribe(_ string, _ byte, handler func(Message)) Token {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.subscribeErr != nil {
-		return fakeToken{complete: true, err: c.subscribeErr}
+	subscribeErr := c.subscribeErr
+	afterSubscribe := c.afterSubscribe
+	c.afterSubscribe = nil
+	if subscribeErr == nil {
+		c.handler = handler
 	}
-	c.handler = handler
-	return fakeToken{complete: true}
+	c.mu.Unlock()
+	if subscribeErr != nil {
+		return fakeToken{complete: true, err: subscribeErr}
+	}
+	return fakeToken{complete: true, afterWait: afterSubscribe}
 }
 
 func (c *fakeClient) Unsubscribe(...string) Token {
+	if c.unsubscribeStarted != nil {
+		c.unsubscribeOnce.Do(func() { close(c.unsubscribeStarted) })
+	}
+	if c.unsubscribeBlock != nil {
+		<-c.unsubscribeBlock
+	}
 	return fakeToken{complete: true}
 }
 
@@ -135,6 +159,9 @@ func TestTransportStartsSubscribesProcessesAndStops(t *testing.T) {
 	}
 	if !transport.Ready() {
 		t.Fatal("transport is not ready after successful subscription")
+	}
+	if client.options.WriteTimeout != 5*time.Second {
+		t.Fatalf("Paho write timeout = %s, want 5s", client.options.WriteTimeout)
 	}
 
 	client.Emit(fakeMessage{topic: "topic", payload: []byte("payload"), qos: 1})
@@ -230,6 +257,63 @@ func TestTransportFailsWhenInitialSubscriptionNeverBecomesReady(t *testing.T) {
 	}
 }
 
+func TestTransportDoesNotRestoreReadinessAfterDisconnectBeforeCommit(t *testing.T) {
+	client := &fakeClient{}
+	client.afterSubscribe = func() { client.Drop() }
+	config := DefaultConfig("mqtt://127.0.0.1:1883")
+	config.SubscribeTimeout = 25 * time.Millisecond
+	config.SubscribeRetryDelay = time.Millisecond
+	transport, err := New(config, func(options *mqtt.ClientOptions) Client {
+		client.options = options
+		return client
+	}, func(context.Context, ingestion.Delivery) {}, nil)
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+	if err := transport.Start(context.Background()); !errors.Is(err, ErrSubscribeTimeout) {
+		t.Fatalf("Start error = %v, want ErrSubscribeTimeout", err)
+	}
+	if transport.Ready() {
+		t.Fatal("transport became ready after the subscription generation was disconnected")
+	}
+}
+
+func TestTransportStopHonorsDeadlineWhenUnsubscribeStalls(t *testing.T) {
+	unsubscribeBlock := make(chan struct{})
+	client := &fakeClient{
+		unsubscribeStarted: make(chan struct{}),
+		unsubscribeBlock:   unsubscribeBlock,
+	}
+	transport, err := New(DefaultConfig("mqtt://127.0.0.1:1883"), func(options *mqtt.ClientOptions) Client {
+		client.options = options
+		return client
+	}, func(context.Context, ingestion.Delivery) {}, nil)
+	if err != nil {
+		t.Fatalf("New returned error: %v", err)
+	}
+	if err := transport.Start(context.Background()); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+	stopContext, cancelStop := context.WithTimeout(context.Background(), 25*time.Millisecond)
+	defer cancelStop()
+	stopDone := make(chan error, 1)
+	go func() { stopDone <- transport.Stop(stopContext) }()
+	select {
+	case <-client.unsubscribeStarted:
+	case <-time.After(time.Second):
+		t.Fatal("unsubscribe did not start")
+	}
+	select {
+	case err := <-stopDone:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("Stop error = %v, want context.DeadlineExceeded", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Stop did not honor its deadline")
+	}
+	close(unsubscribeBlock)
+}
+
 func TestTransportStartWithCanceledContextDoesNotPoisonStop(t *testing.T) {
 	client := &fakeClient{}
 	transport, err := New(DefaultConfig("mqtt://127.0.0.1:1883"), func(options *mqtt.ClientOptions) Client {
@@ -250,13 +334,15 @@ func TestTransportStartWithCanceledContextDoesNotPoisonStop(t *testing.T) {
 }
 
 func TestTransportDrainsQueuedWorkBeforeStopping(t *testing.T) {
-	client := &fakeClient{}
+	client := &fakeClient{unsubscribeStarted: make(chan struct{})}
 	config := DefaultConfig("mqtt://127.0.0.1:1883")
 	config.QueueSize = 1
 	started := make(chan struct{})
 	release := make(chan struct{})
 	var startedOnce sync.Once
 	processed := make(chan ingestion.Delivery, 2)
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
 	transport, err := New(config, func(options *mqtt.ClientOptions) Client {
 		client.options = options
 		return client
@@ -267,7 +353,7 @@ func TestTransportDrainsQueuedWorkBeforeStopping(t *testing.T) {
 			processed <- delivery
 		case <-ctx.Done():
 		}
-	}, nil)
+	}, logger)
 	if err != nil {
 		t.Fatalf("New returned error: %v", err)
 	}
@@ -287,12 +373,21 @@ func TestTransportDrainsQueuedWorkBeforeStopping(t *testing.T) {
 	defer cancelStop()
 	stopDone := make(chan error, 1)
 	go func() { stopDone <- transport.Stop(stopContext) }()
+	select {
+	case <-client.unsubscribeStarted:
+		client.Emit(fakeMessage{payload: []byte("after-drain-start"), qos: 1})
+	case <-time.After(time.Second):
+		t.Fatal("unsubscribe did not start")
+	}
 	close(release)
 	if err := <-stopDone; err != nil {
 		t.Fatalf("Stop returned error: %v", err)
 	}
 	if len(processed) != 2 {
 		t.Fatalf("processed deliveries = %d, want first plus queued second", len(processed))
+	}
+	if !strings.Contains(logs.String(), "reason_code=ingestion_overloaded") {
+		t.Fatalf("transport logs = %q, want queue saturation reason", logs.String())
 	}
 }
 

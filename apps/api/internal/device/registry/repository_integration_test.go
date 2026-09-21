@@ -185,6 +185,9 @@ func TestResolveDeviceByTenantSlugPreservesTenantBoundary(t *testing.T) {
 	if _, err := repository.ResolveDeviceByTenantSlug(ctx, "missing-tenant", deviceA.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("missing-tenant resolve error = %v, want ErrNotFound", err)
 	}
+	if _, err := repository.ResolveDeviceByTenantSlug(ctx, slugA, uuid.New()); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing-device resolve error = %v, want ErrNotFound", err)
+	}
 }
 
 func TestRepositoryConcurrentDuplicateDeviceKey(t *testing.T) {

@@ -55,8 +55,9 @@ try {
     await waitForReady()
     const deviceID = await createDevice()
     await publishSimulator(deviceID)
-    assertNoRawTelemetryInLogs()
     await publishInvalidCases(deviceID)
+    await testBrokerPayloadCap(deviceID)
+    assertNoRawTelemetryInLogs()
     await testRetainedMessage(deviceID)
     await testBrokerRecovery(deviceID)
     if (!await stopApi()) throw new Error('API did not drain and stop cleanly')
@@ -192,9 +193,10 @@ async function publishInvalidCases(deviceID) {
     { label: 'unknown device', topic: topic.replace(deviceID, randomUUID()), payload: validBoundaryPayload(), reason: 'telemetry_device_not_registered_for_tenant' },
   ]
   for (const testCase of cases) {
+    const logOffset = apiOutput.length
     const result = await publishRaw(testCase.topic ?? topic, testCase.payload, false)
     if (result.status !== 0) throw new Error(`${testCase.label} publish failed: ${result.stderr}`)
-    await waitForLog(`reason_code=${testCase.reason}`, 10_000, testCase.label)
+    await waitForLogSince(logOffset, `reason_code=${testCase.reason}`, 10_000, testCase.label)
   }
 
   const duplicateMessageID = '22222222-2222-4222-8222-222222222222'
@@ -227,6 +229,21 @@ async function testBrokerRecovery(deviceID) {
   await waitForLogFields(['reason_code=telemetry_accepted', `message_id=${messageID}`], 10_000, 'post-recovery telemetry acceptance')
 }
 
+async function testBrokerPayloadCap(deviceID) {
+  const topic = `pulsegrid/v1/tenants/pulsegrid-dev/devices/${deviceID}/telemetry`
+  const subscriber = runCapture('docker', [
+    'compose', '-p', projectName, '--profile', 'test', 'exec', '-T', 'mqtt-test',
+    'mosquitto_sub', '-h', '127.0.0.1', '-p', '1883', '-i', `pulsegrid-sub-${randomUUID()}`,
+    '-q', '1', '-t', topic, '-C', '1', '-W', '2',
+  ], environment, 5_000)
+  await delay(300)
+  await publishRaw(topic, 'x'.repeat(17 * 1024), false)
+  const received = await subscriber
+  if (received.stdout.trim() !== '') {
+    throw new Error('Mosquitto forwarded a payload larger than its 16 KiB message cap')
+  }
+}
+
 function assertNoRawTelemetryInLogs() {
   if (apiOutput.includes('23.5') || apiOutput.includes('schemaVersion') || apiOutput.includes('temperatureCelsius')) {
     throw new Error('API logs contain raw telemetry content')
@@ -250,6 +267,15 @@ async function waitForLog(text, timeout, label) {
     await delay(100)
   }
   throw new Error(`${label} was not found in API output: ${text}\nAPI output:\n${apiOutput}`)
+}
+
+async function waitForLogSince(offset, text, timeout, label) {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline && !stopRequested) {
+    if (apiOutput.slice(offset).includes(text)) return
+    await delay(100)
+  }
+  throw new Error(`${label} was not found in new API output: ${text}\nAPI output:\n${apiOutput.slice(offset)}`)
 }
 
 async function waitForLogFields(fields, timeout, label) {
