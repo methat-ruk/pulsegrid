@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -19,6 +20,8 @@ import (
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/databaseconfig"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/httpserver"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/logging"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/telemetry/ingestion"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/telemetry/mqtttransport"
 )
 
 const developmentOrganizationSlug = "pulsegrid-dev"
@@ -29,6 +32,7 @@ const (
 	startupDatabaseSchemaUnavailable = "database_schema_unavailable"
 	startupOrganizationMissing       = "development_organization_missing"
 	startupRepositoryUnavailable     = "repository_initialization_failed"
+	startupMQTTUnavailable           = "mqtt_ingestion_unavailable"
 )
 
 type startupFailure struct {
@@ -57,35 +61,81 @@ func main() {
 
 	logger := logging.New(cfg.Environment, cfg.LogLevel, os.Stdout)
 	serverOptions := httpserver.Options{}
-	var poolClose func()
-	if cfg.IdentityMode == config.IdentityDevelopment {
+	needsRegistry := cfg.IdentityMode == config.IdentityDevelopment || cfg.MQTTIngestionEnabled()
+	var pool *pgxpool.Pool
+	var repository *registry.Repository
+	var organizationID uuid.UUID
+	if needsRegistry {
 		startupContext, cancelStartup := context.WithTimeout(ctx, 10*time.Second)
-		pool, repository, organizationID, startupErr := openDevelopmentGraphQL(startupContext)
+		var startupErr error
+		pool, repository, startupErr = openDevelopmentDependencies(startupContext)
+		if startupErr == nil && cfg.IdentityMode == config.IdentityDevelopment {
+			organizationID, startupErr = resolveDevelopmentOrganization(startupContext, repository)
+		}
 		cancelStartup()
 		if startupErr != nil {
 			reasonCode, message := startupFailureDetails(startupErr)
-			logger.Error("graphql startup failed", "reason_code", reasonCode)
-			fmt.Fprintf(os.Stderr, "GraphQL startup failed: %s\n", message)
+			logger.Error("API dependency startup failed", "reason_code", reasonCode)
+			fmt.Fprintf(os.Stderr, "API dependency startup failed: %s\n", message)
 			os.Exit(1)
 		}
-		poolClose = pool.Close
+		defer pool.Close()
+	}
+
+	if cfg.IdentityMode == config.IdentityDevelopment {
 		graphqlHandler, handlerErr := graph.NewHandler(repository, organizationID, logger)
 		if handlerErr != nil {
-			poolClose()
+			pool.Close()
 			logger.Error("graphql startup failed", "reason_code", "handler_initialization_failed")
 			fmt.Fprintln(os.Stderr, "GraphQL startup failed: handler initialization failed")
 			os.Exit(1)
 		}
-		serverOptions = httpserver.Options{
-			GraphQLHandler:  graphqlHandler,
-			ContextEnricher: graph.NewDevelopmentContextEnricher(organizationID),
-			ReadinessCheck: func(probeContext context.Context) error {
-				return pool.Ping(probeContext)
-			},
+		serverOptions.GraphQLHandler = graphqlHandler
+		serverOptions.ContextEnricher = graph.NewDevelopmentContextEnricher(organizationID)
+	}
+
+	var mqttRuntime *mqtttransport.Transport
+	if cfg.MQTTIngestionEnabled() {
+		resolver := repositoryResolver{repository: repository}
+		consumer := ingestion.ConsumerFunc(func(context.Context, ingestion.AcceptedTelemetry) error {
+			return nil
+		})
+		handler, handlerErr := ingestion.NewHandler(resolver, consumer, ingestion.HandlerConfig{})
+		if handlerErr != nil {
+			if pool != nil {
+				pool.Close()
+			}
+			logger.Error("MQTT ingestion startup failed", "reason_code", startupMQTTUnavailable)
+			fmt.Fprintln(os.Stderr, "MQTT ingestion startup failed: handler initialization failed")
+			os.Exit(1)
+		}
+		processor := telemetryProcessor(handler, logger)
+		var transportErr error
+		mqttRuntime, transportErr = mqtttransport.New(mqtttransport.DefaultConfig(cfg.MQTTBrokerURL), mqtttransport.PahoClientFactory, processor, logger)
+		if transportErr == nil {
+			transportErr = mqttRuntime.Start(ctx)
+		}
+		if transportErr != nil {
+			if pool != nil {
+				pool.Close()
+			}
+			logger.Error("MQTT ingestion startup failed", "reason_code", startupMQTTUnavailable)
+			fmt.Fprintln(os.Stderr, "MQTT ingestion startup failed: broker or subscription unavailable")
+			os.Exit(1)
 		}
 	}
-	if poolClose != nil {
-		defer poolClose()
+
+	serverOptions.ReadinessCheck = readinessCheck(pool, mqttRuntime)
+
+	var mqttStopDone chan error
+	if mqttRuntime != nil {
+		mqttStopDone = make(chan error, 1)
+		go func() {
+			<-ctx.Done()
+			shutdownContext, cancelShutdown := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+			defer cancelShutdown()
+			mqttStopDone <- mqttRuntime.Stop(shutdownContext)
+		}()
 	}
 
 	server := httpserver.New(cfg, logger, serverOptions)
@@ -99,34 +149,131 @@ func main() {
 			logger.Error("http server shutdown did not complete", "reason_code", "shutdown_incomplete")
 			os.Exit(1)
 		}
+		if mqttStopDone != nil {
+			select {
+			case stopErr := <-mqttStopDone:
+				if stopErr != nil {
+					logger.Error("MQTT ingestion shutdown failed", "reason_code", "shutdown_incomplete")
+					os.Exit(1)
+				}
+			case <-waitContext.Done():
+				logger.Error("MQTT ingestion shutdown did not complete", "reason_code", "shutdown_incomplete")
+				os.Exit(1)
+			}
+		}
 	}
 
 	if listenErr != nil && !errors.Is(listenErr, context.Canceled) {
+		if mqttRuntime != nil && ctx.Err() == nil {
+			shutdownContext, cancelShutdown := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+			_ = mqttRuntime.Stop(shutdownContext)
+			cancelShutdown()
+		}
 		logger.Error("http server exited", "reason_code", "listen_failed", "error", listenErr.Error())
 		os.Exit(1)
 	}
 }
 
 func openDevelopmentGraphQL(ctx context.Context) (*pgxpool.Pool, *registry.Repository, uuid.UUID, error) {
+	pool, repository, err := openDevelopmentDependencies(ctx)
+	if err != nil {
+		return nil, nil, uuid.Nil, err
+	}
+	organizationID, err := resolveDevelopmentOrganization(ctx, repository)
+	if err != nil {
+		pool.Close()
+		return nil, nil, uuid.Nil, err
+	}
+	return pool, repository, organizationID, nil
+}
+
+func openDevelopmentDependencies(ctx context.Context) (*pgxpool.Pool, *registry.Repository, error) {
 	databaseConfiguration, err := databaseconfig.Load()
 	if err != nil {
-		return nil, nil, uuid.Nil, newStartupFailure(startupConfigurationInvalid, "development database configuration is invalid", err)
+		return nil, nil, newStartupFailure(startupConfigurationInvalid, "development database configuration is invalid", err)
 	}
 	pool, err := database.Open(ctx, databaseConfiguration.URL)
 	if err != nil {
-		return nil, nil, uuid.Nil, newStartupFailure(startupDatabaseUnavailable, "development database is unavailable", err)
+		return nil, nil, newStartupFailure(startupDatabaseUnavailable, "development database is unavailable", err)
 	}
 	repository, err := registry.NewRepository(pool)
 	if err != nil {
 		pool.Close()
-		return nil, nil, uuid.Nil, newStartupFailure(startupRepositoryUnavailable, "development registry is unavailable", err)
+		return nil, nil, newStartupFailure(startupRepositoryUnavailable, "development registry is unavailable", err)
 	}
+	return pool, repository, nil
+}
+
+func resolveDevelopmentOrganization(ctx context.Context, repository *registry.Repository) (uuid.UUID, error) {
 	organizationID, err := repository.FindOrganizationBySlug(ctx, developmentOrganizationSlug)
 	if err != nil {
-		pool.Close()
-		return nil, nil, uuid.Nil, classifyOrganizationLookupFailure(err)
+		return uuid.Nil, classifyOrganizationLookupFailure(err)
 	}
-	return pool, repository, organizationID, nil
+	return organizationID, nil
+}
+
+type repositoryResolver struct {
+	repository *registry.Repository
+}
+
+func (r repositoryResolver) ResolveDevice(ctx context.Context, tenantSlug string, deviceID uuid.UUID) (uuid.UUID, error) {
+	device, err := r.repository.ResolveDeviceByTenantSlug(ctx, tenantSlug, deviceID)
+	if errors.Is(err, registry.ErrNotFound) {
+		return uuid.Nil, ingestion.ErrDeviceNotFound
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return device.OrganizationID, nil
+}
+
+func telemetryProcessor(handler *ingestion.Handler, logger *slog.Logger) mqtttransport.Processor {
+	return func(ctx context.Context, delivery ingestion.Delivery) {
+		accepted, err := handler.Handle(ctx, delivery)
+		if err != nil {
+			fields := []any{
+				"reason_code", ingestion.ReasonOf(err),
+				"ingestion_id", delivery.IngestionID,
+				"payload_bytes", len(delivery.Payload),
+				"qos", delivery.QoS,
+				"retained", delivery.Retained,
+				"duplicate", delivery.Duplicate,
+			}
+			if ingestion.IsRejected(err) {
+				logger.Warn("mqtt telemetry rejected", fields...)
+			} else {
+				logger.Error("mqtt telemetry processing failed", fields...)
+			}
+			return
+		}
+		logger.Info("mqtt telemetry accepted",
+			"reason_code", "telemetry_accepted",
+			"ingestion_id", accepted.IngestionID,
+			"message_id", accepted.MessageID,
+			"organization_id", accepted.OrganizationID,
+			"device_id", accepted.DeviceID,
+			"observed_at", accepted.ObservedAt,
+			"received_at", accepted.ReceivedAt,
+			"duplicate", accepted.MQTTDuplicate,
+		)
+	}
+}
+
+func readinessCheck(pool *pgxpool.Pool, mqttRuntime *mqtttransport.Transport) func(context.Context) error {
+	if pool == nil && mqttRuntime == nil {
+		return nil
+	}
+	return func(ctx context.Context) error {
+		if pool != nil {
+			if err := pool.Ping(ctx); err != nil {
+				return err
+			}
+		}
+		if mqttRuntime != nil && !mqttRuntime.Ready() {
+			return errors.New("mqtt ingestion is unavailable")
+		}
+		return nil
+	}
 }
 
 func classifyOrganizationLookupFailure(err error) error {

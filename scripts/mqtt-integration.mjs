@@ -6,36 +6,40 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const rootDirectory = process.cwd()
-const testPort = 11883
+const brokerPort = 11883
+const databasePort = 15432
+const apiPort = 18080
 const projectName = `pulsegrid-mqtt-test-${process.pid}-${Date.now()}`
 const password = `test-${randomBytes(18).toString('base64url')}`
-const composeEnvironment = {
+const databaseUrl = `postgres://pulsegrid:${password}@127.0.0.1:${databasePort}/pulsegrid_test?sslmode=disable`
+const environment = {
   ...process.env,
+  PULSEGRID_ENV: 'test',
+  PULSEGRID_IDENTITY_MODE: 'development',
+  PULSEGRID_MQTT_INGESTION_MODE: 'development',
+  PULSEGRID_MQTT_BROKER_URL: `mqtt://127.0.0.1:${brokerPort}`,
+  PULSEGRID_DATABASE_URL: databaseUrl,
+  PULSEGRID_HTTP_HOST: '127.0.0.1',
+  PULSEGRID_HTTP_PORT: String(apiPort),
   PULSEGRID_POSTGRES_PASSWORD: password,
 }
 const runningChildren = new Set()
 let stopRequested = false
 let stopCode = 0
-
-if (await isPortOpen(testPort)) {
-  console.error(`refusing to run MQTT integration: 127.0.0.1:${testPort} is already in use`)
-  process.exit(1)
-}
+let cleanupStarted = false
+let apiChild = null
+let apiExit = null
+let apiOutput = ''
 
 const simulatorDirectory = mkdtempSync(join(tmpdir(), 'pulsegrid-mqtt-'))
+const apiBinary = join(simulatorDirectory, 'api')
 const simulatorBinary = join(simulatorDirectory, 'device-simulator')
-let cleanupStarted = false
-const cleanup = async () => {
-  if (cleanupStarted) return true
-  cleanupStarted = true
-  const brokerCleaned = await run('docker', ['compose', '-p', projectName, '--profile', 'test', 'down', '--remove-orphans'], composeEnvironment, 120_000)
-  try {
-    rmSync(simulatorDirectory, { recursive: true, force: true })
-  } catch (error) {
-    console.error(`unable to remove simulator build directory: ${error.message}`)
-    return false
+
+for (const port of [brokerPort, databasePort, apiPort]) {
+  if (await isPortOpen(port)) {
+    console.error(`refusing MQTT ingestion integration: 127.0.0.1:${port} is already in use`)
+    process.exit(1)
   }
-  return brokerCleaned
 }
 
 process.once('SIGINT', () => requestStop('SIGINT', 130))
@@ -43,132 +47,276 @@ process.once('SIGTERM', () => requestStop('SIGTERM', 143))
 
 let exitCode = 1
 try {
-  const simulatorBuilt = await run('go', ['-C', 'apps/api', 'build', '-o', simulatorBinary, './cmd/device-simulator'], process.env, 180_000)
-  if (simulatorBuilt) {
-    const started = await run('docker', ['compose', '-p', projectName, '--profile', 'test', 'up', '-d', '--wait', 'mqtt-test'], composeEnvironment, 180_000)
-    if (started && !stopRequested && await exerciseBroker('initial publish')) {
-      const restarted = await run('docker', ['compose', '-p', projectName, '--profile', 'test', 'restart', 'mqtt-test'], composeEnvironment, 60_000)
-      const recovered = restarted && !stopRequested && await run('docker', ['compose', '-p', projectName, '--profile', 'test', 'up', '-d', '--wait', 'mqtt-test'], composeEnvironment, 180_000)
-      if (recovered && !stopRequested) {
-        exitCode = await exerciseBroker('publish after broker restart') ? 0 : 1
-      }
-    }
+  const built = await buildBinaries()
+  const started = built && await run('docker', ['compose', '-p', projectName, '--profile', 'test', 'up', '-d', '--wait', 'postgres-test', 'mqtt-test'], environment, 180_000)
+  const migrated = started && await prepareDatabase()
+  if (migrated && !stopRequested) {
+    await startApi()
+    await waitForReady()
+    const deviceID = await createDevice()
+    await publishSimulator(deviceID)
+    await publishInvalidCases(deviceID)
+    await testBrokerPayloadCap(deviceID)
+    assertNoRawTelemetryInLogs()
+    await testRetainedMessage(deviceID)
+    await testBrokerRecovery(deviceID)
+    if (!await stopApi()) throw new Error('API did not drain and stop cleanly')
+    if (!apiOutput.includes('reason_code=shutdown_complete')) throw new Error('API shutdown completion was not logged')
+    exitCode = stopRequested ? stopCode : 0
   }
+} catch (error) {
+  console.error(`MQTT ingestion integration failed: ${error.message}`)
+  exitCode = stopRequested ? stopCode : 1
 } finally {
-  if (!(await cleanup()) && !stopRequested) exitCode = 1
+  if (apiChild) await stopApi()
+  const cleanupSucceeded = await cleanup()
+  if (!cleanupSucceeded && !stopRequested) exitCode = 1
   if (stopRequested) exitCode = stopCode
 }
 process.exit(exitCode)
 
-async function exerciseBroker(label) {
-  const deviceID = randomUUID()
-  const topic = `pulsegrid/v1/tenants/pulsegrid-dev/devices/${deviceID}/telemetry`
-  const subscriber = spawnSubscriber(topic, 10)
-  await delay(500)
-  if (stopRequested) return false
+async function buildBinaries() {
+  const apiBuilt = await run('go', ['-C', 'apps/api', 'build', '-o', apiBinary, './cmd/api'], process.env, 180_000)
+  const simulatorBuilt = apiBuilt && await run('go', ['-C', 'apps/api', 'build', '-o', simulatorBinary, './cmd/device-simulator'], process.env, 180_000)
+  return apiBuilt && simulatorBuilt
+}
 
-  const publisherEnvironment = {
-    ...process.env,
-    PULSEGRID_ENV: 'test',
-    PULSEGRID_MQTT_BROKER_URL: `mqtt://127.0.0.1:${testPort}`,
-    PULSEGRID_MQTT_TENANT_SLUG: 'pulsegrid-dev',
-    PULSEGRID_MQTT_DEVICE_ID: deviceID,
-    PULSEGRID_SIMULATOR_TEMPERATURE_CELSIUS: '23.5',
-  }
-  const published = await run(simulatorBinary, [], publisherEnvironment, 30_000)
-  const received = await subscriber.result
-  if (stopRequested) return false
-  if (!published) {
-    console.error(`${label}: simulator publish failed`)
-    return false
-  }
-  if (received.status !== 0 || received.stdout.trim() === '') {
-    console.error(`${label}: subscriber did not receive one message`, received.stderr.trim())
-    return false
-  }
+async function prepareDatabase() {
+  return await run('go', ['-C', 'apps/api', 'run', './cmd/db', 'migrate', 'up'], environment, 120_000) &&
+    await run('go', ['-C', 'apps/api', 'run', './cmd/db', 'migrate', 'up'], environment, 120_000) &&
+    await run('go', ['-C', 'apps/api', 'run', './cmd/db', 'migrate', 'down'], environment, 120_000) &&
+    await run('go', ['-C', 'apps/api', 'run', './cmd/db', 'migrate', 'up'], environment, 120_000) &&
+    await run('go', ['-C', 'apps/api', 'run', './cmd/db', 'seed'], environment, 120_000)
+}
 
-  const firstLine = received.stdout.trim().split(/\r?\n/u)[0]
-  const separator = firstLine.indexOf(' ')
-  const receivedTopic = separator === -1 ? '' : firstLine.slice(0, separator)
-  const rawPayload = separator === -1 ? '' : firstLine.slice(separator + 1)
-  if (receivedTopic !== topic) {
-    console.error(`${label}: received topic does not match the simulator topic`)
-    return false
-  }
-  let payload
-  try {
-    payload = JSON.parse(rawPayload)
-  } catch {
-    console.error(`${label}: received payload is not JSON`)
-    return false
-  }
-  const payloadKeys = Object.keys(payload).sort().join(',')
-  if (payloadKeys !== 'messageId,observedAt,schemaVersion,temperatureCelsius' || payload.schemaVersion !== 1 || payload.temperatureCelsius !== 23.5 || typeof payload.messageId !== 'string' || typeof payload.observedAt !== 'string' || !payload.observedAt.endsWith('Z')) {
-    console.error(`${label}: received payload does not match telemetry v1`)
-    return false
-  }
+async function startApi() {
+  if (apiChild) throw new Error('API is already running')
+  apiOutput = ''
+  apiChild = spawn(apiBinary, [], {
+    cwd: rootDirectory,
+    env: environment,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  runningChildren.add(apiChild)
+  apiChild.stdout.on('data', (chunk) => { apiOutput += chunk.toString() })
+  apiChild.stderr.on('data', (chunk) => { apiOutput += chunk.toString() })
+  const child = apiChild
+  apiExit = new Promise((resolve) => {
+    child.once('close', (status, signal) => {
+      runningChildren.delete(child)
+      resolve({ status: status ?? 1, signal })
+    })
+    child.once('error', (error) => {
+      runningChildren.delete(child)
+      resolve({ status: 1, signal: null, error })
+    })
+  })
+}
 
-  const lateSubscriber = spawnSubscriber(topic, 2)
-  const lateResult = await lateSubscriber.result
-  if (stopRequested) return false
-  if (lateResult.status === 0 || lateResult.stdout.trim() !== '') {
-    console.error(`${label}: message was retained unexpectedly`)
+async function stopApi() {
+  if (!apiChild) return true
+  const child = apiChild
+  const exit = apiExit
+  apiChild = null
+  child.kill('SIGTERM')
+  const result = await Promise.race([exit, delay(15_000).then(() => ({ status: 1, signal: 'timeout' }))])
+  if (result.status !== 0) {
+    child.kill('SIGKILL')
+    console.error(`API process did not exit cleanly: ${JSON.stringify(result)}`)
     return false
   }
-  const oversizedSubscriber = spawnSubscriber(topic, 2)
-  await delay(300)
-  if (stopRequested) return false
-  const oversized = await runCapture('docker', [
-    'compose', '-p', projectName, '--profile', 'test', 'exec', '-T', 'mqtt-test',
-    'mosquitto_pub', '-h', '127.0.0.1', '-p', '1883', '-i', 'pulsegrid-oversized',
-    '-q', '1', '-t', topic, '-m', 'x'.repeat(17000),
-  ], composeEnvironment, 10_000)
-  const oversizedReceived = await oversizedSubscriber.result
-  if (stopRequested) return false
-  if (oversizedReceived.stdout.trim() !== '') {
-    console.error(`${label}: broker forwarded an oversized publish`)
-    return false
-  }
-  console.log(`${label}: QoS 1 payload, retain=false, and 16 KiB broker cap verified (MQTT 3.1.1 publish status ${oversized.status})`)
   return true
 }
 
-function spawnSubscriber(topic, timeoutSeconds) {
-  const child = spawn('docker', [
-    'compose', '-p', projectName, '--profile', 'test', 'exec', '-T', 'mqtt-test',
-    'mosquitto_sub', '-h', '127.0.0.1', '-p', '1883', '-t', topic, '-q', '1', '-v', '-C', '1', '-W', String(timeoutSeconds),
-  ], {
-    cwd: rootDirectory,
-    env: composeEnvironment,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-  runningChildren.add(child)
-  let stdout = ''
-  let stderr = ''
-  child.stdout.on('data', (chunk) => { stdout += chunk })
-  child.stderr.on('data', (chunk) => { stderr += chunk })
+async function waitForReady() {
+  await waitForHTTP((response) => response.status === 200 && response.body?.status === 'ready', 30_000, 'API readiness')
+}
 
-  const result = new Promise((resolve) => {
-    let settled = false
-    const finish = (value) => {
-      if (settled) return
-      settled = true
-      runningChildren.delete(child)
-      resolve(value)
+async function waitForNotReady() {
+  await waitForHTTP((response) => response.status === 503 && response.body?.reason === 'dependency_unavailable', 15_000, 'API dependency-unavailable readiness')
+}
+
+async function waitForHTTP(predicate, timeout, label) {
+  const deadline = Date.now() + timeout
+  let lastStatus = 'unreachable'
+  while (Date.now() < deadline && !stopRequested) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${apiPort}/health/ready`)
+      const body = await response.json()
+      lastStatus = `${response.status} ${JSON.stringify(body)}`
+      if (predicate({ status: response.status, body })) return
+    } catch {
+      lastStatus = 'unreachable'
     }
-    child.once('close', (status, signal) => finish({ status: status ?? 1, signal, stdout, stderr }))
-    child.once('error', (error) => finish({ status: 1, signal: null, stdout, stderr: `${stderr}${error.message}` }))
+    await delay(150)
+  }
+  throw new Error(`${label} was not observed before timeout; last state: ${lastStatus}`)
+}
+
+async function createDevice() {
+  const response = await fetch(`http://127.0.0.1:${apiPort}/graphql`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      query: 'mutation CreateDevice($input: CreateDeviceInput!) { createDevice(input: $input) { id } }',
+      variables: { input: { deviceKey: `mqtt-ingestion-${randomUUID()}`, displayName: 'MQTT ingestion integration' } },
+    }),
   })
-  return { child, result }
+  const body = await response.json()
+  const deviceID = body?.data?.createDevice?.id
+  if (response.status !== 200 || typeof deviceID !== 'string') {
+    throw new Error(`device registration failed: ${JSON.stringify(body)}`)
+  }
+  return deviceID
+}
+
+async function publishSimulator(deviceID) {
+  const result = await runCapture(simulatorBinary, [], {
+    ...environment,
+    PULSEGRID_MQTT_DEVICE_ID: deviceID,
+    PULSEGRID_MQTT_TENANT_SLUG: 'pulsegrid-dev',
+    PULSEGRID_SIMULATOR_TEMPERATURE_CELSIUS: '23.5',
+  }, 30_000)
+  if (result.status !== 0) throw new Error(`simulator publish failed: ${result.stderr}`)
+  const messageMatch = result.stdout.match(/message_id=([0-9a-f-]{36})/u)
+  if (!messageMatch) throw new Error(`simulator output did not contain message ID: ${result.stdout}`)
+  await waitForLogFields(['reason_code=telemetry_accepted', `message_id=${messageMatch[1]}`], 10_000, 'valid telemetry acceptance')
+}
+
+async function publishInvalidCases(deviceID) {
+  const topic = `pulsegrid/v1/tenants/pulsegrid-dev/devices/${deviceID}/telemetry`
+  const validBoundaryPayload = () => JSON.stringify({ schemaVersion: 1, messageId: randomUUID(), observedAt: pastObservedAt(), temperatureCelsius: 24 })
+  const cases = [
+    { label: 'malformed payload', payload: '{', reason: 'telemetry_payload_malformed' },
+    { label: 'application oversized payload', payload: 'x'.repeat(1100), reason: 'telemetry_payload_too_large' },
+    { label: 'wrong tenant', topic: topic.replace('/tenants/pulsegrid-dev/', '/tenants/other-tenant/'), payload: validBoundaryPayload(), reason: 'telemetry_device_not_registered_for_tenant' },
+    { label: 'unknown device', topic: topic.replace(deviceID, randomUUID()), payload: validBoundaryPayload(), reason: 'telemetry_device_not_registered_for_tenant' },
+  ]
+  for (const testCase of cases) {
+    const logOffset = apiOutput.length
+    const result = await publishRaw(testCase.topic ?? topic, testCase.payload, false)
+    if (result.status !== 0) throw new Error(`${testCase.label} publish failed: ${result.stderr}`)
+    await waitForLogSince(logOffset, `reason_code=${testCase.reason}`, 10_000, testCase.label)
+  }
+
+  const duplicateMessageID = '22222222-2222-4222-8222-222222222222'
+  const duplicatePayload = JSON.stringify({ schemaVersion: 1, messageId: duplicateMessageID, observedAt: pastObservedAt(), temperatureCelsius: 24.5 })
+  await publishRaw(topic, duplicatePayload, false)
+  await publishRaw(topic, duplicatePayload, false)
+  await waitForLogCountFields(['reason_code=telemetry_accepted', `message_id=${duplicateMessageID}`], 2, 10_000, 'duplicate logical message acceptance')
+}
+
+async function testRetainedMessage(deviceID) {
+  const topic = `pulsegrid/v1/tenants/pulsegrid-dev/devices/${deviceID}/telemetry`
+  if (!await stopApi()) throw new Error('API did not stop before retained-message test')
+  const retainedPayload = JSON.stringify({ schemaVersion: 1, messageId: '33333333-3333-4333-8333-333333333333', observedAt: pastObservedAt(), temperatureCelsius: 25 })
+  if ((await publishRaw(topic, retainedPayload, true)).status !== 0) throw new Error('retained publish failed')
+  await startApi()
+  await waitForReady()
+  await waitForLog('reason_code=telemetry_retained_rejected', 10_000, 'retained message rejection')
+  await publishRaw(topic, '', true)
+}
+
+async function testBrokerRecovery(deviceID) {
+  const stopped = await run('docker', ['compose', '-p', projectName, '--profile', 'test', 'stop', 'mqtt-test'], environment, 60_000)
+  if (!stopped) throw new Error('unable to stop test broker for recovery test')
+  await waitForNotReady()
+  const started = await run('docker', ['compose', '-p', projectName, '--profile', 'test', 'up', '-d', '--wait', 'mqtt-test'], environment, 120_000)
+  if (!started) throw new Error('unable to restart test broker for recovery test')
+  await waitForReady()
+  const messageID = randomUUID()
+  await publishRaw(`pulsegrid/v1/tenants/pulsegrid-dev/devices/${deviceID}/telemetry`, JSON.stringify({ schemaVersion: 1, messageId: messageID, observedAt: pastObservedAt(), temperatureCelsius: 26 }), false)
+  await waitForLogFields(['reason_code=telemetry_accepted', `message_id=${messageID}`], 10_000, 'post-recovery telemetry acceptance')
+}
+
+async function testBrokerPayloadCap(deviceID) {
+  const topic = `pulsegrid/v1/tenants/pulsegrid-dev/devices/${deviceID}/telemetry`
+  const subscriber = runCapture('docker', [
+    'compose', '-p', projectName, '--profile', 'test', 'exec', '-T', 'mqtt-test',
+    'mosquitto_sub', '-h', '127.0.0.1', '-p', '1883', '-i', `pulsegrid-sub-${randomUUID()}`,
+    '-q', '1', '-t', topic, '-C', '1', '-W', '2',
+  ], environment, 5_000)
+  await delay(300)
+  await publishRaw(topic, 'x'.repeat(17 * 1024), false)
+  const received = await subscriber
+  if (received.stdout.trim() !== '') {
+    throw new Error('Mosquitto forwarded a payload larger than its 16 KiB message cap')
+  }
+}
+
+function assertNoRawTelemetryInLogs() {
+  if (apiOutput.includes('23.5') || apiOutput.includes('schemaVersion') || apiOutput.includes('temperatureCelsius')) {
+    throw new Error('API logs contain raw telemetry content')
+  }
+}
+
+async function publishRaw(topic, payload, retained) {
+  const args = [
+    'docker', 'compose', '-p', projectName, '--profile', 'test', 'exec', '-T', 'mqtt-test',
+    'mosquitto_pub', '-h', '127.0.0.1', '-p', '1883', '-i', `pulsegrid-pub-${randomUUID()}`,
+    '-q', '1', '-t', topic, '-m', payload,
+  ]
+  if (retained) args.push('-r')
+  return runCapture(args[0], args.slice(1), environment, 15_000)
+}
+
+async function waitForLog(text, timeout, label) {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline && !stopRequested) {
+    if (apiOutput.includes(text)) return
+    await delay(100)
+  }
+  throw new Error(`${label} was not found in API output: ${text}\nAPI output:\n${apiOutput}`)
+}
+
+async function waitForLogSince(offset, text, timeout, label) {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline && !stopRequested) {
+    if (apiOutput.slice(offset).includes(text)) return
+    await delay(100)
+  }
+  throw new Error(`${label} was not found in new API output: ${text}\nAPI output:\n${apiOutput.slice(offset)}`)
+}
+
+async function waitForLogFields(fields, timeout, label) {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline && !stopRequested) {
+    if (fields.every((field) => apiOutput.includes(field))) return
+    await delay(100)
+  }
+  throw new Error(`${label} was not found in API output: ${fields.join(', ')}\nAPI output:\n${apiOutput}`)
+}
+
+async function waitForLogCountFields(fields, expected, timeout, label) {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline && !stopRequested) {
+    if (countLogFields(fields) >= expected) return
+    await delay(100)
+  }
+  throw new Error(`${label} did not reach ${expected} occurrences: ${fields.join(', ')}\nAPI output:\n${apiOutput}`)
+}
+
+function countLogFields(fields) {
+  return apiOutput.split('\n').filter((line) => fields.every((field) => line.includes(field))).length
+}
+
+async function cleanup() {
+  if (cleanupStarted) return true
+  cleanupStarted = true
+  let success = true
+  if (!await run('docker', ['compose', '-p', projectName, '--profile', 'test', 'down', '-v', '--remove-orphans'], environment, 120_000)) success = false
+  try {
+    rmSync(simulatorDirectory, { recursive: true, force: true })
+  } catch (error) {
+    console.error(`unable to remove temporary binaries: ${error.message}`)
+    success = false
+  }
+  return success
 }
 
 function run(command, args, env, timeout) {
   return new Promise((resolve) => {
-    const child = spawn(command, args, {
-      cwd: rootDirectory,
-      env,
-      stdio: 'inherit',
-    })
+    const child = spawn(command, args, { cwd: rootDirectory, env, stdio: 'inherit' })
     runningChildren.add(child)
     let settled = false
     let timedOut = false
@@ -194,11 +342,7 @@ function run(command, args, env, timeout) {
 
 function runCapture(command, args, env, timeout) {
   return new Promise((resolve) => {
-    const child = spawn(command, args, {
-      cwd: rootDirectory,
-      env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
+    const child = spawn(command, args, { cwd: rootDirectory, env, stdio: ['ignore', 'pipe', 'pipe'] })
     runningChildren.add(child)
     let stdout = ''
     let stderr = ''
@@ -209,8 +353,8 @@ function runCapture(command, args, env, timeout) {
       child.kill('SIGTERM')
       setTimeout(() => child.kill('SIGKILL'), 5_000).unref()
     }, timeout)
-    child.stdout.on('data', (chunk) => { stdout += chunk })
-    child.stderr.on('data', (chunk) => { stderr += chunk })
+    child.stdout.on('data', (chunk) => { stdout += chunk.toString() })
+    child.stderr.on('data', (chunk) => { stderr += chunk.toString() })
     const finish = (status, signal, errorMessage = '') => {
       if (settled) return
       settled = true
@@ -225,6 +369,10 @@ function runCapture(command, args, env, timeout) {
 
 function delay(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}
+
+function pastObservedAt() {
+  return new Date(Date.now() - 60_000).toISOString()
 }
 
 function isPortOpen(port) {

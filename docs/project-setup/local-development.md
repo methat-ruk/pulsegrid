@@ -1,8 +1,8 @@
 # PulseGrid local development
 
 Status: Local repository workflow and merge-gate enforcement implemented;
-FND-004 readiness and the MVP-003 device-registry browser journey are
-implemented and locally validated.
+FND-004 readiness, the MVP-003 device-registry browser journey, and the
+MVP-005 local/test MQTT ingestion path are implemented and locally validated.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
@@ -97,14 +97,15 @@ existing ones. `docker:dev:stop` stops both containers without removing them;
 `docker:dev:down` removes both containers and their Compose network while
 preserving the named PostgreSQL volume.
 
-### Local MQTT broker and simulator
+### Local MQTT broker, API consumer, and simulator
 
 MVP-004 adds an ephemeral, loopback-only Mosquitto broker and a separate
-one-shot device simulator. The development broker uses `127.0.0.1:1883`; the
-isolated integration broker uses `127.0.0.1:11883`. The broker has no named
-volume, retained telemetry, dashboard, bridge, plugin, TLS, or production
-identity. Its Compose lifecycle is service-scoped so PostgreSQL containers and
-volumes are not removed:
+one-shot device simulator. MVP-005 adds the opt-in API consumer in the same Go
+process. The development broker uses `127.0.0.1:1883`; the isolated integration
+broker uses `127.0.0.1:11883`. The broker has no named volume, retained
+telemetry, dashboard, bridge, plugin, TLS, or production identity. Its Compose
+lifecycle is service-scoped so PostgreSQL containers and volumes are not
+removed:
 
 ```sh
 corepack pnpm run mqtt:dev:up
@@ -133,10 +134,30 @@ period. Missing broker, occupied port, invalid configuration, timeout, or
 failed acknowledgement is a non-zero outcome. The output reports only the
 topic, message ID, timestamp, QoS, and retain flag.
 
-Run the real-broker integration evidence with a unique Compose project. It
-starts a subscriber before each publish, validates the exact topic and payload,
-checks that a later subscriber receives no retained message, restarts the
-broker, and removes only its own container/network on success or failure:
+The API example enables `PULSEGRID_MQTT_INGESTION_MODE=development`, so start
+the broker and database, migrate/seed, then start the API before publishing:
+
+```sh
+corepack pnpm run docker:dev:up
+corepack pnpm run db:dev:migrate
+corepack pnpm run db:dev:seed
+corepack pnpm run dev:api
+```
+
+Check `GET /health/ready` for `200`/`ready`; the enabled API is ready only when
+PostgreSQL is reachable and its MQTT subscription is connected. Publish with
+`mqtt:simulator` and inspect the API log for `reason_code=telemetry_accepted`.
+The log exposes correlation and registry IDs but never the raw payload or
+temperature. Invalid, retained, unknown-device, wrong-tenant, oversized, and
+future-skewed messages are rejected with stable reason codes. Stop with
+`Ctrl-C`; the API stops admission, drains its bounded queue, and then closes
+the database pool.
+
+Run the real API/broker/database integration evidence with a unique Compose
+project. It registers a device through GraphQL, publishes with the real
+simulator, checks strict rejection and duplicate semantics, exercises retained
+input and readiness recovery across broker stop/start, signals the API for
+drain, and removes only its own disposable resources on success or failure:
 
 ```sh
 corepack pnpm run mqtt:test:integration

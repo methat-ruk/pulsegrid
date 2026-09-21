@@ -214,6 +214,27 @@ leave the device UUID blank; a contributor supplies it only in an ignored local
 file or the test process environment. These keys do not make the API depend on
 MQTT, and production identity/TLS/authorization remain a later decision.
 
+### MVP-005 API MQTT ingestion keys
+
+MVP-005 adds two server-only API keys. The broker URL is intentionally shared
+with the standalone simulator, but the API does not consume the simulator's
+tenant/device/temperature keys; it derives authority from the topic and the
+PostgreSQL registry.
+
+| Key | Development | Test | Production |
+| --- | --- | --- | --- |
+| `PULSEGRID_MQTT_INGESTION_MODE` | `disabled` by default; exact `development` enables the local consumer | `disabled` for ordinary tests; the owned MQTT integration runner injects `development` | `disabled` only; enabled mode is rejected |
+| `PULSEGRID_MQTT_BROKER_URL` | Required only when enabled; exact `mqtt://127.0.0.1:1883` | Required only when enabled; exact `mqtt://127.0.0.1:11883` | No broker URL is accepted while ingestion is disabled |
+
+Enabled ingestion requires the existing database configuration because device
+authority is resolved before acceptance. The API rejects credentials, alternate
+schemes, non-loopback hosts, URL paths/queries/fragments, and environment-port
+crossover. A broker disconnect makes readiness return the generic
+`dependency_unavailable` state while bounded reconnect and resubscription run;
+liveness remains process-only. Application acceptance is a diagnostic,
+non-durable handoff until MVP-006 adds persistence and logical `messageId`
+idempotency.
+
 ## Delivery sequence
 
 1. This documentation foundation defines the policy and plan.
@@ -230,7 +251,8 @@ MQTT, and production identity/TLS/authorization remain a later decision.
    mode and runtime database readiness; MVP-003 consumes the existing private
    origin through a fixed same-origin adapter and does not add a browser-facing
    origin or credential; MVP-004 adds and validates the local MQTT simulator
-   configuration with its broker and simulator consumer.
+   configuration; MVP-005 adds the explicit API ingestion mode and shared
+   loopback broker URL.
 7. Production hardening defines the deployment secret provider, rotation,
    access controls, and production-mode smoke validation.
 

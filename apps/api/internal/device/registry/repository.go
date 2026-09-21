@@ -212,6 +212,36 @@ func (r *Repository) GetDevice(ctx context.Context, organizationID uuid.UUID, de
 	return device, nil
 }
 
+// ResolveDeviceByTenantSlug resolves a device only when its ID belongs to the
+// organization identified by the supplied slug. Missing tenant, missing
+// device, and a cross-tenant device pair all map to ErrNotFound.
+func (r *Repository) ResolveDeviceByTenantSlug(ctx context.Context, tenantSlug string, deviceID uuid.UUID) (Device, error) {
+	if err := validateOrganizationSlug(tenantSlug); err != nil {
+		return Device{}, err
+	}
+	if deviceID == uuid.Nil {
+		return Device{}, ErrInvalidInput
+	}
+
+	var device Device
+	err := r.pool.QueryRow(ctx, `
+		SELECT d.id, d.organization_id, d.device_key, d.display_name, d.created_at
+		FROM organizations AS o
+		JOIN devices AS d ON d.organization_id = o.id
+		WHERE o.slug = $1 AND d.id = $2
+	`, tenantSlug, deviceID).Scan(
+		&device.ID,
+		&device.OrganizationID,
+		&device.DeviceKey,
+		&device.DisplayName,
+		&device.CreatedAt,
+	)
+	if err != nil {
+		return Device{}, mapDatabaseError(err)
+	}
+	return device, nil
+}
+
 // ListDevices returns a deterministic, bounded tenant-scoped page.
 func (r *Repository) ListDevices(ctx context.Context, organizationID uuid.UUID, pageSize int, cursor *Cursor) (DevicePage, error) {
 	if organizationID == uuid.Nil {

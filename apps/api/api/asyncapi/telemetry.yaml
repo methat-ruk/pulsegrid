@@ -1,0 +1,94 @@
+asyncapi: 3.1.0
+info:
+  title: PulseGrid telemetry ingestion
+  version: 1.0.0
+  description: >-
+    The local/test MQTT contract received by the PulseGrid telemetry ingestion
+    boundary. Broker acknowledgement is transport evidence only; application
+    acceptance requires strict validation and tenant/device resolution.
+servers:
+  development:
+    host: 127.0.0.1:1883
+    protocol: mqtt
+    protocolVersion: 3.1.1
+    description: Loopback-only development Mosquitto listener.
+    bindings:
+      mqtt:
+        cleanSession: true
+        keepAlive: 10
+        bindingVersion: 0.2.0
+  test:
+    host: 127.0.0.1:11883
+    protocol: mqtt
+    protocolVersion: 3.1.1
+    description: Isolated loopback-only test Mosquitto listener.
+    bindings:
+      mqtt:
+        cleanSession: true
+        keepAlive: 10
+        bindingVersion: 0.2.0
+defaultContentType: application/json
+channels:
+  telemetry:
+    address: pulsegrid/v1/tenants/{tenantSlug}/devices/{deviceId}/telemetry
+    parameters:
+      tenantSlug:
+        description: Lowercase tenant slug resolved by the device registry.
+        examples:
+          - pulsegrid-dev
+      deviceId:
+        description: Canonical lowercase UUID resolved within tenantSlug.
+        examples:
+          - 5edacace-70a7-4a8f-846d-3f4d60c56f3a
+    messages:
+      telemetryV1:
+        $ref: '#/components/messages/telemetryV1'
+operations:
+  receiveTelemetry:
+    action: receive
+    security: []
+    channel:
+      $ref: '#/channels/telemetry'
+    bindings:
+      mqtt:
+        qos: 1
+        bindingVersion: 0.2.0
+components:
+  messages:
+    telemetryV1:
+      name: telemetry.v1
+      title: Telemetry v1
+      summary: One device temperature observation.
+      contentType: application/json
+      payload:
+        type: object
+        additionalProperties: false
+        required:
+          - schemaVersion
+          - messageId
+          - observedAt
+          - temperatureCelsius
+        properties:
+          schemaVersion:
+            type: integer
+            const: 1
+          messageId:
+            type: string
+            format: uuid
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+          observedAt:
+            type: string
+            format: date-time
+            pattern: 'Z$'
+          temperatureCelsius:
+            type: number
+        examples:
+          - name: temperatureObservation
+            payload:
+              schemaVersion: 1
+              messageId: 5edacace-70a7-4a8f-846d-3f4d60c56f3a
+              observedAt: '2026-09-18T04:00:00Z'
+              temperatureCelsius: 23.5
+      bindings:
+        mqtt:
+          bindingVersion: 0.2.0

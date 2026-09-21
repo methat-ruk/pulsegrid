@@ -419,6 +419,8 @@ jobs:
         run: corepack pnpm install --frozen-lockfile
       - name: Validate and render OpenAPI
         run: corepack pnpm run openapi
+      - name: Validate AsyncAPI
+        run: corepack pnpm run asyncapi:lint
       - name: Upload OpenAPI review artifacts
         if: success()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

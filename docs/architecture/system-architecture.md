@@ -13,11 +13,12 @@ by the [roadmap](../roadmap/roadmap.md).
 ## Current state
 
 The Go/Fiber API is implemented and validated as one modular process with
-lifecycle, health, and development-only GraphQL device endpoints. MVP-003 adds
-the first device-registry operator journey and a fixed same-origin Nuxt GraphQL
-transport adapter backed by the MVP-001 organization/device registry.
-Production identity, deployment exposure, and later event contracts remain
-unimplemented.
+lifecycle, health, development-only GraphQL device endpoints, and the
+local/test MVP-005 MQTT telemetry consumer. MVP-003 adds the first
+device-registry operator journey and a fixed same-origin Nuxt GraphQL transport
+adapter backed by the MVP-001 organization/device registry. Production
+identity, deployment exposure, telemetry persistence, and later event
+contracts remain unimplemented.
 
 Architecture diagrams below describe an intended sequence of evolution. They
 must not be read as deployed topology.
@@ -78,10 +79,35 @@ Both listeners are published only on loopback (`1883` for development and
 telemetry. The simulator cannot target production or external brokers and does
 not import or call the API, GraphQL, registry, database, or migration boundary.
 
-This is a producer/transport fixture, not an application consumer. MVP-005 owns
-untrusted MQTT input validation, tenant/device resolution, duplicate handling,
-and application acceptance; the API readiness contract remains independent of
-MQTT until that consumer exists.
+This is a producer/transport fixture, not an application consumer. MVP-005 now
+owns untrusted MQTT input validation, tenant/device resolution, duplicate
+metadata, and application acceptance. The API keeps one PostgreSQL pool and
+one Paho client when ingestion is explicitly enabled; readiness then requires
+both PostgreSQL and connected-plus-subscribed MQTT, while liveness remains
+process-only.
+
+### MVP-005 local telemetry ingestion
+
+The enabled local/test runtime is a bounded module inside the existing API
+process:
+
+```text
+Mosquitto -> Paho adapter -> 64-item queue -> one worker
+          -> strict topic/payload boundary -> registry resolution
+          -> diagnostic AcceptedTelemetry consumer -> safe structured log
+```
+
+The Paho adapter copies delivery metadata and payload bytes before non-blocking
+queue admission. The ingestion boundary owns exact topic levels, UTF-8/JSON
+strictness, duplicate-key rejection, the 1 KiB payload cap, canonical UUIDs,
+UTC/future-clock checks, QoS/retained rules, and registry authority. Every
+delivery receives a fresh `IngestionID`; the producer `messageId` is preserved
+for MVP-006, but no in-memory or durable deduplication is claimed here.
+
+This handoff is intentionally non-durable: broker acknowledgement, enqueue
+success, and registry lookup are not application persistence. Queue saturation,
+registry failures, and consumer failures are explicit diagnostics, and a broker
+outage degrades readiness while bounded Paho reconnect/resubscribe proceeds.
 
 ## Conditional target architecture
 
@@ -128,7 +154,8 @@ ownership evidence identifies a separate scaling or failure unit.
 | Boundary | Owns | Does not own |
 | --- | --- | --- |
 | Device registry | Device identity, tenant association, profile basics, lifecycle state | Telemetry history, alerts, command execution |
-| Telemetry ingestion | MQTT input validation, device resolution, ingestion metadata | Long-term analytics or rule policy |
+| MQTT transport adapter | Paho connect/subscribe/reconnect, bounded admission, connection readiness, and shutdown drain | Tenant authority, payload business rules, persistence, retries, or projection |
+| Telemetry ingestion | MQTT input validation, device resolution, ingestion metadata, and the `AcceptedTelemetry` consumer port | Long-term analytics, persistence, current-state projection, or rule policy |
 | Device state | Latest accepted measurements, connectivity, last-seen projection | Device ownership or command state |
 | Rules and alerts | Limited threshold definitions, evaluation result, alert lifecycle | General workflow automation |
 | Commands | Command intent, valid state transitions, delivery/ACK/result/timeout state | Device profile or transport-wide policy |
@@ -244,6 +271,7 @@ The MVP must define and test at least these cases:
 - malformed or unsupported MQTT payload;
 - telemetry for an unknown or wrong-tenant device;
 - duplicate telemetry identifiers;
+- retained, oversized, future-skewed, and queue-saturated telemetry;
 - late or out-of-order device timestamps;
 - broker disconnect and process restart;
 - rule evaluation failure without silent data loss;
@@ -254,6 +282,11 @@ The MVP must define and test at least these cases:
 Retries must be bounded. A retry must not create a second logical command or a
 second alert for the same accepted input. Exact delivery guarantees are defined
 by each feature plan and validated at the boundary where the behavior exists.
+
+MVP-005 deliberately stops before persistence: it logs diagnostic acceptance
+after tenant resolution and passes the validated `AcceptedTelemetry` shape to
+the next module boundary. MVP-006 owns durable idempotency by `messageId`,
+transactional history, and current-state ordering.
 
 Kafka retry and dead-letter mechanisms are Post-MVP concerns because the MVP
 does not yet have a Kafka boundary.
