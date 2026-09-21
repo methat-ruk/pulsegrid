@@ -8,6 +8,7 @@ import (
 	"maps"
 	"net"
 	"net/netip"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -25,6 +26,8 @@ const (
 	defaultShutdownTimeout = 10 * time.Second
 	minimumShutdownTimeout = 1 * time.Second
 	maximumShutdownTimeout = 2 * time.Minute
+	developmentMQTTBroker  = "mqtt://127.0.0.1:1883"
+	testMQTTBroker         = "mqtt://127.0.0.1:11883"
 )
 
 // Environment identifies the runtime mode selected by the operator or runner.
@@ -53,14 +56,31 @@ const (
 	IdentityDevelopment IdentityMode = "development"
 )
 
+// MQTTIngestionMode controls whether the API opens the local MQTT consumer.
+// Production ingestion is intentionally not part of this MVP boundary.
+type MQTTIngestionMode string
+
+const (
+	MQTTIngestionDisabled    MQTTIngestionMode = "disabled"
+	MQTTIngestionDevelopment MQTTIngestionMode = "development"
+)
+
 // Config contains only the settings consumed by the API foundation.
 type Config struct {
-	Environment     Environment
-	IdentityMode    IdentityMode
-	HTTPHost        string
-	HTTPPort        int
-	LogLevel        slog.Level
-	ShutdownTimeout time.Duration
+	Environment       Environment
+	IdentityMode      IdentityMode
+	MQTTIngestionMode MQTTIngestionMode
+	MQTTBrokerURL     string
+	HTTPHost          string
+	HTTPPort          int
+	LogLevel          slog.Level
+	ShutdownTimeout   time.Duration
+}
+
+// MQTTIngestionEnabled reports whether the API must connect to the local
+// broker and include it in readiness.
+func (c Config) MQTTIngestionEnabled() bool {
+	return c.MQTTIngestionMode == MQTTIngestionDevelopment
 }
 
 // Address returns the listener address for the configured host and port.
@@ -155,14 +175,60 @@ func parse(values map[string]string, environment Environment) (Config, error) {
 		return Config{}, err
 	}
 
+	mqttIngestionMode, mqttBrokerURL, err := parseMQTTIngestion(values, environment)
+	if err != nil {
+		return Config{}, err
+	}
+
 	return Config{
-		Environment:     environment,
-		IdentityMode:    identityMode,
-		HTTPHost:        host,
-		HTTPPort:        port,
-		LogLevel:        logLevel,
-		ShutdownTimeout: shutdownTimeout,
+		Environment:       environment,
+		IdentityMode:      identityMode,
+		MQTTIngestionMode: mqttIngestionMode,
+		MQTTBrokerURL:     mqttBrokerURL,
+		HTTPHost:          host,
+		HTTPPort:          port,
+		LogLevel:          logLevel,
+		ShutdownTimeout:   shutdownTimeout,
 	}, nil
+}
+
+func parseMQTTIngestion(values map[string]string, environment Environment) (MQTTIngestionMode, string, error) {
+	rawMode := strings.ToLower(strings.TrimSpace(values["PULSEGRID_MQTT_INGESTION_MODE"]))
+	if rawMode == "" {
+		rawMode = string(MQTTIngestionDisabled)
+	}
+
+	mode := MQTTIngestionMode(rawMode)
+	if mode == MQTTIngestionDisabled {
+		if environment == Production && strings.TrimSpace(values["PULSEGRID_MQTT_BROKER_URL"]) != "" {
+			return "", "", errors.New("configuration PULSEGRID_MQTT_BROKER_URL is not allowed in production while MQTT ingestion is disabled")
+		}
+		return mode, "", nil
+	}
+	if mode != MQTTIngestionDevelopment {
+		return "", "", errors.New("configuration PULSEGRID_MQTT_INGESTION_MODE must be disabled or development")
+	}
+	if environment == Production {
+		return "", "", errors.New("configuration PULSEGRID_MQTT_INGESTION_MODE development is not allowed in production")
+	}
+
+	rawBrokerURL := strings.TrimSpace(values["PULSEGRID_MQTT_BROKER_URL"])
+	if rawBrokerURL == "" {
+		return "", "", errors.New("configuration PULSEGRID_MQTT_BROKER_URL is required when MQTT ingestion is enabled")
+	}
+	parsed, err := url.Parse(rawBrokerURL)
+	if err != nil || parsed.Scheme != "mqtt" || parsed.Hostname() != "127.0.0.1" || parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.Opaque != "" {
+		return "", "", errors.New("configuration PULSEGRID_MQTT_BROKER_URL must be a loopback mqtt URL")
+	}
+
+	expected := developmentMQTTBroker
+	if environment == Test {
+		expected = testMQTTBroker
+	}
+	if rawBrokerURL != expected {
+		return "", "", errors.New("configuration PULSEGRID_MQTT_BROKER_URL must use the environment-specific loopback broker")
+	}
+	return mode, rawBrokerURL, nil
 }
 
 func isLoopbackHTTPHost(host string) bool {

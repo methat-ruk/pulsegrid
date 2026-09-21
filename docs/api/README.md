@@ -1,9 +1,9 @@
 # PulseGrid API documentation
 
 Status: MVP-002 development GraphQL device contract, MVP-003 console
-integration, and the MVP-004 local MQTT producer fixture are implemented and
-validated. Platform ingestion, production identity, and product expansion
-remain deferred.
+integration, MVP-004 local MQTT producer fixture, and MVP-005 local/test
+telemetry ingestion are implemented and validated. Persistence, production
+identity, and production MQTT remain deferred.
 
 ## Purpose and ownership
 
@@ -16,6 +16,12 @@ The machine-readable operational HTTP contract is
 The OpenAPI document is the source of truth for the wire shape of the health
 endpoints. Go handler tests remain the runtime evidence that the implementation
 matches that contract.
+
+The machine-readable telemetry contract is
+[apps/api/api/asyncapi/telemetry.yaml](../../apps/api/api/asyncapi/telemetry.yaml).
+It is the source of truth for the local/test MQTT topic, payload, and QoS shape;
+the ingestion package and integration harness own executable validation for
+strict fields, tenant/device resolution, clock skew, and failure behavior.
 
 Product semantics remain owned by the [product scope](../product/product-scope.md)
 and the relevant feature plan. Logical API boundaries remain owned by the
@@ -41,7 +47,7 @@ and are review artifacts only; they are not published or served at runtime.
 | Console readiness adapter | Same-origin Nuxt server route | Implemented in FND-004; local process-readiness adapter only | [`ready.get.ts`](../../apps/web-console/server/api/operational/ready.get.ts) and the FND-001 operational contract |
 | Console GraphQL adapter | Same-origin Nuxt server route | Implemented in MVP-003; development/test transport adapter only | [`graphql.post.ts`](../../apps/web-console/server/api/graphql.post.ts) and [`graphql-proxy.ts`](../../apps/web-console/server/utils/graphql-proxy.ts) |
 | Operator product API | GraphQL/gqlgen | Implemented for development-only MVP-002 scope | [`device.graphqls`](../../apps/api/graph/schema/device.graphqls) and committed generated artifacts |
-| Device telemetry | MQTT | MVP-004 producer fixture implemented; platform consumer planned for MVP-005 onward | [MVP-004 telemetry v1 contract](../roadmap/feature-plans/completed/MVP-004-mqtt-local-runtime-and-simulator.md) |
+| Device telemetry | MQTT | MVP-004 producer fixture and MVP-005 local/test consumer implemented; persistence deferred to MVP-006 | [AsyncAPI telemetry contract](../../apps/api/api/asyncapi/telemetry.yaml) and [MVP-005 plan](../roadmap/feature-plans/planned/MVP-005-mqtt-telemetry-ingestion.md) |
 | Device commands | MQTT | Planned for MVP-011 onward | AsyncAPI/message schema when a concrete flow exists |
 | Durable event distribution | Kafka | Post-MVP conditional | A flow-specific AsyncAPI/message contract |
 | Internal synchronous service calls | gRPC/Protobuf | Post-MVP conditional | A flow-specific protobuf contract |
@@ -67,9 +73,33 @@ to a loopback Mosquitto broker. The producer contract is:
 
 The broker is local-only and ephemeral. The simulator's PUBACK proves only that
 the broker acknowledged the publish; MQTT QoS 1 can duplicate delivery, and
-the payload is untrusted for the future MVP-005 ingestion boundary. No API
-subscriber, registry lookup, persistence, current-state projection, or console
-telemetry behavior is implemented by this producer fixture.
+the payload is untrusted at the API ingestion boundary. The simulator does not
+verify registry membership or call the API; the MVP-005 consumer performs strict
+validation and registry resolution before emitting diagnostic acceptance.
+
+## MVP-005 telemetry ingestion
+
+When `PULSEGRID_MQTT_INGESTION_MODE=development` is explicitly enabled, the
+API subscribes to the loopback broker at QoS 1 with a bounded 64-item in-memory
+queue. It accepts only the exact telemetry-v1 topic and four-field payload,
+resolves the tenant/device pair through PostgreSQL, and writes one structured
+`telemetry_accepted` log after the diagnostic consumer returns. The log contains
+safe IDs and timestamps, never the raw payload or temperature. Unknown devices,
+wrong-tenant topics, malformed/oversized/future/retained messages, queue drops,
+and dependency failures use stable `reason_code` values.
+
+MQTT PUBACK and queue admission are transport evidence only. MVP-005 is
+intentionally non-durable and does not deduplicate logical `messageId`; those
+guarantees belong to MVP-006. Enabled ingestion participates in readiness, so a
+broker disconnect returns `503 dependency_unavailable` while bounded reconnect
+and resubscription proceed. Liveness remains process-only.
+
+Validate the real API, PostgreSQL, Mosquitto, simulator, rejection, duplicate,
+readiness-recovery, and shutdown paths with:
+
+```sh
+corepack pnpm run mqtt:test:integration
+```
 
 ## Current operational contract
 
@@ -85,7 +115,9 @@ traffic. It returns `503` with one of these stable states while it cannot accept
 normal traffic:
 
 - `{"status":"not_ready","reason":"starting"}` during startup;
-- `{"status":"not_ready","reason":"draining"}` during graceful shutdown.
+- `{"status":"not_ready","reason":"draining"}` during graceful shutdown;
+- `{"status":"not_ready","reason":"dependency_unavailable"}` when an
+  enabled PostgreSQL or MQTT dependency is unavailable.
 
 The `503` response is an expected readiness state. A probe or local test must
 not treat it as proof that the process has crashed.
@@ -156,6 +188,8 @@ goenv exec go test ./...
 goenv exec go test -race ./...
 goenv exec go vet ./...
 PULSEGRID_ENV=development corepack pnpm run dev:api
+corepack pnpm run asyncapi:lint
+corepack pnpm run mqtt:test:integration
 ```
 
 From another terminal:
@@ -181,7 +215,9 @@ API process.
 - Keep REST JSON naming consistent with the existing operational contract.
 - Keep GraphQL SDL as the source of truth for the MVP-002 product API; generated
   gqlgen output is not hand-edited.
-- Introduce AsyncAPI only with a concrete MQTT or Kafka producer and consumer.
+- Keep the concrete local/test MQTT receiver contract in AsyncAPI and validate
+  it with the existing Redocly toolchain; do not imply production broker
+  identity or durable delivery from this document.
 - Treat local `curl` commands as onboarding and smoke checks; automated Go and
   CI contract tests remain the authority.
 
@@ -190,4 +226,5 @@ API process.
 - [System architecture](../architecture/system-architecture.md)
 - [Technology decisions](../architecture/technology-decisions.md)
 - [FND-001 Go API Foundation](../roadmap/feature-plans/completed/FND-001-go-api-foundation.md)
+- [MVP-005 MQTT Telemetry Ingestion](../roadmap/feature-plans/planned/MVP-005-mqtt-telemetry-ingestion.md)
 - [Roadmap](../roadmap/roadmap.md)

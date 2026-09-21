@@ -4,6 +4,12 @@ extends:
 apis:
   operational:
     root: apps/api/api/openapi/operational.yaml
+  telemetry:
+    root: apps/api/api/asyncapi/telemetry.yaml
+    rules:
+      # The local broker is intentionally anonymous and loopback-only in this
+      # MVP; production authentication/TLS/ACLs are a later boundary.
+      security-defined: off
 
 rules:
   # PulseGrid has no selected repository or API publication license yet.

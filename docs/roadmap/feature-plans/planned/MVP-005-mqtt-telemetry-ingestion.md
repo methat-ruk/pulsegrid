@@ -1,13 +1,13 @@
 # MVP-005 — MQTT Telemetry Ingestion
 
-Status: Planned
+Status: In progress
 
 Review state: Reviewed and revised on 2026-09-21 against the merged MVP-004
 runtime, current API composition, registry boundary, dependency graph, CI
 gates, and planning sources. The architecture, contract, failure behavior,
 security limits, validation, rollback, and documentation closeout are explicit.
-No implementation has started. Implementation requires approval of this plan
-and must stop for re-planning if it needs production MQTT, credentials, durable
+Implementation is authorized within this reviewed scope. It must stop for
+re-planning if it needs production MQTT, credentials, durable
 delivery, persistence, schema changes, a new runtime, or another dependency.
 
 Branch: `feat/mvp-005-mqtt-telemetry-ingestion`
@@ -638,7 +638,7 @@ re-plan trigger, not silent documentation expansion.
 
 ### Approval verdict
 
-Plan verdict: **Ready for implementation approval; implementation not started.**
+Plan verdict: **Approved for implementation within the reviewed boundary.**
 
 Reasoning budget: Full for a Material Change (Tier 2).
 
@@ -646,10 +646,44 @@ Confidence: High for repository state, selected dependencies, architecture,
 contract, and test surfaces; medium for future production delivery semantics,
 which remain explicitly outside this slice.
 
-Approval authorizes only the scope and decisions in this reviewed version.
+Implementation is now in progress within this reviewed version. The initial
+planning/env commit is `fc27f61`; the current working tree adds the AsyncAPI,
+ingestion boundary, Paho runtime, composition, integration harness, and
+documentation updates. Final completion still
+requires plan-to-actual reconciliation, author self-review/fixes, exact-head
+validation, and the required PR review evidence. Approval authorizes only the
+scope and decisions in this reviewed version.
 Production MQTT, durable delivery/persistence, migrations, new dependencies,
 broker changes, service extraction, or a materially different acceptance
 contract requires re-planning and new approval before implementation continues.
+
+## Implementation checkpoint (2026-09-21)
+
+The reviewed candidate now implements the approved local/test boundary: shared
+telemetry contract and AsyncAPI receiver document, disabled-by-default strict
+MQTT configuration, tenant-slug/device registry resolution, transport-free
+validation and `AcceptedTelemetry` handoff, Paho reconnect/readiness/drain
+runtime, API composition, diagnostic allowlisted logs, and the real
+PostgreSQL/Mosquitto/API integration harness. No migration, new dependency,
+Compose service, production broker path, or persistence was added.
+
+Evidence on the current working tree:
+
+- `corepack pnpm run check` passed, including format/generated checks,
+  modernization, Staticcheck, vet, lint, typecheck, unit/Vitest tests, race,
+  build, OpenAPI/AsyncAPI validation, Node/Go audits, MQTT integration,
+  PostgreSQL integration, and 17 browser smoke tests;
+- the MQTT integration passed valid acceptance, malformed/oversized/
+  wrong-tenant/unknown-device/retained rejection, duplicate logical delivery,
+  broker outage/readiness recovery, log redaction, signal-driven drain, and
+  disposable cleanup; and
+- author self-review added explicit initial connect/subscribe timeout tests,
+  nil-callback protection, fuzz seeds for strict payload decoding, and timeout
+  failure handling in the integration runner.
+
+The plan remains `In progress` in `planned/` because exact-head CI/PR review and
+any required independent review have not yet occurred. Move it to `completed/`
+only after those gates and the final plan-to-actual closeout are satisfied.
 
 ## Done Criteria
 

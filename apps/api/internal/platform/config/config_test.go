@@ -43,6 +43,92 @@ func TestLoadFromUsesTestDefaults(t *testing.T) {
 	}
 }
 
+func TestLoadFromDefaultsMQTTIngestionToDisabled(t *testing.T) {
+	got, err := LoadFrom(map[string]string{"PULSEGRID_ENV": "development"}, t.TempDir(), missingDotenv)
+	if err != nil {
+		t.Fatalf("LoadFrom returned error: %v", err)
+	}
+	if got.MQTTIngestionMode != MQTTIngestionDisabled || got.MQTTBrokerURL != "" {
+		t.Fatalf("MQTT config = (%q, %q), want disabled and empty URL", got.MQTTIngestionMode, got.MQTTBrokerURL)
+	}
+}
+
+func TestLoadFromAcceptsEnvironmentSpecificMQTTIngestion(t *testing.T) {
+	for _, test := range []struct {
+		environment Environment
+		brokerURL   string
+	}{
+		{environment: Development, brokerURL: "mqtt://127.0.0.1:1883"},
+		{environment: Test, brokerURL: "mqtt://127.0.0.1:11883"},
+	} {
+		got, err := LoadFrom(map[string]string{
+			"PULSEGRID_ENV":                 string(test.environment),
+			"PULSEGRID_MQTT_INGESTION_MODE": "development",
+			"PULSEGRID_MQTT_BROKER_URL":     test.brokerURL,
+		}, t.TempDir(), missingDotenv)
+		if err != nil {
+			t.Fatalf("%s MQTT config rejected: %v", test.environment, err)
+		}
+		if got.MQTTIngestionMode != MQTTIngestionDevelopment || got.MQTTBrokerURL != test.brokerURL {
+			t.Fatalf("%s MQTT config = (%q, %q)", test.environment, got.MQTTIngestionMode, got.MQTTBrokerURL)
+		}
+	}
+}
+
+func TestLoadFromRejectsUnsafeMQTTIngestionConfiguration(t *testing.T) {
+	base := map[string]string{
+		"PULSEGRID_ENV":                 "development",
+		"PULSEGRID_MQTT_INGESTION_MODE": "development",
+		"PULSEGRID_MQTT_BROKER_URL":     "mqtt://127.0.0.1:1883",
+	}
+	for _, test := range []struct {
+		name   string
+		mutate func(map[string]string)
+	}{
+		{name: "missing broker", mutate: func(values map[string]string) { delete(values, "PULSEGRID_MQTT_BROKER_URL") }},
+		{name: "external host", mutate: func(values map[string]string) { values["PULSEGRID_MQTT_BROKER_URL"] = "mqtt://192.0.2.10:1883" }},
+		{name: "alternate scheme", mutate: func(values map[string]string) { values["PULSEGRID_MQTT_BROKER_URL"] = "tcp://127.0.0.1:1883" }},
+		{name: "userinfo", mutate: func(values map[string]string) {
+			values["PULSEGRID_MQTT_BROKER_URL"] = "mqtt://user:secret@127.0.0.1:1883"
+		}},
+		{name: "path", mutate: func(values map[string]string) { values["PULSEGRID_MQTT_BROKER_URL"] = "mqtt://127.0.0.1:1883/path" }},
+		{name: "query", mutate: func(values map[string]string) {
+			values["PULSEGRID_MQTT_BROKER_URL"] = "mqtt://127.0.0.1:1883?token=secret"
+		}},
+		{name: "fragment", mutate: func(values map[string]string) { values["PULSEGRID_MQTT_BROKER_URL"] = "mqtt://127.0.0.1:1883#broker" }},
+		{name: "wrong environment port", mutate: func(values map[string]string) { values["PULSEGRID_MQTT_BROKER_URL"] = "mqtt://127.0.0.1:11883" }},
+		{name: "production enabled", mutate: func(values map[string]string) {
+			values["PULSEGRID_ENV"] = "production"
+			values["PULSEGRID_HTTP_HOST"] = "api.example.test"
+			values["PULSEGRID_HTTP_PORT"] = "443"
+			values["PULSEGRID_LOG_LEVEL"] = "info"
+			values["PULSEGRID_SHUTDOWN_TIMEOUT"] = "15s"
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			values := cloneValues(base)
+			test.mutate(values)
+			if _, err := LoadFrom(values, t.TempDir(), missingDotenv); err == nil {
+				t.Fatal("LoadFrom returned nil error")
+			}
+		})
+	}
+}
+
+func TestLoadFromAllowsInvalidMQTTURLWhenIngestionIsDisabled(t *testing.T) {
+	got, err := LoadFrom(map[string]string{
+		"PULSEGRID_ENV":                 "development",
+		"PULSEGRID_MQTT_INGESTION_MODE": "disabled",
+		"PULSEGRID_MQTT_BROKER_URL":     "mqtt://user:secret@example.test:1883",
+	}, t.TempDir(), missingDotenv)
+	if err != nil {
+		t.Fatalf("disabled ingestion rejected unrelated broker URL: %v", err)
+	}
+	if got.MQTTIngestionEnabled() {
+		t.Fatal("disabled ingestion reported enabled")
+	}
+}
+
 func TestLoadFromAcceptsDevelopmentIdentityOnlyOutsideProduction(t *testing.T) {
 	got, err := LoadFrom(map[string]string{
 		"PULSEGRID_ENV":           "test",

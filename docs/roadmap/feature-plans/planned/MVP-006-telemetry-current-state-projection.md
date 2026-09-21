@@ -1,6 +1,6 @@
 # MVP-006 — Telemetry and Current-State Projection
 
-Status: Planned
+Status: Planned; depends on the implemented MVP-005 local/test ingestion boundary
 
 Branch: `feat/mvp-006-telemetry-current-state-projection`
 
@@ -37,14 +37,26 @@ receipt alone is not product value.
 
 ## Architecture / Boundaries
 
+MVP-005 hands this plan a validated, tenant-resolved `AcceptedTelemetry` value:
+`IngestionID`, producer `MessageID`, registry-authoritative `OrganizationID` and
+`DeviceID`, `ObservedAt`, server `ReceivedAt`, finite
+`TemperatureCelsius`, and transport-only `MQTTDuplicate`. The topic tenant is
+not an authority and must not be persisted as a substitute for the registry
+organization.
+
 Telemetry history is the accepted-input record; current state is a derived read
 model with a named writer. The device registry remains authoritative for device
-ownership.
+ownership. MVP-005's diagnostic handoff is bounded and non-durable: queue drops,
+registry/consumer failures, process restarts, and transport acknowledgement do
+not produce a durable record. This plan owns the transactional persistence and
+logical `MessageID` idempotency needed to close that gap.
 
 ## Implementation Direction
 
 Use PostgreSQL for the bounded MVP dataset. Make ordering and deduplication
-rules explicit before optimizing storage.
+rules explicit before optimizing storage. Persist `MessageID` as the logical
+idempotency key, retain `IngestionID` and `ReceivedAt` as delivery diagnostics,
+and define how late/out-of-order `ObservedAt` values affect current state.
 
 ## Validation
 

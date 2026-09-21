@@ -1,8 +1,9 @@
 # PulseGrid API
 
 This directory owns the Go/Fiber API process. It exposes lifecycle and health
-contracts in every mode, plus the development-only GraphQL device contract
-when the fixed development identity is explicitly enabled.
+contracts in every mode, the development-only GraphQL device contract when the
+fixed development identity is explicitly enabled, and the opt-in local/test
+MVP-005 MQTT telemetry consumer.
 
 ## Requirements
 
@@ -43,6 +44,13 @@ corepack pnpm run db:dev:seed
 corepack pnpm run dev:api
 ```
 
+The development example also enables
+`PULSEGRID_MQTT_INGESTION_MODE=development`. Keep the loopback Mosquitto
+service running before `dev:api`; the API connects and subscribes before it
+starts serving, and `/health/ready` remains unavailable if PostgreSQL or MQTT
+is down. Set the mode to `disabled` in the ignored environment file when a
+health-only or GraphQL-only run is desired.
+
 The GraphQL transport accepts JSON POST requests only. Test and production
 examples default to `PULSEGRID_IDENTITY_MODE=disabled`, which keeps the API
 health-only and does not open PostgreSQL. The repository browser smoke
@@ -63,7 +71,7 @@ The machine-readable operational contract and response semantics are in the
 GraphQL device contract is documented in the API index; production product
 APIs are not implemented by this foundation.
 
-## Local MQTT simulator (MVP-004)
+## Local MQTT simulator and ingestion (MVP-004/MVP-005)
 
 The `device-simulator` is a separate one-shot Go process. It publishes one
 versioned telemetry observation over MQTT and does not import or call the API,
@@ -88,6 +96,15 @@ retain flag; it does not print the payload or environment values. Any missing
 broker, invalid configuration, timeout, or failed acknowledgement exits
 non-zero without attempting registry or application acceptance.
 
+MVP-005 consumes the same topic in the API process. It validates the exact
+topic/payload contract, rejects retained/QoS-0/oversized/future/malformed input,
+resolves the device through PostgreSQL, and logs
+`reason_code=telemetry_accepted` only after the diagnostic consumer succeeds.
+The handoff is bounded and non-durable: PUBACK and queue admission are not
+persistence, duplicate `messageId` values are not deduplicated, and failures
+are not retried by this slice. Persistence and durable idempotency are owned by
+MVP-006.
+
 Stop or remove only the MQTT service; these commands do not remove PostgreSQL
 containers or volumes:
 
@@ -99,16 +116,17 @@ corepack pnpm run mqtt:dev:down
 ```
 
 The isolated real-broker evidence uses port `127.0.0.1:11883`, a unique
-Compose project, a subscriber started before publish, broker restart/recovery,
-and owned cleanup:
+Compose project, a real API process and simulator, strict rejection cases,
+broker restart/readiness recovery, and owned cleanup:
 
 ```sh
 corepack pnpm run mqtt:test:integration
 ```
 
-Broker acknowledgement proves transport delivery to Mosquitto only. It does
-not prove that PulseGrid subscribed, validated, accepted, stored, or displayed
-the message; those boundaries belong to MVP-005 and later plans.
+Broker acknowledgement proves transport delivery to Mosquitto only. The
+integration command also proves the MVP-005 validation and diagnostic
+acceptance boundary. It does not claim persistence or display; those belong to
+MVP-006 and later plans.
 
 ## Local PostgreSQL (MVP-001)
 

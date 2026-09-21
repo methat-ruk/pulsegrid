@@ -148,6 +148,45 @@ func TestFindOrganizationBySlugDoesNotCreateOrMutate(t *testing.T) {
 	}
 }
 
+func TestResolveDeviceByTenantSlugPreservesTenantBoundary(t *testing.T) {
+	repository, cleanup := integrationRepository(t)
+	defer cleanup()
+	ctx := context.Background()
+	slugA := "resolve-a-" + strings.ReplaceAll(uuid.NewString(), "-", "")
+	slugB := "resolve-b-" + strings.ReplaceAll(uuid.NewString(), "-", "")
+	orgA, err := repository.CreateOrganization(ctx, slugA, "Resolve A")
+	if err != nil {
+		t.Fatalf("create organization A: %v", err)
+	}
+	orgB, err := repository.CreateOrganization(ctx, slugB, "Resolve B")
+	if err != nil {
+		t.Fatalf("create organization B: %v", err)
+	}
+	defer cleanupOrganizations(t, repository, orgA, orgB)
+	deviceA, err := repository.CreateDevice(ctx, orgA, CreateDeviceInput{DeviceKey: "resolve-a-device", DisplayName: "Resolve A device"})
+	if err != nil {
+		t.Fatalf("create organization A device: %v", err)
+	}
+	deviceB, err := repository.CreateDevice(ctx, orgB, CreateDeviceInput{DeviceKey: "resolve-b-device", DisplayName: "Resolve B device"})
+	if err != nil {
+		t.Fatalf("create organization B device: %v", err)
+	}
+
+	resolved, err := repository.ResolveDeviceByTenantSlug(ctx, slugA, deviceA.ID)
+	if err != nil {
+		t.Fatalf("resolve valid device: %v", err)
+	}
+	if resolved.ID != deviceA.ID || resolved.OrganizationID != orgA {
+		t.Fatalf("resolved device = %+v, want device %s in organization %s", resolved, deviceA.ID, orgA)
+	}
+	if _, err := repository.ResolveDeviceByTenantSlug(ctx, slugA, deviceB.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("cross-tenant resolve error = %v, want ErrNotFound", err)
+	}
+	if _, err := repository.ResolveDeviceByTenantSlug(ctx, "missing-tenant", deviceA.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing-tenant resolve error = %v, want ErrNotFound", err)
+	}
+}
+
 func TestRepositoryConcurrentDuplicateDeviceKey(t *testing.T) {
 	repository, cleanup := integrationRepository(t)
 	defer cleanup()

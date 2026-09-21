@@ -45,16 +45,16 @@ or immediately required dependency.
 | PostgreSQL 18.6 | Selected — MVP | Transactional authority for the MVP-001 organization/device registry; local and CI targets are pinned and isolated |
 | pgx v5 | Selected — MVP | Direct parameterized Go PostgreSQL driver and bounded pool for the registry boundary |
 | Goose v3 SQL migrations | Selected — MVP | Explicit versioned SQL migrations with session locking; migration execution remains outside API startup |
-| MQTT 3.1.1 | Selected — MVP | MVP-004 selects QoS 1, non-retained telemetry over loopback TCP for the first producer fixture; duplicate and untrusted-input handling remain with MVP-005/MVP-006 |
+| MQTT 3.1.1 | Selected — MVP | MVP-004 and MVP-005 use QoS 1, non-retained telemetry over loopback TCP; durable duplicate handling remains with MVP-006 |
 | Eclipse Mosquitto 2.1.2 | Selected — MVP | Reviewed for the MVP-004 local/test broker and pinned by multi-platform image digest; production broker product/topology remains open |
-| Eclipse Paho MQTT Go client v1.5.1 | Selected — MVP | Reviewed for the separate MVP-004 simulator command and reusable by the later Go ingestion boundary without a generic messaging abstraction |
+| Eclipse Paho MQTT Go client v1.5.1 | Selected — MVP | Reused by the separate simulator and the MVP-005 API consumer; the adapter keeps Paho types out of ingestion and does not introduce a generic messaging abstraction |
 | Docker Compose | Selected — MVP | Local PostgreSQL and the reviewed loopback-only MQTT development/test services are implemented as isolated dependency runtimes |
 | Backend/frontend Dockerfiles | Conditional target | Add when a containerized run, CI, or deployment target will build and exercise the images |
 | MongoDB | Conditional target | Adopt only when heterogeneous profile data and queries justify separate authority |
 | Dedicated time-series storage | Open | Select from measured volume, retention, aggregation, and query patterns |
 | Redis | Conditional target | Adopt for a concrete ephemeral, cache, coordination, or idempotency use case |
 | Apache Kafka | Conditional target | Adopt for a concrete durable fan-out, replay, or independent-consumer flow |
-| AsyncAPI | Conditional target | Introduce with the first concrete MQTT or Kafka producer/consumer message flow |
+| AsyncAPI | Selected — MVP | MVP-005 introduces the first concrete MQTT producer/consumer flow and validates its local/test receiver contract with the existing Redocly toolchain; production broker semantics remain open |
 | Kafka consumer groups | Conditional target | Introduce with a Kafka workload that requires parallel consumption |
 | gRPC and Protocol Buffers | Conditional target | Adopt when independently deployed services need a synchronous typed contract |
 | OpenTelemetry | Conditional target | Adopt when cross-process request/event diagnosis is required |
@@ -134,6 +134,28 @@ The implementation-admission re-scan on 2026-09-18 reproduced the same result
 on linux/arm64 and linux/amd64: 0 Critical, 2 High cJSON findings, with no
 fixed package. The pinned image and source call-path disposition therefore
 remain unchanged and must be revisited if the artifact or advisory changes.
+
+## MVP-005 local MQTT ingestion decision
+
+MVP-005 extends the selected local MQTT stack into the existing Go process only
+when `PULSEGRID_MQTT_INGESTION_MODE=development` is explicitly enabled in
+development or test. The receiver uses Paho MQTT Go v1.5.1, MQTT 3.1.1, a
+process-unique clean session, QoS 1 subscription, one worker, and a fixed
+64-delivery in-memory queue. It reuses the loopback Mosquitto services and
+their reviewed digests; no Compose service, broker image, or runtime
+dependency is added.
+
+The receiver contract is documented in
+[`apps/api/api/asyncapi/telemetry.yaml`](../../apps/api/api/asyncapi/telemetry.yaml)
+and linted by the pinned Redocly CLI. AsyncAPI owns the concrete topic/payload
+shape; executable ingestion tests own strict duplicate-key, UTF-8, size,
+clock, registry, reconnect, readiness, saturation, and drain semantics.
+
+This is a local/test diagnostic boundary, not a production selection. It has no
+TLS, credentials, ACLs, persistent session, offline store, retry of application
+work, durable delivery, or deduplication. MVP-006 owns durable `messageId`
+idempotency and persistence. Production broker product, identity, authorization,
+and delivery guarantees remain open and require a new feature decision.
 
 Revisit the selection when production identity/TLS/authorization is planned, a
 non-loopback or shared environment is required, command delivery proves
