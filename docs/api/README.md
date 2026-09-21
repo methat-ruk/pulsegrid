@@ -47,7 +47,7 @@ and are review artifacts only; they are not published or served at runtime.
 | Console readiness adapter | Same-origin Nuxt server route | Implemented in FND-004; local process-readiness adapter only | [`ready.get.ts`](../../apps/web-console/server/api/operational/ready.get.ts) and the FND-001 operational contract |
 | Console GraphQL adapter | Same-origin Nuxt server route | Implemented in MVP-003; development/test transport adapter only | [`graphql.post.ts`](../../apps/web-console/server/api/graphql.post.ts) and [`graphql-proxy.ts`](../../apps/web-console/server/utils/graphql-proxy.ts) |
 | Operator product API | GraphQL/gqlgen | Implemented for development-only MVP-002 scope | [`device.graphqls`](../../apps/api/graph/schema/device.graphqls) and committed generated artifacts |
-| Device telemetry | MQTT | MVP-004 producer fixture and MVP-005 local/test consumer implemented; persistence deferred to MVP-006 | [AsyncAPI telemetry contract](../../apps/api/api/asyncapi/telemetry.yaml) and [MVP-005 plan](../roadmap/feature-plans/planned/MVP-005-mqtt-telemetry-ingestion.md) |
+| Device telemetry | MQTT | MVP-004 producer fixture and MVP-005 local/test consumer implemented; persistence deferred to MVP-006 | [AsyncAPI telemetry contract](../../apps/api/api/asyncapi/telemetry.yaml) and [MVP-005 plan](../roadmap/feature-plans/completed/MVP-005-mqtt-telemetry-ingestion.md) |
 | Device commands | MQTT | Planned for MVP-011 onward | AsyncAPI/message schema when a concrete flow exists |
 | Durable event distribution | Kafka | Post-MVP conditional | A flow-specific AsyncAPI/message contract |
 | Internal synchronous service calls | gRPC/Protobuf | Post-MVP conditional | A flow-specific protobuf contract |
@@ -226,5 +226,5 @@ API process.
 - [System architecture](../architecture/system-architecture.md)
 - [Technology decisions](../architecture/technology-decisions.md)
 - [FND-001 Go API Foundation](../roadmap/feature-plans/completed/FND-001-go-api-foundation.md)
-- [MVP-005 MQTT Telemetry Ingestion](../roadmap/feature-plans/planned/MVP-005-mqtt-telemetry-ingestion.md)
+- [MVP-005 MQTT Telemetry Ingestion](../roadmap/feature-plans/completed/MVP-005-mqtt-telemetry-ingestion.md)
 - [Roadmap](../roadmap/roadmap.md)

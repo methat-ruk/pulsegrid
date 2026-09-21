@@ -1,14 +1,15 @@
 # MVP-005 — MQTT Telemetry Ingestion
 
-Status: In progress
+Status: Complete
 
-Review state: Reviewed and revised on 2026-09-21 against the merged MVP-004
-runtime, current API composition, registry boundary, dependency graph, CI
-gates, and planning sources. The architecture, contract, failure behavior,
-security limits, validation, rollback, and documentation closeout are explicit.
-Implementation is authorized within this reviewed scope. It must stop for
-re-planning if it needs production MQTT, credentials, durable
-delivery, persistence, schema changes, a new runtime, or another dependency.
+Review state: Implemented, reviewed, and reconciled on 2026-09-21 against the
+merged MVP-004 runtime, current API composition, registry boundary, dependency
+graph, CI gates, and planning sources. The architecture, contract, failure
+behavior, security limits, validation, rollback, and documentation closeout are
+explicit. PR #14 review findings were resolved in `7fe92c2`; the PR candidate
+is ready for merge review within this boundary. It must stop for re-planning if
+it needs production MQTT, credentials, durable delivery, persistence, schema
+changes, a new runtime, or another dependency.
 
 Branch: `feat/mvp-005-mqtt-telemetry-ingestion`
 
@@ -548,7 +549,7 @@ not claim the plan complete or PR ready solely from unit evidence.
 
 ## Documentation and Closeout
 
-Implementation must update:
+The implementation and closeout updated:
 
 - `docs/api/README.md` with the AsyncAPI source of truth, accepted/rejected
   semantics, application-versus-transport acknowledgement, and operator test
@@ -566,9 +567,9 @@ Implementation must update:
 - `docs/roadmap/feature-plans/planned/MVP-006-telemetry-current-state-projection.md`
   with the exact accepted-input fields, durable duplicate ownership, and the
   MVP-005 non-durable handoff limitation; and
-- roadmap/feature-plan status and this plan's plan-to-actual evidence during
-  closeout, moving the file to `completed/` only after the PR candidate is
-  implemented, reviewed, and validated.
+- roadmap/feature-plan status and this plan's plan-to-actual evidence. The plan
+  is now in `completed/` because the PR candidate is implemented, reviewed, and
+  validated; merge approval remains an external repository action.
 
 The completed MVP-004 plan remains historical evidence and is not rewritten.
 Product scope, GraphQL/OpenAPI behavior, and frontend documentation change only
@@ -636,7 +637,7 @@ re-plan trigger, not silent documentation expansion.
 - Queue capacity and single-worker throughput are unmeasured MVP choices with
   explicit saturation and revisit signals, not scale claims.
 
-### Approval verdict
+### Prior approval verdict
 
 Plan verdict: **Approved for implementation within the reviewed boundary.**
 
@@ -646,16 +647,14 @@ Confidence: High for repository state, selected dependencies, architecture,
 contract, and test surfaces; medium for future production delivery semantics,
 which remain explicitly outside this slice.
 
-Implementation is now in progress within this reviewed version. The initial
-planning/env commit is `fc27f61`; the current working tree adds the AsyncAPI,
-ingestion boundary, Paho runtime, composition, integration harness, and
-documentation updates. Final completion still
-requires plan-to-actual reconciliation, author self-review/fixes, exact-head
-validation, and the required PR review evidence. Approval authorizes only the
-scope and decisions in this reviewed version.
+The initial planning/env commit was `fc27f61`; the delivered candidate adds the
+AsyncAPI, ingestion boundary, Paho runtime, composition, integration harness,
+and documentation updates. This prior approval authorized only the scope and
+decisions in the reviewed version.
 Production MQTT, durable delivery/persistence, migrations, new dependencies,
 broker changes, service extraction, or a materially different acceptance
-contract requires re-planning and new approval before implementation continues.
+contract remains a re-planning condition rather than an implicit extension of
+this completed plan.
 
 ## Implementation checkpoint (2026-09-21)
 
@@ -667,7 +666,7 @@ runtime, API composition, diagnostic allowlisted logs, and the real
 PostgreSQL/Mosquitto/API integration harness. No migration, new dependency,
 Compose service, production broker path, or persistence was added.
 
-Evidence on the current working tree:
+Evidence on the delivered candidate:
 
 - `corepack pnpm run check` passed, including format/generated checks,
   modernization, Staticcheck, vet, lint, typecheck, unit/Vitest tests, race,
@@ -683,11 +682,18 @@ Evidence on the current working tree:
   synchronizes readiness generation commits, bounds Paho write/unsubscribe
   shutdown, removes MQTT 5-only AsyncAPI fields, scopes integration assertions
   to each delivery, restores broker-cap coverage, and adds deterministic drain,
-  saturation, deadline, and missing-device evidence.
+  saturation, deadline, and missing-device evidence; and
+- PR #14's required GitHub checks passed on the implementation/review head,
+  covering repository policy, API static/test/race/database/security checks,
+  web lint/typecheck/test/build, dependency audit, MQTT integration, OpenAPI
+  contract validation, and browser smoke. The documentation-only closeout is
+  limited to plan/index/link updates and is revalidated by the same PR gates
+  before merge.
 
-The plan remains `In progress` in `planned/` because exact-head CI/PR review and
-any required independent review have not yet occurred. Move it to `completed/`
-only after those gates and the final plan-to-actual closeout are satisfied.
+Plan-to-actual result: the approved boundary, ownership, exclusions, failure
+semantics, validation matrix, rollback path, and named documentation all match
+the delivered implementation. The plan is complete and remains unmerged only
+because merge is a separate repository action.
 
 ## Done Criteria
 

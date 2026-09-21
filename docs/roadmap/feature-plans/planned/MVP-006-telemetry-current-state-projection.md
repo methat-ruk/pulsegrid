@@ -1,6 +1,6 @@
 # MVP-006 — Telemetry and Current-State Projection
 
-Status: Planned; depends on the implemented MVP-005 local/test ingestion boundary
+Status: Planned; depends on the completed MVP-005 local/test ingestion boundary
 
 Branch: `feat/mvp-006-telemetry-current-state-projection`
 

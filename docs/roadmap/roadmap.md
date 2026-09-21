@@ -90,15 +90,17 @@ flowchart TD
     class MVP002 complete;
     class MVP003 complete;
     class MVP004 complete;
+    class MVP005 complete;
 ```
 
 FND-001 implementation establishes the backend runtime shell, FND-002
 establishes the frontend runtime shell, FND-003 establishes the repository
 quality and merge-gate boundary, and FND-004 proves the first cross-boundary
 process journey. MVP-001 and MVP-002 provide the persistence and GraphQL
-contract; MVP-003 closes the first operator-visible device-registry slice; and
-MVP-004 provides the completed local MQTT transport and simulator fixture for
-the in-progress telemetry milestone.
+contract; MVP-003 closes the first operator-visible device-registry slice;
+MVP-004 provides the completed local MQTT transport and simulator fixture; and
+MVP-005 provides the completed local/test telemetry ingestion boundary for the
+in-progress telemetry milestone.
 
 ## Milestones
 
@@ -162,7 +164,7 @@ validated recent telemetry and current state visible in the console.
 Plans:
 
 - [MVP-004 — MQTT local runtime and simulator](feature-plans/completed/MVP-004-mqtt-local-runtime-and-simulator.md)
-- [MVP-005 — MQTT telemetry ingestion](feature-plans/planned/MVP-005-mqtt-telemetry-ingestion.md)
+- [MVP-005 — MQTT telemetry ingestion](feature-plans/completed/MVP-005-mqtt-telemetry-ingestion.md)
 - [MVP-006 — Telemetry and current-state projection](feature-plans/planned/MVP-006-telemetry-current-state-projection.md)
 - [MVP-007 — Telemetry and device-state console](feature-plans/planned/MVP-007-telemetry-device-state-console.md)
 
