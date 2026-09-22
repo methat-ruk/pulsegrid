@@ -6,8 +6,9 @@ Review state: Reviewed on 2026-09-22 against merged MVP-005, the current Go
 composition and telemetry handoff, PostgreSQL migrations/repositories, GraphQL
 contract and complexity controls, dependency pins, integration harnesses, CI
 gates, and downstream MVP-007/MVP-008 needs. The reviewed implementation has
-started within the boundary below. Local final validation has passed; plan-to-
-actual reconciliation and independent review remain open.
+started within the boundary below. Local final validation has passed, and the
+latest independent re-review found no Blocker or High findings; exact-head CI
+and readiness/acceptance closeout remain in the PR workflow.
 
 Branch: `feat/mvp-006-telemetry-current-state-projection`
 
@@ -675,17 +676,23 @@ new infrastructure, or implementation beyond this plan.
 
 ## Implementation Checkpoint and Plan-to-Actual Reconciliation (2026-09-22)
 
-The implementation is recorded in commits `42e114e` and review-fix commit
-`82227de` on the feature branch, with `82227de` pushed as the current head of
-open Draft PR #15. The changed surfaces stay inside the
+The implementation and review fixes are pushed on the feature branch. The
+review-fix implementation is recorded in `82227de`; PR #15 and its
+provider-reported head remain the authority for the current candidate rather
+than a mutable checkpoint SHA. The changed surfaces stay inside the
 reviewed boundary: migration `005`, the telemetry projection package and
 real-store tests, API composition, additive GraphQL schema/resolvers/cursors
 and generated artifacts, GraphQL tests, the existing MQTT integration harness,
 and the named API/architecture/local-development/downstream plan documents.
-There is no dependency, environment key, Compose service, AsyncAPI/OpenAPI,
-frontend, or registry-schema change. The existing modernization quality gate
+There is no runtime dependency, environment key, product Compose service,
+AsyncAPI/OpenAPI, frontend, or registry-schema change. The existing
+modernization quality gate
 was extended only to enable the `forvar` and `stringsseq` analyzers that caught
-the two findings below; no new CI job or context was added.
+the two findings below; no new CI job or context was added. The existing
+`api-db-integration` job now invokes the canonical
+`scripts/test-api-integration.mjs` suite so migration recovery, pre-005 startup
+rejection, process-level listener safety, and PostgreSQL race coverage cannot
+drift between local and CI execution.
 
 The actual behavior matches the selected decisions: append-only device-scoped
 logical identity authority, exact replay no-op after history pruning,
