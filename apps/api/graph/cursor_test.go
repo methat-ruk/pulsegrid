@@ -84,6 +84,9 @@ func TestTelemetryCursorRejectsDeviceNamespaceAndMalformedValues(t *testing.T) {
 			t.Fatalf("decodeTelemetryCursor(%q) error = %v, want ErrInvalidInput", raw, err)
 		}
 	}
+	if _, err := decodeTelemetryCursor(strings.Repeat("A", maxCursorSize+1)); err == nil {
+		t.Fatal("decodeTelemetryCursor accepted oversized cursor")
+	}
 }
 
 func encodeRawCursorForTest(t *testing.T, raw string) string {

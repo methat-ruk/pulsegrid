@@ -118,19 +118,30 @@ PostgreSQL projection consumer in the same API process:
 ```text
 AcceptedTelemetry
 -> one transaction
-   -> device-scoped (DeviceID, MessageID) insert/classification
+   -> append-only device-scoped identity classification
+   -> bounded history insert for a new logical observation
    -> current measurement compare by (ObservedAt, MessageID)
    -> independent LastSeenAt maximum for new logical observations
    -> selected current row + newest stored rows retained (max 1,000/device)
 -> telemetry_accepted log after commit or exact replay
 ```
 
-Telemetry history is the durable logical-observation record; current state is a
-derived read model with one projection writer. Exact replay is a successful
-no-op that does not advance state or last-seen. Reusing a logical ID with a
-different observed time or temperature is a conflict and rolls back without a
-partial write. PostgreSQL `timestamptz` values are normalized to its
-microsecond storage precision before logical replay comparison.
+The append-only identity authority is the durable logical-observation and
+conflict record; telemetry history is a bounded inspection view over newly
+accepted observations. Pruning history cannot make a replay or conflicting
+message-ID reuse look new. Current state is a derived read model with one
+projection writer. Exact replay is a successful no-op that does not advance
+state or last-seen. Reusing a logical ID with a different observed time or
+temperature is a conflict and rolls back without a partial write. PostgreSQL
+`timestamptz` values are normalized to its microsecond storage precision before
+logical replay comparison. The identity table is intentionally append-only in
+this MVP; its one compact row per accepted logical message is the explicit
+capacity trade-off for the durable replay guarantee.
+
+The API validates the required telemetry tables and columns before opening the
+development listener or MQTT subscription. A database below migration 005 is
+classified as `database_schema_unavailable` and fails startup rather than
+reporting readiness for an unusable telemetry path.
 
 The development GraphQL API exposes only bounded, tenant-scoped reads:
 `deviceCurrentState` and `deviceTelemetry` (default 50, maximum 100) with a
@@ -268,12 +279,15 @@ Telemetry retention must be deliberately bounded for the MVP. The initial
 schema is a product-learning mechanism, not a permanent high-volume storage
 decision.
 
-MVP-006 implements that boundary with a maximum of 1,000 logical observations
-per device. The durable key is `(device_id, message_id)`; current measurement
+MVP-006 implements that boundary with a maximum of 1,000 logical history
+observations per device. The append-only durable identity key is
+`(device_id, message_id)` and stores the canonical observed time/value needed
+for replay/conflict classification after history pruning. Current measurement
 ordering is `(observed_at, message_id)` and `last_seen_at` is tracked separately
 from the selected measurement. GraphQL history is bounded and keyset-paginated;
-time-based retention, aggregation, and specialized storage remain open until
-volume and query evidence justify them.
+identity-authority growth is explicit and unbounded in this MVP, while
+time-based history retention, aggregation, and specialized storage remain open
+until volume and query evidence justify them.
 
 ### Conditional specialization
 

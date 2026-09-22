@@ -102,10 +102,13 @@ topic/payload contract, rejects retained/QoS-0/oversized/future/malformed input,
 and resolves the device through PostgreSQL. MVP-006 replaces the diagnostic
 consumer with a transactional PostgreSQL projection: one logical
 `(deviceId,messageId)` observation is stored at most once, exact replay is a
-no-op, conflicting reuse fails safely, and current state is selected by
-`(observedAt,messageId)` with an independent `lastSeenAt`. The history is
-bounded to 1,000 logical observations per device; GraphQL exposes only bounded
-tenant-scoped current-state and recent-history reads.
+no-op, conflicting reuse fails safely even after its bounded history row is
+pruned, and current state is selected by `(observedAt,messageId)` with an
+independent `lastSeenAt`. A small append-only identity authority retains the
+canonical message/time/value identity and first-ingestion uniqueness; the
+separate history view is bounded to 1,000 logical observations per device.
+GraphQL exposes only bounded tenant-scoped current-state and recent-history
+reads.
 
 `reason_code=telemetry_accepted` is emitted only after the persistence consumer
 commits or identifies an exact replay. PUBACK, queue admission, and registry
@@ -224,6 +227,10 @@ FROM telemetry_observations
 ORDER BY observed_at DESC, message_id DESC
 LIMIT 100;
 
+SELECT device_id, message_id, observed_at, temperature_celsius
+FROM telemetry_observation_keys
+ORDER BY device_id, message_id;
+
 SELECT * FROM device_current_state;
 ```
 
@@ -232,9 +239,10 @@ the integration command creates a disposable database with a random Compose
 project and removes it after the run.
 
 The integration command owns a separate disposable Compose project on port
-15432, applies migrations twice, verifies a disposable `down`/`up` recovery,
-executes the real-PostgreSQL tests, and removes only that test project and
-volume. It refuses to attach to an existing process on the test port:
+15432, applies migrations twice, verifies pre-005 startup rejection plus a
+disposable `down`/`up` recovery, executes the real-PostgreSQL tests under the
+race detector, and removes only that test project and volume. It refuses to
+attach to an existing process on the test port:
 
 ```sh
 corepack pnpm run api:test:integration

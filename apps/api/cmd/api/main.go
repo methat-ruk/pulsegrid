@@ -70,10 +70,7 @@ func main() {
 	if needsRegistry {
 		startupContext, cancelStartup := context.WithTimeout(ctx, 10*time.Second)
 		var startupErr error
-		pool, repository, startupErr = openDevelopmentDependencies(startupContext)
-		if startupErr == nil {
-			telemetryRepository, startupErr = projection.NewRepository(pool)
-		}
+		pool, repository, telemetryRepository, startupErr = openDevelopmentDependencies(startupContext)
 		if startupErr == nil && cfg.IdentityMode == config.IdentityDevelopment {
 			organizationID, startupErr = resolveDevelopmentOrganization(startupContext, repository)
 		}
@@ -178,7 +175,7 @@ func main() {
 }
 
 func openDevelopmentGraphQL(ctx context.Context) (*pgxpool.Pool, *registry.Repository, uuid.UUID, error) {
-	pool, repository, err := openDevelopmentDependencies(ctx)
+	pool, repository, _, err := openDevelopmentDependencies(ctx)
 	if err != nil {
 		return nil, nil, uuid.Nil, err
 	}
@@ -190,21 +187,43 @@ func openDevelopmentGraphQL(ctx context.Context) (*pgxpool.Pool, *registry.Repos
 	return pool, repository, organizationID, nil
 }
 
-func openDevelopmentDependencies(ctx context.Context) (*pgxpool.Pool, *registry.Repository, error) {
+func openDevelopmentDependencies(ctx context.Context) (*pgxpool.Pool, *registry.Repository, *projection.Repository, error) {
 	databaseConfiguration, err := databaseconfig.Load()
 	if err != nil {
-		return nil, nil, newStartupFailure(startupConfigurationInvalid, "development database configuration is invalid", err)
+		return nil, nil, nil, newStartupFailure(startupConfigurationInvalid, "development database configuration is invalid", err)
 	}
 	pool, err := database.Open(ctx, databaseConfiguration.URL)
 	if err != nil {
-		return nil, nil, newStartupFailure(startupDatabaseUnavailable, "development database is unavailable", err)
+		return nil, nil, nil, newStartupFailure(startupDatabaseUnavailable, "development database is unavailable", err)
 	}
 	repository, err := registry.NewRepository(pool)
 	if err != nil {
 		pool.Close()
-		return nil, nil, newStartupFailure(startupRepositoryUnavailable, "development registry is unavailable", err)
+		return nil, nil, nil, newStartupFailure(startupRepositoryUnavailable, "development registry is unavailable", err)
 	}
-	return pool, repository, nil
+	telemetryRepository, err := projection.NewRepository(pool)
+	if err != nil {
+		pool.Close()
+		return nil, nil, nil, newStartupFailure(startupRepositoryUnavailable, "development telemetry projection is unavailable", err)
+	}
+	if err := telemetryRepository.ValidateSchema(ctx); err != nil {
+		pool.Close()
+		return nil, nil, nil, classifyTelemetrySchemaFailure(err)
+	}
+	return pool, repository, telemetryRepository, nil
+}
+
+func classifyTelemetrySchemaFailure(err error) error {
+	if errors.Is(err, projection.ErrSchemaUnavailable) {
+		return newStartupFailure(startupDatabaseSchemaUnavailable, "development database schema is unavailable; run migrations", err)
+	}
+	if pgError, ok := errors.AsType[*pgconn.PgError](err); ok {
+		switch pgError.Code {
+		case "3F000", "42P01", "42703":
+			return newStartupFailure(startupDatabaseSchemaUnavailable, "development database schema is unavailable; run migrations", err)
+		}
+	}
+	return newStartupFailure(startupDatabaseUnavailable, "development database is unavailable", err)
 }
 
 func resolveDevelopmentOrganization(ctx context.Context, repository *registry.Repository) (uuid.UUID, error) {

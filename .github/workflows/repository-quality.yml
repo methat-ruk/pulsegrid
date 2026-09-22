@@ -165,12 +165,12 @@ jobs:
           PULSEGRID_ENV: test
           PULSEGRID_DATABASE_URL: postgres://pulsegrid:pulsegrid-ci@127.0.0.1:15432/pulsegrid_test?sslmode=disable
         run: go -C apps/api run ./cmd/db migrate up
-      - name: Run PostgreSQL integration tests
+      - name: Run PostgreSQL integration race tests
         env:
           PULSEGRID_ENV: test
           PULSEGRID_IDENTITY_MODE: development
           PULSEGRID_DATABASE_URL: postgres://pulsegrid:pulsegrid-ci@127.0.0.1:15432/pulsegrid_test?sslmode=disable
-        run: go -C apps/api test -count=1 -tags integration ./...
+        run: go -C apps/api test -race -count=1 -tags integration ./...
 
   api-vulnerabilities:
     name: api-vulnerabilities

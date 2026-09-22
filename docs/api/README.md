@@ -106,17 +106,20 @@ corepack pnpm run mqtt:test:integration
 
 The configured `AcceptedTelemetryConsumer` now commits accepted logical
 observations to PostgreSQL before the API emits `telemetry_accepted`. The
-durable idempotency key is `(device_id, message_id)`. An exact replay is a
-successful no-op: it does not create another history row, advance current state,
-or advance `lastSeenAt`. Reusing the same device/message ID with a different
-observed time or temperature is a safe processing failure with no partial
-mutation.
+durable idempotency authority is an append-only canonical identity table keyed
+by `(device_id, message_id)`; it is deliberately separate from bounded history
+so pruning cannot make an old replay look new. An exact replay is a successful
+no-op: it does not create another history row, advance current state, or advance
+`lastSeenAt`. Reusing the same device/message ID with a different observed time
+or temperature is a safe processing failure with no partial mutation.
 
 Current measurement uses the greatest `(observedAt, messageId)` tuple. A late
 observation remains in bounded history and may advance `lastSeenAt`, but cannot
 replace a newer current measurement. History retains at most 1,000 logical
-observations per device; this is an MVP count bound, not a time-retention or
-permanent telemetry-store decision.
+observations per device; the identity authority retains one compact canonical
+row per accepted logical message and has no MVP retention deletion policy. The
+history bound is an MVP count bound, not a time-retention or permanent
+telemetry-store decision.
 
 The additive development GraphQL reads are:
 
@@ -191,6 +194,11 @@ The endpoint accepts `Content-Type: application/json` and returns
 uploads, persisted queries, and playground routes are not enabled. Introspection
 is available only in this explicit development mode. The SDL is the source of
 truth; generated gqlgen files are committed and checked for drift.
+
+The development API validates the telemetry schema before it starts listening;
+a database below migration 005 fails startup with the safe
+`database_schema_unavailable` action rather than reporting ready and exposing a
+partially usable API.
 
 The contract exposes `device`, bounded forward `devices` pagination
 (`first` 1–100 with opaque versioned cursors), `createDevice`, and the additive

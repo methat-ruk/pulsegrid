@@ -147,14 +147,18 @@ corepack pnpm run dev:api
 ```
 
 Check `GET /health/ready` for `200`/`ready`; the enabled API is ready only when
-PostgreSQL is reachable and its MQTT subscription is connected. Publish with
+PostgreSQL is reachable, the required MVP-006 schema was validated before
+listening, and its MQTT subscription is connected. A database below migration
+005 fails startup with `database_schema_unavailable` rather than exposing a
+partially usable telemetry API. Publish with
 `mqtt:simulator`, query `deviceCurrentState` and `deviceTelemetry`, and inspect
 the API log for `reason_code=telemetry_accepted`. The log exposes correlation
 and registry IDs but never the raw payload or temperature. Invalid, retained,
 unknown-device, wrong-tenant, oversized, and future-skewed messages are
 rejected with stable reason codes. Exact replay does not add a history row or
-advance `lastSeenAt`; late observations remain queryable but cannot replace a
-newer `(observedAt,messageId)` state. Stop with `Ctrl-C`; the API stops
+advance `lastSeenAt`, including after the bounded history row has been pruned;
+late observations remain queryable but cannot replace a newer
+`(observedAt,messageId)` state. Stop with `Ctrl-C`; the API stops
 admission, drains its bounded queue, and then closes the database pool.
 
 Run the real API/broker/database integration evidence with a unique Compose

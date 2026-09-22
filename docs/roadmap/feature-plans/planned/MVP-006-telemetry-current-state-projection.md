@@ -25,10 +25,10 @@ dependency, or a specialized telemetry store.
 ## Goal
 
 Replace MVP-005's diagnostic telemetry sink with one transactional consumer
-that stores a bounded set of unique device observations and maintains a
-deterministic current-device-state projection. Expose the current state and a
-bounded recent history through the existing tenant-scoped development GraphQL
-API.
+that stores an append-only logical-identity authority, a bounded set of unique
+device observations, and a deterministic current-device-state projection.
+Expose the current state and a bounded recent history through the existing
+tenant-scoped development GraphQL API.
 
 An MQTT delivery is application-accepted only after this consumer commits or
 identifies an exact logical replay as an idempotent no-op. The slice must not
@@ -117,22 +117,26 @@ MQTT delivery metadata with logical telemetry identity.
 
 ## Scope
 
-1. Add one forward/backward Goose migration for telemetry observations and the
+1. Add one forward/backward Goose migration for the append-only logical
+   observation identity authority, bounded telemetry observations, and the
    per-device current-state projection, with the constraints and indexes needed
-   for idempotency, projection ordering, tenant-scoped reads, and bounded
-   history.
+   for replay/conflict classification, projection ordering, tenant-scoped
+   reads, and bounded history.
 2. Add a telemetry persistence/projection package behind the existing
    `AcceptedTelemetryConsumer` port. Keep pgx and SQL inside this boundary; do
    not move persistence into MQTT transport, ingestion validation, registry,
    GraphQL resolvers, or `cmd/api`.
-3. Store each new logical observation and update its current-state projection
+3. Classify each logical observation against an append-only canonical identity
+   authority and update identity, bounded history, current-state projection,
    and per-device retention in one transaction. Exact replay is a successful
-   no-op; message-ID reuse with different logical content is a processing
-   failure.
-4. Retain at most 1,000 logical observations per device: the selected current
-   observation plus the 999 newest other rows by a database-generated internal
-   storage sequence. This is the MVP count bound, not a time-based retention
-   promise.
+   no-op even after its history row is pruned; message-ID reuse with different
+   logical content is a processing failure.
+4. Retain at most 1,000 logical history observations per device: the selected
+   current observation plus the 999 newest other rows by a database-generated
+   internal storage sequence. The identity authority is not pruned in this MVP;
+   its compact one-row-per-accepted-message growth is the explicit cost of the
+   durable replay/conflict contract. The history bound is not a time-based
+   retention promise.
 5. Add narrow tenant-scoped repository reads for current state and recent
    history. Keep storage records internal and map them to explicit GraphQL
    models.
@@ -223,21 +227,25 @@ cmd/api composition root
 
 ### Durable model and invariants
 
-The migration adds two module-owned tables (names may follow the existing SQL
-naming convention, with `telemetry_observations` and `device_current_state` as
-the reviewed intent):
+The migration adds three module-owned tables: an append-only identity authority
+`telemetry_observation_keys`, bounded history `telemetry_observations`, and the
+derived `device_current_state` projection:
 
-- one observation row per `(device_id, message_id)`;
+- one identity row per `(device_id, message_id)`, retaining the first ingestion
+  ID plus canonical observed time and temperature for replay/conflict
+  classification;
+- one bounded history row per newly accepted logical observation;
 - a database-generated monotonic storage sequence used only for bounded
   retention and internal references, never as device/event time;
-- the first accepted delivery's `ingestion_id` as unique correlation identity;
+- the first accepted delivery's ingestion ID as unique correlation identity in
+  the identity authority and retained history row;
 - `observed_at`, first `received_at`, finite `temperature_celsius`, and first
   delivery's `mqtt_duplicate` diagnostic;
 - one current-state row per device, including the selected observation identity
   and value, its observed/received times, and `last_seen_at`;
-- foreign keys to the registry device and from current state to its selected
-  observation, non-null checks, non-nil UUID checks, and finite-temperature
-  protection; and
+- foreign keys to the registry device, from history to the identity authority,
+  and from current state to its selected observation, non-null checks, non-nil
+  UUID checks, and finite-temperature protection; and
 - indexes matching the exact idempotency lookup, projection/history order, and
   tenant-scoped device read paths. Indexes must be justified by these queries;
   no speculative time-series indexes are added.
@@ -251,10 +259,12 @@ data; it is not the default rollback after real telemetry exists.
 - Producer `MessageID` is the logical observation identifier only within one
   registered device. The durable idempotency key is therefore
   `(DeviceID, MessageID)`, not a global message ID, MQTT packet ID,
-  `IngestionID`, or DUP flag.
+  `IngestionID`, or DUP flag. The identity authority is the durable source of
+  truth; bounded history cannot redefine identity when rows are pruned.
 - An exact replay has the same device, message ID, observed time, and
   temperature. Differences in ingestion ID, receive time, or MQTT DUP are
-  delivery diagnostics and do not make a new logical observation.
+  delivery diagnostics and do not make a new logical observation, regardless
+  of whether its bounded history row still exists.
 - Exact replay commits no new row and changes neither current state nor
   `last_seen_at`; it returns success so the ingestion boundary can truthfully
   report that the logical observation is accepted.
@@ -286,13 +296,15 @@ data; it is not the default rollback after real telemetry exists.
 
 - After a new logical observation, the same transaction retains the selected
   current observation plus the 999 greatest internal storage sequences for
-  that device excluding that selected row, and removes older rows. This keeps
-  the current-state source valid and makes newly received late observations
-  inspectable without confusing receive order with device observation order.
+  that device excluding the selected row, and removes older history rows. This
+  keeps the current-state source valid and makes newly received late
+  observations inspectable without confusing receive order with device
+  observation order. It never deletes the identity-authority row.
 - The storage sequence is an internal retention mechanism, not a public
   timestamp, ordering promise, or cursor. Application acceptance means the
-  bounded persistence policy completed; it does not promise a time period or
-  indefinite row retention.
+  bounded history policy and identity-authority write completed; it does not
+  promise a time period for history retention. The identity authority has no
+  MVP deletion policy and grows one compact row per accepted logical message.
 - Recent-history GraphQL order is `ObservedAt DESC, MessageID DESC`. Its opaque
   telemetry cursor encodes exactly that continuation tuple, has a distinct
   type/version marker from the device cursor, and rejects empty, oversized,
@@ -303,9 +315,10 @@ data; it is not the default rollback after real telemetry exists.
 
 ### Transaction and concurrency
 
-- New-observation insert/classification, conditional projection update,
-  last-seen update, and pruning are one PostgreSQL transaction. Any failure
-  rolls back the complete logical acceptance.
+- Identity classification/write, bounded-history insert, conditional projection
+  update, last-seen update, and history pruning are one PostgreSQL transaction.
+  Any failure rolls back the complete logical acceptance and cannot leave a
+  replay authority without its corresponding history/state mutation.
 - Database uniqueness is the final idempotency authority; application
   pre-checks cannot replace it. Conflicting concurrent inserts must converge on
   the same exact-replay or contract-conflict result.
@@ -349,12 +362,12 @@ mutation is added.
 | Failure or abuse path | Required behavior and control | Evidence | Remaining risk |
 | --- | --- | --- | --- |
 | Cross-tenant read/write attempt | Server principal/registry IDs only; every SQL path proves organization/device association; absent and foreign devices disclose no telemetry | Two-tenant PostgreSQL and GraphQL negative tests | Production auth/RBAC/RLS remain deferred |
-| QoS replay or duplicate publish | Device-scoped unique key; exact replay succeeds without state/last-seen change | Sequential, concurrent, restart, and real-MQTT replay tests | Transport attempts are not retained as an audit log |
+| QoS replay or duplicate publish | Append-only device-scoped identity authority; exact replay succeeds without state/last-seen change even after history pruning | Sequential, concurrent, prune-then-replay, restart, and real-MQTT replay tests | Transport attempts are not retained as an audit log; identity authority grows with accepted logical messages |
 | Message ID reused with different content | Detect conflict, roll back, emit safe stable diagnostic, preserve first logical observation | Real-store conflict tests and log-redaction assertion | Publisher repair is manual in the local fixture |
 | Late or equal-time input | Persist subject to cap; total-order conditional projection; independent last-seen update | Order-permutation and restart tests | Device clocks can still be inaccurate within MVP-005's accepted skew |
 | Database unavailable or transaction canceled | No partial history/state/retention mutation and no false acceptance; readiness already reports dependency unavailable | Fault/cancellation and runtime recovery evidence | Transport-acknowledged message can be lost until manually republished |
 | Concurrent writes race | Database uniqueness and narrow per-device serialization preserve one history row, total-order state, and cap | Race plus real-PostgreSQL concurrent tests | Current runtime has one worker; higher parallelism needs new measurements/review |
-| Unbounded history or query amplification | Hard 1,000 rows/device, page max 100, keyset cursor, selected fields, complexity limit | 1,001+ retention test, page/cursor/complexity contract tests | Overall tenant device count and long-term capacity are not scale-tested |
+| Unbounded history or query amplification | Hard 1,000 history rows/device, append-only compact identity authority, page max 100, keyset cursor, selected fields, complexity limit | 1,001+ retention/prune-identity tests, page/cursor/complexity contract tests | Overall tenant device count and long-term identity-authority capacity are not scale-tested |
 | Sensitive diagnostic exposure | GraphQL allowlist; errors/logs omit temperature, payload, SQL, URLs, and credentials | Response/log assertions | Local operators can inspect their own database by design |
 
 ## Decisions and Alternatives
@@ -365,6 +378,8 @@ mutation is added.
   dependency or runtime.
 - One transactional projection consumer behind the existing synchronous port.
 - Device-scoped producer message ID for durable idempotency.
+- An append-only compact identity authority separate from bounded observation
+  history, so pruning cannot weaken replay/conflict semantics.
 - `(ObservedAt, MessageID)` as the shared total order for projection, query
   pagination, and deterministic restart behavior; retention separately uses an
   internal storage sequence while always preserving the selected current row.
@@ -387,8 +402,10 @@ mutation is added.
   arrival/concurrency dependent and non-deterministic after rebuild.
 - **Update last-seen on replay:** broker redelivery could make a silent device
   appear active.
-- **Unbounded storage with query-only limits:** violates the MVP's bounded
-  telemetry requirement and hides retention debt.
+- **Unbounded history with query-only limits:** violates the MVP's bounded
+  telemetry requirement and hides retention debt. The selected identity
+  authority is a separate compact ledger with an explicit one-row-per-message
+  capacity cost and no public history/query role.
 - **Time-based retention or background cleanup:** no product period, scheduler,
   or operational owner exists yet; a transactional count cap is smaller and
   testable.
@@ -419,8 +436,9 @@ mutation is added.
    and integration tests first, including up/down/up on a disposable database,
    constraints, exact replay, conflicting reuse, and tenant/device ownership.
 2. Add consumer-safe telemetry records, typed persistence errors, and the
-   transactional repository/consumer. Prove order, last-seen, rollback,
-   retention, and concurrent permutations at the real PostgreSQL boundary.
+   transactional repository/consumer. Prove identity authority, order,
+   last-seen, rollback, history pruning, replay/conflict after pruning, and
+   concurrent permutations at the real PostgreSQL boundary.
 3. Replace the no-op `cmd/api` consumer with the persistence consumer while
    preserving one pool and existing lifecycle/readiness behavior. Add safe
    failure classification without logging raw values.
@@ -434,7 +452,8 @@ mutation is added.
    replay, late, and newer observations; query GraphQL; restart the API; and
    prove one logical history row, deterministic current state, last-seen,
    durability, and log redaction. Do not create a competing harness.
-7. Update only the documentation listed below from the behavior and evidence
+7. Validate the required telemetry schema before startup/listening. Update only
+   the documentation listed below from the behavior and evidence
    that actually landed. Reconcile requirement/plan to the final diff, perform
    author self-review and fixes, and rerun final validation.
 8. Open the PR only after local final validation. Inspect required checks on the
@@ -491,13 +510,20 @@ when material.
 ### Real-boundary integration evidence
 
 - PostgreSQL tests prove constraints, first insert, exact sequential and
-  concurrent replay, content conflict, transaction rollback, new/late/equal
-  order permutations, last-seen monotonicity, 1,000-row retention after 1,001+
-  unique observations, pagination without gaps/duplicates, restart rebuild
-  truth, and two-tenant isolation.
+  concurrent replay, content conflict after history pruning, transaction
+  cancellation rollback, new/late/equal order permutations, concurrent
+  conflicting and distinct-message writes, last-seen monotonicity,
+  current-source preservation when storage order is old, 1,000-row history
+  retention after 1,001+ unique observations, pagination without gaps/
+  duplicates, restart rebuild truth, and two-tenant isolation.
 - Migration evidence runs up, second up, down, and up on disposable data. A
   populated-database down is destructive and is not presented as a safe
   operational rollback.
+- Startup evidence runs dependency composition and the API process against a
+  disposable pre-005 database, proves `database_schema_unavailable`, confirms
+  no readiness/listener port opens, and only then migrates up. The normal
+  PostgreSQL integration suite reruns the same packages with
+  `-race -tags integration`.
 - The existing real MQTT/PostgreSQL/API/simulator harness proves publish to
   committed query result, exact replay idempotency, late/new projection,
   process restart persistence, persistence-failure non-acceptance, and absence
@@ -603,11 +629,26 @@ change only if actual behavior crosses their ownership boundary.
 - **Major:** rollback and documentation closeout did not distinguish reversible
   code containment from destructive schema down. That distinction and the
   affected downstream plans are now named.
+- **Blocker:** bounded-history pruning could delete the only replay/conflict
+  authority. The implementation now separates an append-only canonical
+  identity authority from bounded history and proves prune-then-replay and
+  prune-then-conflict behavior at PostgreSQL.
+- **High:** API startup could report ready against a pre-005 schema. The
+  composition now validates the required telemetry tables/columns before
+  resolving the development organization or opening the listener/ingestion
+  path, with a disposable pre-005 startup test.
+- **Evidence:** real-store cancellation, old-current retention, concurrent
+  conflict/distinct ordering, multi-page pagination, telemetry GraphQL default/
+  boundary/complexity cases, and integration-tagged race execution are now
+  covered by the validation gates.
 
 ### Remaining non-blocking limitations
 
 - Transport-acknowledged messages can still be lost before database commit;
   local manual republish with the same logical ID is the recovery path.
+- The append-only identity authority grows one compact row per accepted logical
+  message and has no MVP deletion/compaction policy; changing that guarantee
+  requires a new reviewed contract and capacity decision.
 - The 1,000-row bound and one-worker throughput are unmeasured MVP choices with
   explicit revisit triggers, not capacity or production claims.
 - Equal observed timestamps use an arbitrary but deterministic UUID tie-break;
@@ -645,10 +686,11 @@ frontend, or registry-schema change. The existing modernization quality gate
 was extended only to enable the `forvar` and `stringsseq` analyzers that caught
 the two findings below; no new CI job or context was added.
 
-The actual behavior matches the selected decisions: device-scoped logical
-idempotency, exact replay no-op, conflicting reuse rejection, deterministic
-`(observedAt,messageId)` current-state ordering, independent last-seen updates,
-atomic current-state/retention work, a 1,000-row device bound, tenant-scoped
+The actual behavior matches the selected decisions: append-only device-scoped
+logical identity authority, exact replay no-op after history pruning,
+conflicting reuse rejection, deterministic `(observedAt,messageId)`
+current-state ordering, independent last-seen updates, atomic identity/history/
+current-state/retention work, a 1,000-row history bound, tenant-scoped
 GraphQL reads, and a type-specific bounded cursor. Generated GraphQL artifacts
 are synchronized and the staged diff has no whitespace errors.
 
@@ -662,7 +704,8 @@ up/down/up and cleanly removed their disposable resources.
 
 This checkpoint is not a closeout claim. Exact-head CI result, independent
 review, merge, production migration, and production identity/durability
-evidence remain open. The live MQTT harness proves committed
+evidence remain open. Startup validation now rejects a pre-005 schema before
+the listener/ingestion path, and the live MQTT harness proves committed
 normal/duplicate/late/restart projection behavior; persistence-failure
 non-acceptance remains covered at the ingestion consumer-failure boundary and
 is not presented as a production broker replay guarantee. Any remaining
@@ -672,9 +715,11 @@ plan to `completed/`.
 ## Done Criteria
 
 MVP-006 is complete only when the exact reviewed implementation stores each new
-device-scoped logical observation at most once; rejects conflicting reuse;
-atomically maintains the deterministic current measurement, independent
-last-seen, and 1,000-row bound; exposes only tenant-scoped bounded GraphQL
+device-scoped logical observation in an append-only identity authority at most
+once; rejects conflicting reuse after history pruning; atomically maintains
+the deterministic current measurement, independent last-seen, and 1,000-row
+history bound; validates the required schema before startup; exposes only
+tenant-scoped bounded GraphQL
 reads; preserves state across restart and late/concurrent input; passes the
 required unit, race, real-PostgreSQL, real-MQTT, GraphQL, migration, regression,
 and exact-head CI evidence; reconciles plan to actual; completes author and any

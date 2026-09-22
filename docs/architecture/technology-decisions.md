@@ -167,20 +167,25 @@ preserves the selected boundary and its revisit triggers.
 ## MVP-006 bounded telemetry projection decision
 
 MVP-006 reuses the existing PostgreSQL 18.6, pgx, Goose, and gqlgen stack inside
-the existing Go modular process. It adds one module-owned observation table and
-one derived current-state table, with no new dependency, service, broker, or
-configuration key. A single transaction inserts/classifies a logical
+the existing Go modular process. It adds a compact append-only logical
+identity-authority table, a bounded observation-history table, and one derived
+current-state table, with no new dependency, service, broker, or configuration
+key. A single transaction inserts/classifies a logical
 `(device_id,message_id)`, conditionally advances current state by
 `(observed_at,message_id)`, updates independent `last_seen_at`, and enforces a
-1,000-observation-per-device count bound. The selected current observation is
-always retained even when the bounded history is pruned.
+1,000-observation-per-device history count bound. The selected current
+observation is always retained even when bounded history is pruned.
 
-The count bound is an MVP product-learning mechanism, not a time-retention
-policy or permanent high-volume storage choice. Recent GraphQL history uses a
-bounded keyset cursor ordered by `observedAt DESC, messageId DESC`; exact replay
-does not advance state or last-seen, and conflicting message-ID reuse fails
-without partial mutation. The API exposes only tenant-scoped development/test
-read fields and keeps ingestion/delivery identifiers internal.
+The history count bound is an MVP product-learning mechanism, not a
+time-retention policy or permanent high-volume storage choice. The identity
+authority deliberately has no deletion policy in this MVP so the replay/conflict
+guarantee survives history pruning; its compact per-message growth is an
+explicit capacity trade-off and future retention/compaction requires a new
+reviewed contract. Recent GraphQL history uses a bounded keyset cursor ordered
+by `observedAt DESC, messageId DESC`; exact replay does not advance state or
+last-seen, and conflicting message-ID reuse fails without partial mutation. The
+API exposes only tenant-scoped development/test read fields and keeps
+ingestion/delivery identifiers internal.
 
 Revisit PostgreSQL, the count bound, or the storage shape when measured volume,
 retention period, aggregation, query latency, independent consumers, replay, or

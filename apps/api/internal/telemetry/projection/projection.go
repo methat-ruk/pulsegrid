@@ -25,10 +25,11 @@ const (
 )
 
 var (
-	ErrInvalidInput    = errors.New("telemetry projection input is invalid")
-	ErrNotFound        = errors.New("telemetry projection record not found")
-	ErrMessageConflict = errors.New("telemetry message ID conflicts with existing observation")
-	ErrStorageConflict = errors.New("telemetry storage identity conflicts with existing observation")
+	ErrInvalidInput      = errors.New("telemetry projection input is invalid")
+	ErrNotFound          = errors.New("telemetry projection record not found")
+	ErrMessageConflict   = errors.New("telemetry message ID conflicts with existing observation")
+	ErrStorageConflict   = errors.New("telemetry storage identity conflicts with existing observation")
+	ErrSchemaUnavailable = errors.New("telemetry projection schema is unavailable")
 )
 
 // CurrentState is the consumer-safe current state projection for one device.
@@ -77,6 +78,57 @@ func NewRepository(pool *pgxpool.Pool) (*Repository, error) {
 	return &Repository{pool: pool}, nil
 }
 
+// ValidateSchema verifies the tables and columns required by the projection
+// boundary before the API starts accepting GraphQL or MQTT traffic.
+func (r *Repository) ValidateSchema(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	var available bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT NOT EXISTS (
+			SELECT 1
+			FROM (VALUES
+				('telemetry_observation_keys'::text, 'device_id'::text),
+				('telemetry_observation_keys'::text, 'message_id'::text),
+				('telemetry_observation_keys'::text, 'first_ingestion_id'::text),
+				('telemetry_observation_keys'::text, 'observed_at'::text),
+				('telemetry_observation_keys'::text, 'temperature_celsius'::text),
+				('telemetry_observations'::text, 'storage_sequence'::text),
+				('telemetry_observations'::text, 'ingestion_id'::text),
+				('telemetry_observations'::text, 'device_id'::text),
+				('telemetry_observations'::text, 'message_id'::text),
+				('telemetry_observations'::text, 'observed_at'::text),
+				('telemetry_observations'::text, 'received_at'::text),
+				('telemetry_observations'::text, 'temperature_celsius'::text),
+				('telemetry_observations'::text, 'mqtt_duplicate'::text),
+				('device_current_state'::text, 'device_id'::text),
+				('device_current_state'::text, 'observation_sequence'::text),
+				('device_current_state'::text, 'message_id'::text),
+				('device_current_state'::text, 'observed_at'::text),
+				('device_current_state'::text, 'received_at'::text),
+				('device_current_state'::text, 'temperature_celsius'::text),
+				('device_current_state'::text, 'last_seen_at'::text)
+			) AS required(table_name, column_name)
+			WHERE NOT EXISTS (
+				SELECT 1
+				FROM information_schema.columns
+				WHERE table_schema = current_schema()
+				  AND table_name = required.table_name
+				  AND column_name = required.column_name
+			)
+		)
+	`).Scan(&available)
+	if err != nil {
+		return fmt.Errorf("validate telemetry projection schema: %w", err)
+	}
+	if !available {
+		return ErrSchemaUnavailable
+	}
+	return nil
+}
+
 // Consume persists one accepted logical observation and updates its derived
 // state atomically. Exact replays are successful idempotent no-ops.
 func (r *Repository) Consume(ctx context.Context, accepted ingestion.AcceptedTelemetry) error {
@@ -114,30 +166,28 @@ func (r *Repository) Consume(ctx context.Context, accepted ingestion.AcceptedTel
 		return ErrNotFound
 	}
 
-	var storageSequence int64
+	var firstIngestionID uuid.UUID
 	insertErr := tx.QueryRow(ctx, `
-		INSERT INTO telemetry_observations (
-			ingestion_id,
+		INSERT INTO telemetry_observation_keys (
 			device_id,
 			message_id,
+			first_ingestion_id,
 			observed_at,
-			received_at,
-			temperature_celsius,
-			mqtt_duplicate
+			temperature_celsius
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (device_id, message_id) DO NOTHING
-		RETURNING storage_sequence
-	`, accepted.IngestionID, accepted.DeviceID, accepted.MessageID, observedAt, receivedAt, accepted.TemperatureCelsius, accepted.MQTTDuplicate).Scan(&storageSequence)
+		RETURNING first_ingestion_id
+	`, accepted.DeviceID, accepted.MessageID, accepted.IngestionID, observedAt, accepted.TemperatureCelsius).Scan(&firstIngestionID)
 	if errors.Is(insertErr, pgx.ErrNoRows) {
 		var existingObservedAt time.Time
 		var existingTemperature float64
 		if err := tx.QueryRow(ctx, `
 			SELECT observed_at, temperature_celsius
-			FROM telemetry_observations
+			FROM telemetry_observation_keys
 			WHERE device_id = $1 AND message_id = $2
 		`, accepted.DeviceID, accepted.MessageID).Scan(&existingObservedAt, &existingTemperature); err != nil {
-			return fmt.Errorf("read existing telemetry observation: %w", err)
+			return fmt.Errorf("read existing telemetry observation key: %w", err)
 		}
 		if !sameLogicalObservation(existingObservedAt, existingTemperature, observedAt, accepted.TemperatureCelsius) {
 			return ErrMessageConflict
@@ -148,6 +198,27 @@ func (r *Repository) Consume(ctx context.Context, accepted ingestion.AcceptedTel
 		committed = true
 		return nil
 	}
+	if insertErr != nil {
+		if isUniqueViolation(insertErr) {
+			return ErrStorageConflict
+		}
+		return fmt.Errorf("insert telemetry observation key: %w", insertErr)
+	}
+
+	var storageSequence int64
+	insertErr = tx.QueryRow(ctx, `
+		INSERT INTO telemetry_observations (
+			ingestion_id,
+			device_id,
+			message_id,
+			observed_at,
+			received_at,
+			temperature_celsius,
+			mqtt_duplicate
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING storage_sequence
+	`, accepted.IngestionID, accepted.DeviceID, accepted.MessageID, observedAt, receivedAt, accepted.TemperatureCelsius, accepted.MQTTDuplicate).Scan(&storageSequence)
 	if insertErr != nil {
 		if isUniqueViolation(insertErr) {
 			return ErrStorageConflict
