@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/methat-ruk/pulsegrid/apps/api/graph/model"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/device/registry"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/telemetry/projection"
 )
 
 // CreateDevice is the resolver for the createDevice field.
@@ -87,12 +88,115 @@ func (r *queryResolver) Devices(ctx context.Context, first int, after *string) (
 	return &model.DeviceConnection{Edges: edges, PageInfo: pageInfo}, nil
 }
 
+// DeviceCurrentState is the resolver for the deviceCurrentState field.
+func (r *queryResolver) DeviceCurrentState(ctx context.Context, deviceID string) (*model.DeviceCurrentState, error) {
+	organizationID, err := r.authority(ctx)
+	if err != nil {
+		return nil, err
+	}
+	telemetryRepository, err := r.telemetryRepositoryForQuery()
+	if err != nil {
+		return nil, err
+	}
+	parsedDeviceID, err := parseCanonicalUUID(deviceID)
+	if err != nil {
+		return nil, err
+	}
+	state, err := telemetryRepository.GetCurrentState(ctx, organizationID, parsedDeviceID)
+	if errors.Is(err, projection.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return presentCurrentState(state), nil
+}
+
+// DeviceTelemetry is the resolver for the deviceTelemetry field.
+func (r *queryResolver) DeviceTelemetry(ctx context.Context, deviceID string, first int, after *string) (*model.TelemetryConnection, error) {
+	organizationID, err := r.authority(ctx)
+	if err != nil {
+		return nil, err
+	}
+	telemetryRepository, err := r.telemetryRepositoryForQuery()
+	if err != nil {
+		return nil, err
+	}
+	parsedDeviceID, err := parseCanonicalUUID(deviceID)
+	if err != nil {
+		return nil, err
+	}
+	if first < 1 || first > projection.MaxPageSize {
+		return nil, newPublicError(errorCodeBadUserInput, "first must be between 1 and 100", projection.ErrInvalidInput)
+	}
+
+	var cursor *projection.Cursor
+	if after != nil {
+		cursor, err = decodeTelemetryCursor(*after)
+		if err != nil {
+			return nil, err
+		}
+	}
+	page, err := telemetryRepository.ListTelemetry(ctx, organizationID, parsedDeviceID, first, cursor)
+	if err != nil {
+		if errors.Is(err, projection.ErrInvalidInput) {
+			return nil, newPublicError(errorCodeBadUserInput, "telemetry query input is invalid", err)
+		}
+		return nil, err
+	}
+
+	edges := make([]*model.TelemetryEdge, 0, len(page.Points))
+	for _, point := range page.Points {
+		pointCursor, cursorErr := encodeTelemetryCursor(projection.Cursor{ObservedAt: point.ObservedAt, MessageID: point.MessageID})
+		if cursorErr != nil {
+			return nil, cursorErr
+		}
+		edges = append(edges, &model.TelemetryEdge{
+			Cursor: pointCursor,
+			Node:   presentTelemetryPoint(point),
+		})
+	}
+
+	pageInfo := &model.PageInfo{HasNextPage: page.NextCursor != nil}
+	if len(edges) > 0 {
+		endCursor := edges[len(edges)-1].Cursor
+		pageInfo.EndCursor = &endCursor
+	}
+	return &model.TelemetryConnection{Edges: edges, PageInfo: pageInfo}, nil
+}
+
+func (r *queryResolver) telemetryRepositoryForQuery() (TelemetryRepository, error) {
+	if r.telemetryRepository == nil {
+		return nil, newPublicError(errorCodeInternal, "telemetry repository is unavailable", errors.New("telemetry repository is not configured"))
+	}
+	return r.telemetryRepository, nil
+}
+
 func presentDevice(device registry.Device) *model.Device {
 	return &model.Device{
 		ID:          device.ID.String(),
 		DeviceKey:   device.DeviceKey,
 		DisplayName: device.DisplayName,
 		CreatedAt:   device.CreatedAt.UTC(),
+	}
+}
+
+func presentCurrentState(state projection.CurrentState) *model.DeviceCurrentState {
+	return &model.DeviceCurrentState{
+		MessageID:          state.MessageID.String(),
+		ObservedAt:         state.ObservedAt.UTC(),
+		ReceivedAt:         state.ReceivedAt.UTC(),
+		TemperatureCelsius: state.TemperatureCelsius,
+		LastSeenAt:         state.LastSeenAt.UTC(),
+	}
+}
+
+func presentTelemetryPoint(point projection.TelemetryPoint) *model.TelemetryPoint {
+	return &model.TelemetryPoint{
+		MessageID:          point.MessageID.String(),
+		ObservedAt:         point.ObservedAt.UTC(),
+		ReceivedAt:         point.ReceivedAt.UTC(),
+		TemperatureCelsius: point.TemperatureCelsius,
 	}
 }
 

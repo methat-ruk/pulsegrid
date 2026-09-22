@@ -39,7 +39,12 @@ the operator workflow PulseGrid is intended to support.
 ## Architecture / Boundaries
 
 Rules own condition definitions and evaluation. Alerts own the recorded match.
-Neither boundary may rewrite telemetry or device ownership.
+Neither boundary may rewrite telemetry or device ownership. MVP-006 is the
+durable telemetry writer and supplies one successfully stored logical
+observation per device/message pair. Alert records must copy the triggering
+measurement context they need (and may retain the logical message ID as a
+trace reference); they must not make MVP-006's bounded 1,000-row telemetry
+retention unbounded or depend on indefinite telemetry-row retention.
 
 ## Implementation Direction
 
@@ -63,6 +68,8 @@ plugin engine or generic rule DSL for the MVP.
 - Alert repeat/suppression behavior beyond one input.
 - Numeric precision and unit compatibility.
 - Recovery strategy if evaluation fails after telemetry commits.
+- Exact triggering-context snapshot and behavior after the source telemetry row
+  is pruned by MVP-006 retention.
 
 ## Done Criteria
 

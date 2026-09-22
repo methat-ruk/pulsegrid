@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/device/registry"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/telemetry/projection"
 )
 
 func TestCursorRoundTripIsOpaqueAndCanonical(t *testing.T) {
@@ -47,6 +48,41 @@ func TestCursorRejectsMalformedVersionsTimestampsAndUUIDs(t *testing.T) {
 	}
 	if _, err := decodeCursor(strings.Repeat("A", maxCursorSize+1)); err == nil {
 		t.Fatal("decodeCursor accepted oversized cursor")
+	}
+}
+
+func TestTelemetryCursorRoundTripUsesSeparateNamespace(t *testing.T) {
+	want := projection.Cursor{
+		ObservedAt: time.Date(2026, 9, 22, 8, 15, 0, 123456789, time.UTC),
+		MessageID:  uuid.MustParse("33333333-3333-4333-8333-333333333333"),
+	}
+	encoded, err := encodeTelemetryCursor(want)
+	if err != nil {
+		t.Fatalf("encode telemetry cursor: %v", err)
+	}
+	if encoded == "" || strings.Contains(encoded, want.MessageID.String()) || strings.Contains(encoded, "telemetry-v1|") {
+		t.Fatalf("telemetry cursor is not opaque: %q", encoded)
+	}
+	got, err := decodeTelemetryCursor(encoded)
+	if err != nil {
+		t.Fatalf("decode telemetry cursor: %v", err)
+	}
+	if *got != want {
+		t.Fatalf("decoded telemetry cursor = %+v, want %+v", *got, want)
+	}
+}
+
+func TestTelemetryCursorRejectsDeviceNamespaceAndMalformedValues(t *testing.T) {
+	for _, raw := range []string{
+		encodeRawCursorForTest(t, "v1|2026-09-22T08:15:00Z|33333333-3333-4333-8333-333333333333"),
+		encodeRawCursorForTest(t, "telemetry-v2|2026-09-22T08:15:00Z|33333333-3333-4333-8333-333333333333"),
+		encodeRawCursorForTest(t, "telemetry-v1|2026-09-22T08:15:00+07:00|33333333-3333-4333-8333-333333333333"),
+		encodeRawCursorForTest(t, "telemetry-v1|not-time|33333333-3333-4333-8333-333333333333"),
+		encodeRawCursorForTest(t, "telemetry-v1|2026-09-22T08:15:00Z|not-uuid"),
+	} {
+		if _, err := decodeTelemetryCursor(raw); err == nil || !errors.Is(err, registry.ErrInvalidInput) {
+			t.Fatalf("decodeTelemetryCursor(%q) error = %v, want ErrInvalidInput", raw, err)
+		}
 	}
 }
 

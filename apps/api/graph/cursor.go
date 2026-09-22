@@ -7,9 +7,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/device/registry"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/telemetry/projection"
 )
 
 const cursorVersion = "v1"
+const telemetryCursorVersion = "telemetry-v1"
 
 func encodeCursor(cursor registry.Cursor) (string, error) {
 	if cursor.ID == uuid.Nil || cursor.CreatedAt.IsZero() {
@@ -48,4 +50,43 @@ func decodeCursor(raw string) (*registry.Cursor, error) {
 		return nil, protocolError("after must be a valid cursor")
 	}
 	return &registry.Cursor{CreatedAt: createdAt.UTC(), ID: deviceID}, nil
+}
+
+func encodeTelemetryCursor(cursor projection.Cursor) (string, error) {
+	if cursor.MessageID == uuid.Nil || cursor.ObservedAt.IsZero() {
+		return "", newPublicError(errorCodeInternal, "telemetry cursor is unavailable", registry.ErrInvalidInput)
+	}
+	payload := strings.Join([]string{
+		telemetryCursorVersion,
+		cursor.ObservedAt.UTC().Format(time.RFC3339Nano),
+		cursor.MessageID.String(),
+	}, "|")
+	encoded := base64.RawURLEncoding.EncodeToString([]byte(payload))
+	if len(encoded) > maxCursorSize {
+		return "", newPublicError(errorCodeInternal, "telemetry cursor is unavailable", registry.ErrInvalidInput)
+	}
+	return encoded, nil
+}
+
+func decodeTelemetryCursor(raw string) (*projection.Cursor, error) {
+	if raw == "" || len(raw) > maxCursorSize {
+		return nil, protocolError("after must be a valid telemetry cursor")
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(raw)
+	if err != nil || len(decoded) > maxCursorSize {
+		return nil, protocolError("after must be a valid telemetry cursor")
+	}
+	parts := strings.Split(string(decoded), "|")
+	if len(parts) != 3 || parts[0] != telemetryCursorVersion {
+		return nil, protocolError("after must be a valid telemetry cursor")
+	}
+	observedAt, err := time.Parse(time.RFC3339Nano, parts[1])
+	if err != nil || observedAt.UTC().Format(time.RFC3339Nano) != parts[1] {
+		return nil, protocolError("after must be a valid telemetry cursor")
+	}
+	messageID, err := uuid.Parse(parts[2])
+	if err != nil || messageID == uuid.Nil || messageID.String() != parts[2] {
+		return nil, protocolError("after must be a valid telemetry cursor")
+	}
+	return &projection.Cursor{ObservedAt: observedAt.UTC(), MessageID: messageID}, nil
 }

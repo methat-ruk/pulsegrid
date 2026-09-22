@@ -1,12 +1,13 @@
 # MVP-006 — Telemetry and Current-State Projection
 
-Status: Planned
+Status: In progress
 
 Review state: Reviewed on 2026-09-22 against merged MVP-005, the current Go
 composition and telemetry handoff, PostgreSQL migrations/repositories, GraphQL
 contract and complexity controls, dependency pins, integration harnesses, CI
-gates, and downstream MVP-007/MVP-008 needs. This plan is ready for
-implementation only within the boundary below. No implementation has started.
+gates, and downstream MVP-007/MVP-008 needs. The reviewed implementation has
+started within the boundary below. Local final validation has passed; plan-to-
+actual reconciliation and independent review remain open.
 
 Branch: `feat/mvp-006-telemetry-current-state-projection`
 
@@ -413,10 +414,10 @@ mutation is added.
 
 ## Implementation Direction
 
-1. Change status to `In progress` only with the first implementation commit.
-   Add migration `005` and integration tests first, including up/down/up on a
-   disposable database, constraints, exact replay, conflicting reuse, and
-   tenant/device ownership.
+1. Change status to `In progress` when implementation starts (the first
+   implementation change may be staged before its commit). Add migration `005`
+   and integration tests first, including up/down/up on a disposable database,
+   constraints, exact replay, conflicting reuse, and tenant/device ownership.
 2. Add consumer-safe telemetry records, typed persistence errors, and the
    transactional repository/consumer. Prove order, last-seen, rollback,
    retention, and concurrent permutations at the real PostgreSQL boundary.
@@ -454,10 +455,13 @@ Expected new/changed surfaces include:
 - API/local-development, architecture, technology, roadmap, and affected
   downstream feature-plan documentation named below.
 
-No `go.mod`, `go.sum`, `package.json`, lockfile, environment example, Compose,
-Mosquitto, AsyncAPI, OpenAPI, frontend, browser, registry schema ownership, or
-new CI-context change is expected. A diff outside this boundary needs impact
-review and re-planning when material.
+No `go.mod`, `go.sum`, lockfile, environment example, Compose, Mosquitto,
+AsyncAPI, OpenAPI, frontend, browser, registry schema ownership, or new
+CI-context change is expected. The existing `package.json` modernization
+command and repository-quality workflow may receive additional pinned analyzer
+flags as a quality-gate correction, but no new job or runtime context is
+introduced. A diff outside this boundary needs impact review and re-planning
+when material.
 
 ## Validation Plan
 
@@ -627,6 +631,43 @@ named revisit trigger.
 Implementation must stop for re-planning at any trigger above. This verdict
 does not authorize production deployment, destructive rollback of valued data,
 new infrastructure, or implementation beyond this plan.
+
+## Implementation Checkpoint and Plan-to-Actual Reconciliation (2026-09-22)
+
+The implementation is present in the working tree and intentionally remains
+uncommitted at the user's request. The changed surfaces stay inside the
+reviewed boundary: migration `005`, the telemetry projection package and
+real-store tests, API composition, additive GraphQL schema/resolvers/cursors
+and generated artifacts, GraphQL tests, the existing MQTT integration harness,
+and the named API/architecture/local-development/downstream plan documents.
+There is no dependency, environment key, Compose service, AsyncAPI/OpenAPI,
+frontend, or registry-schema change. The existing modernization quality gate
+was extended only to enable the `forvar` and `stringsseq` analyzers that caught
+the two findings below; no new CI job or context was added.
+
+The actual behavior matches the selected decisions: device-scoped logical
+idempotency, exact replay no-op, conflicting reuse rejection, deterministic
+`(observedAt,messageId)` current-state ordering, independent last-seen updates,
+atomic current-state/retention work, a 1,000-row device bound, tenant-scoped
+GraphQL reads, and a type-specific bounded cursor. Generated GraphQL artifacts
+are synchronized and the staged diff has no whitespace errors.
+
+Final local validation passed on 2026-09-22 with
+`corepack pnpm run check`, including format/generated checks, modernize,
+Staticcheck/vet, Go and web lint/typecheck/tests, race tests, builds, OpenAPI
+and AsyncAPI checks, dependency audit, govulncheck, the disposable real MQTT
+projection/recovery harness, the disposable PostgreSQL/API integration suite,
+and all 17 browser tests. The integration suites exercised migration
+up/down/up and cleanly removed their disposable resources.
+
+This checkpoint is not a closeout claim. No commit, PR, exact-head CI result,
+independent review, merge, production migration, or production identity/
+durability evidence exists yet. The live MQTT harness proves committed
+normal/duplicate/late/restart projection behavior; persistence-failure
+non-acceptance remains covered at the ingestion consumer-failure boundary and
+is not presented as a production broker replay guarantee. Any remaining
+evidence gap or material behavior change must be recorded before moving this
+plan to `completed/`.
 
 ## Done Criteria
 

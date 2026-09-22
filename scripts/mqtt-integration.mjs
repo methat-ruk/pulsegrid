@@ -54,11 +54,15 @@ try {
     await startApi()
     await waitForReady()
     const deviceID = await createDevice()
-    await publishSimulator(deviceID)
-    await publishInvalidCases(deviceID)
+    const simulatorTelemetry = await publishSimulator(deviceID)
+    const duplicateMessageID = await publishInvalidCases(deviceID)
+    await assertPersistedObservation(deviceID, simulatorTelemetry.messageID, 23.5, 1)
+    await assertPersistedObservation(deviceID, duplicateMessageID, 24.5, 1)
+    const projectionTelemetry = await testPersistenceProjection(deviceID, simulatorTelemetry)
     await testBrokerPayloadCap(deviceID)
     assertNoRawTelemetryInLogs()
     await testRetainedMessage(deviceID)
+    await assertPersistedObservation(deviceID, projectionTelemetry.newerMessageID, 31, 1)
     await testBrokerRecovery(deviceID)
     if (!await stopApi()) throw new Error('API did not drain and stop cleanly')
     if (!apiOutput.includes('reason_code=shutdown_complete')) throw new Error('API shutdown completion was not logged')
@@ -180,7 +184,10 @@ async function publishSimulator(deviceID) {
   if (result.status !== 0) throw new Error(`simulator publish failed: ${result.stderr}`)
   const messageMatch = result.stdout.match(/message_id=([0-9a-f-]{36})/u)
   if (!messageMatch) throw new Error(`simulator output did not contain message ID: ${result.stdout}`)
+  const observedAtMatch = result.stdout.match(/observed_at=([^ ]+)/u)
+  if (!observedAtMatch) throw new Error(`simulator output did not contain observed time: ${result.stdout}`)
   await waitForLogFields(['reason_code=telemetry_accepted', `message_id=${messageMatch[1]}`], 10_000, 'valid telemetry acceptance')
+  return { messageID: messageMatch[1], observedAt: observedAtMatch[1] }
 }
 
 async function publishInvalidCases(deviceID) {
@@ -204,6 +211,51 @@ async function publishInvalidCases(deviceID) {
   await publishRaw(topic, duplicatePayload, false)
   await publishRaw(topic, duplicatePayload, false)
   await waitForLogCountFields(['reason_code=telemetry_accepted', `message_id=${duplicateMessageID}`], 2, 10_000, 'duplicate logical message acceptance')
+  return duplicateMessageID
+}
+
+async function testPersistenceProjection(deviceID, simulatorTelemetry) {
+  const topic = `pulsegrid/v1/tenants/pulsegrid-dev/devices/${deviceID}/telemetry`
+  const simulatorObservedAt = new Date(simulatorTelemetry.observedAt)
+  const newerMessageID = randomUUID()
+  const lateMessageID = randomUUID()
+  const newerObservedAt = new Date(simulatorObservedAt.getTime() + 1000).toISOString()
+  const lateObservedAt = new Date(simulatorObservedAt.getTime() - 1000).toISOString()
+  await publishRaw(topic, JSON.stringify({ schemaVersion: 1, messageId: newerMessageID, observedAt: newerObservedAt, temperatureCelsius: 31 }), false)
+  await waitForLogFields(['reason_code=telemetry_accepted', `message_id=${newerMessageID}`], 10_000, 'newer telemetry acceptance')
+  await publishRaw(topic, JSON.stringify({ schemaVersion: 1, messageId: lateMessageID, observedAt: lateObservedAt, temperatureCelsius: 18 }), false)
+  await waitForLogFields(['reason_code=telemetry_accepted', `message_id=${lateMessageID}`], 10_000, 'late telemetry acceptance')
+  const data = await queryTelemetry(deviceID)
+  if (data.deviceCurrentState?.messageId !== newerMessageID || data.deviceCurrentState?.temperatureCelsius !== 31) {
+    throw new Error(`late telemetry replaced newer current state: ${JSON.stringify(data.deviceCurrentState)}`)
+  }
+  await assertPersistedObservation(deviceID, newerMessageID, 31, 1)
+  await assertPersistedObservation(deviceID, lateMessageID, 18, 1)
+  return { newerMessageID }
+}
+
+async function queryTelemetry(deviceID) {
+  const response = await fetch(`http://127.0.0.1:${apiPort}/graphql`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      query: `query Telemetry($deviceID: ID!) { deviceCurrentState(deviceId: $deviceID) { messageId observedAt receivedAt temperatureCelsius lastSeenAt } deviceTelemetry(deviceId: $deviceID, first: 100) { edges { node { messageId observedAt receivedAt temperatureCelsius } } pageInfo { hasNextPage } } }`,
+      variables: { deviceID },
+    }),
+  })
+  const body = await response.json()
+  if (response.status !== 200 || body.errors || !body.data) {
+    throw new Error(`telemetry GraphQL query failed: ${JSON.stringify(body)}`)
+  }
+  return body.data
+}
+
+async function assertPersistedObservation(deviceID, messageID, temperature, expectedCount) {
+  const data = await queryTelemetry(deviceID)
+  const points = data.deviceTelemetry?.edges?.map((edge) => edge.node).filter((point) => point.messageId === messageID) ?? []
+  if (points.length !== expectedCount || points.some((point) => point.temperatureCelsius !== temperature)) {
+    throw new Error(`persisted observation ${messageID} = ${JSON.stringify(points)}, want count=${expectedCount} temperature=${temperature}`)
+  }
 }
 
 async function testRetainedMessage(deviceID) {

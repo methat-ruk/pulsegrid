@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/device/registry"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/telemetry/projection"
 )
 
 // This file will not be regenerated automatically.
@@ -21,6 +22,13 @@ type DeviceRepository interface {
 	ListDevices(context.Context, uuid.UUID, int, *registry.Cursor) (registry.DevicePage, error)
 }
 
+// TelemetryRepository is the tenant-scoped read boundary used by GraphQL.
+// Storage records remain behind the telemetry projection package.
+type TelemetryRepository interface {
+	GetCurrentState(context.Context, uuid.UUID, uuid.UUID) (projection.CurrentState, error)
+	ListTelemetry(context.Context, uuid.UUID, uuid.UUID, int, *projection.Cursor) (projection.TelemetryPage, error)
+}
+
 // Principal is the trusted server-selected GraphQL authority. No GraphQL
 // argument, header, cookie, or client state can replace it.
 type Principal struct {
@@ -29,15 +37,23 @@ type Principal struct {
 
 // Resolver owns the request-scoped device use cases and fixed tenant scope.
 type Resolver struct {
-	repository     DeviceRepository
-	organizationID uuid.UUID
+	repository          DeviceRepository
+	telemetryRepository TelemetryRepository
+	organizationID      uuid.UUID
 }
 
 // NewResolver constructs the GraphQL resolver root for one fixed organization.
 func NewResolver(repository DeviceRepository, organizationID uuid.UUID) *Resolver {
+	return NewResolverWithTelemetry(repository, nil, organizationID)
+}
+
+// NewResolverWithTelemetry constructs the GraphQL resolver root with the
+// additive telemetry read boundary enabled.
+func NewResolverWithTelemetry(repository DeviceRepository, telemetryRepository TelemetryRepository, organizationID uuid.UUID) *Resolver {
 	return &Resolver{
-		repository:     repository,
-		organizationID: organizationID,
+		repository:          repository,
+		telemetryRepository: telemetryRepository,
+		organizationID:      organizationID,
 	}
 }
 

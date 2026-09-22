@@ -22,6 +22,7 @@ import (
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/logging"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/telemetry/ingestion"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/telemetry/mqtttransport"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/telemetry/projection"
 )
 
 const developmentOrganizationSlug = "pulsegrid-dev"
@@ -64,11 +65,15 @@ func main() {
 	needsRegistry := cfg.IdentityMode == config.IdentityDevelopment || cfg.MQTTIngestionEnabled()
 	var pool *pgxpool.Pool
 	var repository *registry.Repository
+	var telemetryRepository *projection.Repository
 	var organizationID uuid.UUID
 	if needsRegistry {
 		startupContext, cancelStartup := context.WithTimeout(ctx, 10*time.Second)
 		var startupErr error
 		pool, repository, startupErr = openDevelopmentDependencies(startupContext)
+		if startupErr == nil {
+			telemetryRepository, startupErr = projection.NewRepository(pool)
+		}
 		if startupErr == nil && cfg.IdentityMode == config.IdentityDevelopment {
 			organizationID, startupErr = resolveDevelopmentOrganization(startupContext, repository)
 		}
@@ -83,7 +88,7 @@ func main() {
 	}
 
 	if cfg.IdentityMode == config.IdentityDevelopment {
-		graphqlHandler, handlerErr := graph.NewHandler(repository, organizationID, logger)
+		graphqlHandler, handlerErr := graph.NewHandlerWithTelemetry(repository, telemetryRepository, organizationID, logger)
 		if handlerErr != nil {
 			pool.Close()
 			logger.Error("graphql startup failed", "reason_code", "handler_initialization_failed")
@@ -97,9 +102,7 @@ func main() {
 	var mqttRuntime *mqtttransport.Transport
 	if cfg.MQTTIngestionEnabled() {
 		resolver := repositoryResolver{repository: repository}
-		consumer := ingestion.ConsumerFunc(func(context.Context, ingestion.AcceptedTelemetry) error {
-			return nil
-		})
+		consumer := ingestion.AcceptedTelemetryConsumer(telemetryRepository)
 		handler, handlerErr := ingestion.NewHandler(resolver, consumer, ingestion.HandlerConfig{})
 		if handlerErr != nil {
 			if pool != nil {
@@ -232,7 +235,7 @@ func telemetryProcessor(handler *ingestion.Handler, logger *slog.Logger) mqtttra
 		accepted, err := handler.Handle(ctx, delivery)
 		if err != nil {
 			fields := []any{
-				"reason_code", ingestion.ReasonOf(err),
+				"reason_code", telemetryFailureReason(err),
 				"ingestion_id", delivery.IngestionID,
 				"payload_bytes", len(delivery.Payload),
 				"qos", delivery.QoS,
@@ -256,6 +259,17 @@ func telemetryProcessor(handler *ingestion.Handler, logger *slog.Logger) mqtttra
 			"received_at", accepted.ReceivedAt,
 			"duplicate", accepted.MQTTDuplicate,
 		)
+	}
+}
+
+func telemetryFailureReason(err error) string {
+	switch {
+	case errors.Is(err, projection.ErrMessageConflict):
+		return "telemetry_message_id_conflict"
+	case errors.Is(err, projection.ErrStorageConflict):
+		return "telemetry_storage_conflict"
+	default:
+		return ingestion.ReasonOf(err)
 	}
 }
 

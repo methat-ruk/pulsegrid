@@ -23,6 +23,14 @@ type DeviceConnection struct {
 	PageInfo *PageInfo     `json:"pageInfo"`
 }
 
+type DeviceCurrentState struct {
+	MessageID          string    `json:"messageId"`
+	ObservedAt         time.Time `json:"observedAt"`
+	ReceivedAt         time.Time `json:"receivedAt"`
+	TemperatureCelsius float64   `json:"temperatureCelsius"`
+	LastSeenAt         time.Time `json:"lastSeenAt"`
+}
+
 type DeviceEdge struct {
 	Cursor string  `json:"cursor"`
 	Node   *Device `json:"node"`
@@ -37,4 +45,21 @@ type PageInfo struct {
 }
 
 type Query struct {
+}
+
+type TelemetryConnection struct {
+	Edges    []*TelemetryEdge `json:"edges"`
+	PageInfo *PageInfo        `json:"pageInfo"`
+}
+
+type TelemetryEdge struct {
+	Cursor string          `json:"cursor"`
+	Node   *TelemetryPoint `json:"node"`
+}
+
+type TelemetryPoint struct {
+	MessageID          string    `json:"messageId"`
+	ObservedAt         time.Time `json:"observedAt"`
+	ReceivedAt         time.Time `json:"receivedAt"`
+	TemperatureCelsius float64   `json:"temperatureCelsius"`
 }

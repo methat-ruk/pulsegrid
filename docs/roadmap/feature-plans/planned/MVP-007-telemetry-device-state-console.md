@@ -38,8 +38,15 @@ platform state.
 
 ## Architecture / Boundaries
 
-The UI renders server-owned state. Staleness is explicit and must not be hidden
-by cached visual state.
+The UI renders server-owned state through MVP-006's additive GraphQL reads:
+`deviceCurrentState(deviceId)` and bounded `deviceTelemetry(deviceId, first,
+after)`. `lastSeenAt` is the server's logical maximum receive time for new
+observations; UI staleness must derive from it, not from the selected
+measurement's `observedAt` or `receivedAt`. The UI must not expose ingestion IDs,
+MQTT duplicate metadata, storage sequence values, or choose a tenant.
+
+The history query defaults to 50 rows and accepts at most 100 with an opaque
+keyset cursor ordered by `observedAt DESC, messageId DESC`.
 
 ## Implementation Direction
 
@@ -63,6 +70,7 @@ justify a persistent realtime transport.
 - Poll interval and cache invalidation.
 - Exact connectivity/staleness threshold.
 - Chart introduction depends on enough points to convey meaningful behavior.
+- Empty state versus a stale state when `deviceCurrentState` is nullable.
 
 ## Done Criteria
 

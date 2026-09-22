@@ -1,9 +1,10 @@
 # PulseGrid API documentation
 
 Status: MVP-002 development GraphQL device contract, MVP-003 console
-integration, MVP-004 local MQTT producer fixture, and MVP-005 local/test
-telemetry ingestion are implemented and validated. Persistence, production
-identity, and production MQTT remain deferred.
+integration, MVP-004 local MQTT producer fixture, MVP-005 local/test telemetry
+ingestion, and MVP-006 local/test telemetry persistence/current-state projection
+are implemented on the feature branch and locally validated. Production
+identity, production MQTT, and permanent high-volume storage remain deferred.
 
 ## Purpose and ownership
 
@@ -47,7 +48,7 @@ and are review artifacts only; they are not published or served at runtime.
 | Console readiness adapter | Same-origin Nuxt server route | Implemented in FND-004; local process-readiness adapter only | [`ready.get.ts`](../../apps/web-console/server/api/operational/ready.get.ts) and the FND-001 operational contract |
 | Console GraphQL adapter | Same-origin Nuxt server route | Implemented in MVP-003; development/test transport adapter only | [`graphql.post.ts`](../../apps/web-console/server/api/graphql.post.ts) and [`graphql-proxy.ts`](../../apps/web-console/server/utils/graphql-proxy.ts) |
 | Operator product API | GraphQL/gqlgen | Implemented for development-only MVP-002 scope | [`device.graphqls`](../../apps/api/graph/schema/device.graphqls) and committed generated artifacts |
-| Device telemetry | MQTT | MVP-004 producer fixture and MVP-005 local/test consumer implemented; persistence deferred to MVP-006 | [AsyncAPI telemetry contract](../../apps/api/api/asyncapi/telemetry.yaml) and [MVP-005 plan](../roadmap/feature-plans/completed/MVP-005-mqtt-telemetry-ingestion.md) |
+| Device telemetry | MQTT + PostgreSQL | MVP-004 producer fixture, MVP-005 local/test consumer, and MVP-006 bounded persistence/current state implemented; production delivery deferred | [AsyncAPI telemetry contract](../../apps/api/api/asyncapi/telemetry.yaml), [MVP-005 plan](../roadmap/feature-plans/completed/MVP-005-mqtt-telemetry-ingestion.md), and [MVP-006 plan](../roadmap/feature-plans/planned/MVP-006-telemetry-current-state-projection.md) |
 | Device commands | MQTT | Planned for MVP-011 onward | AsyncAPI/message schema when a concrete flow exists |
 | Durable event distribution | Kafka | Post-MVP conditional | A flow-specific AsyncAPI/message contract |
 | Internal synchronous service calls | gRPC/Protobuf | Post-MVP conditional | A flow-specific protobuf contract |
@@ -98,6 +99,43 @@ Validate the real API, PostgreSQL, Mosquitto, simulator, rejection, duplicate,
 readiness-recovery, and shutdown paths with:
 
 ```sh
+corepack pnpm run mqtt:test:integration
+```
+
+## MVP-006 telemetry persistence and current state
+
+The configured `AcceptedTelemetryConsumer` now commits accepted logical
+observations to PostgreSQL before the API emits `telemetry_accepted`. The
+durable idempotency key is `(device_id, message_id)`. An exact replay is a
+successful no-op: it does not create another history row, advance current state,
+or advance `lastSeenAt`. Reusing the same device/message ID with a different
+observed time or temperature is a safe processing failure with no partial
+mutation.
+
+Current measurement uses the greatest `(observedAt, messageId)` tuple. A late
+observation remains in bounded history and may advance `lastSeenAt`, but cannot
+replace a newer current measurement. History retains at most 1,000 logical
+observations per device; this is an MVP count bound, not a time-retention or
+permanent telemetry-store decision.
+
+The additive development GraphQL reads are:
+
+- `deviceCurrentState(deviceId: ID!): DeviceCurrentState` — nullable when the
+  fixed tenant cannot see a state;
+- `deviceTelemetry(deviceId: ID!, first: Int! = 50, after: String):
+  TelemetryConnection!` — forward keyset pagination, `first` 1–100, ordered by
+  `observedAt DESC, messageId DESC`.
+
+Only message ID, observed/received times, temperature, and `lastSeenAt` on
+current state are exposed. Ingestion IDs, MQTT duplicate flags, organization
+IDs, storage sequence values, and database errors remain internal. Cross-tenant
+and unknown devices return no telemetry rows. The GraphQL contract remains
+development/test-only and uses the existing server-selected principal.
+
+The local API-to-database-to-GraphQL evidence is included in:
+
+```sh
+corepack pnpm run api:test:integration
 corepack pnpm run mqtt:test:integration
 ```
 
@@ -154,11 +192,12 @@ uploads, persisted queries, and playground routes are not enabled. Introspection
 is available only in this explicit development mode. The SDL is the source of
 truth; generated gqlgen files are committed and checked for drift.
 
-The first contract exposes `device`, bounded forward `devices` pagination
-(`first` 1–100 with opaque versioned cursors), and `createDevice`. Device IDs
-are canonical UUID strings and timestamps are UTC RFC3339Nano. Expected resolver
-codes are `BAD_USER_INPUT`, `CONFLICT`, and `INTERNAL_SERVER_ERROR`; parse and
-validation failures use gqlgen's `GRAPHQL_PARSE_FAILED` and
+The contract exposes `device`, bounded forward `devices` pagination
+(`first` 1–100 with opaque versioned cursors), `createDevice`, and the additive
+MVP-006 `deviceCurrentState`/`deviceTelemetry` reads described above. Device
+IDs are canonical UUID strings and timestamps are UTC RFC3339Nano. Expected
+resolver codes are `BAD_USER_INPUT`, `CONFLICT`, and `INTERNAL_SERVER_ERROR`;
+parse and validation failures use gqlgen's `GRAPHQL_PARSE_FAILED` and
 `GRAPHQL_VALIDATION_FAILED` codes. Errors include a safe request correlation ID
 when one is available and never reveal SQL, credentials, tenant existence, or
 request bodies.
