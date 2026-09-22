@@ -634,8 +634,8 @@ new infrastructure, or implementation beyond this plan.
 
 ## Implementation Checkpoint and Plan-to-Actual Reconciliation (2026-09-22)
 
-The implementation is present in the working tree and intentionally remains
-uncommitted at the user's request. The changed surfaces stay inside the
+The implementation is recorded in commit `42e114e` on the feature branch and
+is pushed to the open Draft PR #15. The changed surfaces stay inside the
 reviewed boundary: migration `005`, the telemetry projection package and
 real-store tests, API composition, additive GraphQL schema/resolvers/cursors
 and generated artifacts, GraphQL tests, the existing MQTT integration harness,
@@ -660,9 +660,9 @@ projection/recovery harness, the disposable PostgreSQL/API integration suite,
 and all 17 browser tests. The integration suites exercised migration
 up/down/up and cleanly removed their disposable resources.
 
-This checkpoint is not a closeout claim. No commit, PR, exact-head CI result,
-independent review, merge, production migration, or production identity/
-durability evidence exists yet. The live MQTT harness proves committed
+This checkpoint is not a closeout claim. Exact-head CI result, independent
+review, merge, production migration, and production identity/durability
+evidence remain open. The live MQTT harness proves committed
 normal/duplicate/late/restart projection behavior; persistence-failure
 non-acceptance remains covered at the ingestion consumer-failure boundary and
 is not presented as a production broker replay guarantee. Any remaining
