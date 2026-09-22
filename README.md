@@ -5,16 +5,16 @@
 Connect devices · Stream telemetry · Detect conditions · Deliver commands ·
 Operate fleets
 
-![Status](https://img.shields.io/badge/status-mvp--telemetry--transport--in--progress-yellow)
+![Status](https://img.shields.io/badge/status-mvp--telemetry--console--planned-yellow)
 
 > [!IMPORTANT]
 > PulseGrid's documentation foundation, Go API foundation, Nuxt console
 > foundation, MVP-001 persistence, MVP-002 development GraphQL contract,
-> MVP-003 device-registry journey, and the MVP-004 local MQTT producer fixture
-> are implemented and locally validated. The independent MQTT CI job is defined,
-> passed on the final PR head, and is required by `main` branch protection.
-> Telemetry ingestion, production identity, and production readiness remain
-> deferred.
+> MVP-003 device-registry journey, MVP-004 local MQTT producer fixture,
+> MVP-005 local/test telemetry ingestion, and MVP-006 bounded telemetry
+> persistence/current state are implemented and validated. MVP-007 remains the
+> planned operator-visible telemetry console. Production identity and
+> production readiness remain deferred.
 
 ## What is PulseGrid?
 
@@ -102,7 +102,7 @@ The decision state and adoption trigger for each technology are maintained in
 
 ## Project status
 
-**Current phase: MVP telemetry transport in progress**
+**Current phase: MVP telemetry console planned**
 
 - Product intent and MVP boundary: documented.
 - Architecture and technology adoption rules: documented.
@@ -113,9 +113,10 @@ The decision state and adoption trigger for each technology are maintained in
 - Nuxt console foundation and the MVP-003 device registry journey: implemented
   and validated; the journey uses a fixed same-origin GraphQL adapter and a
   real browser/DB smoke path for development/test only.
-- The MVP-004 local/test MQTT broker and one-shot simulator are implemented;
-  platform telemetry ingestion, current-state projection, production identity,
-  and production readiness remain planned or deferred.
+- The MVP-004 local/test MQTT broker and one-shot simulator, MVP-005 telemetry
+  ingestion, and MVP-006 bounded PostgreSQL history/current-state projection
+  are implemented and validated. The MVP-007 console consumer remains planned;
+  production identity and production readiness remain deferred.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
   required checks include browser evidence for the real local API readiness
   journey.

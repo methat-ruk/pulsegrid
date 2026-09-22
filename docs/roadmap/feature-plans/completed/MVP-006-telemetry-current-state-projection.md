@@ -2,14 +2,15 @@
 
 Status: Complete
 
-Review state: Implemented, independently re-reviewed, and reconciled on
-2026-09-22 against merged MVP-005, the current Go composition and telemetry
-handoff, PostgreSQL migrations/repositories, GraphQL contract and complexity
-controls, dependency pins, integration harnesses, CI gates, and downstream
-MVP-007/MVP-008 needs. The latest independent re-review found no Blocker or
-High findings; the PR is Ready for review with exact-head CI green. Merge,
-production migration, and production identity/durability approval were not
-performed.
+Review state: Implemented and reconciled on 2026-09-22 against merged MVP-005,
+the Go composition and telemetry handoff, PostgreSQL migrations/repositories,
+GraphQL contract and complexity controls, dependency pins, integration
+harnesses, CI gates, and downstream MVP-007/MVP-008 needs. Independent review
+covered earlier head `8bc58d0`; no independent re-review or formal GitHub
+review was recorded for final PR head `5436dbe`. PR #15 nevertheless merged on
+2026-09-22 as commit `8c7a0f5` after all 14 checks passed. This is a historical
+review-evidence limitation, not an unmerged change. No production migration or
+production identity/durability approval was performed.
 
 Branch: `feat/mvp-006-telemetry-current-state-projection`
 
@@ -677,14 +678,14 @@ new infrastructure, or implementation beyond this plan.
 
 ## Implementation Checkpoint and Plan-to-Actual Reconciliation (2026-09-22)
 
-The implementation and review fixes are pushed on the feature branch. The
-review-fix implementation is recorded in `82227de`; PR #15 and its
-provider-reported head remain the authority for the current candidate rather
-than a mutable checkpoint SHA. The changed surfaces stay inside the
-reviewed boundary: migration `005`, the telemetry projection package and
-real-store tests, API composition, additive GraphQL schema/resolvers/cursors
-and generated artifacts, GraphQL tests, the existing MQTT integration harness,
-and the named API/architecture/local-development/downstream plan documents.
+The implementation and review fixes were delivered through PR #15. The
+review-fix implementation is recorded in `82227de`, the final PR head is
+`5436dbe`, and merge commit `8c7a0f5` is the accepted repository result. The
+changed surfaces stayed inside the reviewed boundary: migration `005`, the
+telemetry projection package and real-store tests, API composition, additive
+GraphQL schema/resolvers/cursors and generated artifacts, GraphQL tests, the
+existing MQTT integration harness, and the named API/architecture/
+local-development/downstream plan documents.
 There is no runtime dependency, environment key, product Compose service,
 AsyncAPI/OpenAPI, frontend, or registry-schema change. The existing
 modernization quality gate
@@ -711,23 +712,24 @@ projection/recovery harness, the disposable PostgreSQL/API integration suite,
 and all 17 browser tests. The integration suites exercised migration
 up/down/up and cleanly removed their disposable resources.
 
-This checkpoint records the completed PR candidate. The latest provider-reported
-PR head has all 14 required GitHub checks green, including the canonical
-PostgreSQL/API integration suite; the latest independent re-review found no
-Blocker or High findings, and PR #15 is Ready for review. Follow-up local
-validation also passed `corepack pnpm run api:test:integration`,
+This closeout records the merged result. Final PR head `5436dbe` had all 14
+required GitHub checks green, including the canonical PostgreSQL/API
+integration suite. Independent review of earlier head `8bc58d0` found no
+Blocker or High findings, but changes through the final head were not
+independently re-reviewed and no formal GitHub review was recorded. Follow-up
+local validation also passed `corepack pnpm run api:test:integration`,
 `corepack pnpm run check:fast`, `node --check scripts/test-api-integration.mjs`,
 and `git diff --check`. Startup validation now rejects a pre-005 schema before
 the listener/ingestion path, and the live MQTT harness proves committed
 normal/duplicate/late/restart projection behavior; persistence-failure
 non-acceptance remains covered at the ingestion consumer-failure boundary and
-is not presented as a production broker replay guarantee. Merge, production
-migration, and production identity/durability evidence remain outside this
-closeout and were not performed.
+is not presented as a production broker replay guarantee. PR #15 merged as
+`8c7a0f5`; production migration and production identity/durability evidence
+remain outside this closeout and were not performed.
 
 ## Done Criteria
 
-MVP-006 is complete only when the exact reviewed implementation stores each new
+The merged MVP-006 implementation stores each new
 device-scoped logical observation in an append-only identity authority at most
 once; rejects conflicting reuse after history pruning; atomically maintains
 the deterministic current measurement, independent last-seen, and 1,000-row
@@ -735,7 +737,8 @@ history bound; validates the required schema before startup; exposes only
 tenant-scoped bounded GraphQL
 reads; preserves state across restart and late/concurrent input; passes the
 required unit, race, real-PostgreSQL, real-MQTT, GraphQL, migration, regression,
-and exact-head CI evidence; reconciles plan to actual; completes author and any
-required independent review; updates the named documentation; and reports all
-skipped/unavailable checks and remaining risk without overstating durability,
-scale, security, or production readiness.
+and exact-head CI evidence; and reconciles plan to actual. The required
+exact-head independent review was not completed before merge and remains the
+historical evidence limitation recorded above; it must not be retroactively
+claimed from automated checks. The named documentation is updated without
+overstating durability, scale, security, or production readiness.

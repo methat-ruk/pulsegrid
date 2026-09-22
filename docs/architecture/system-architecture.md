@@ -14,10 +14,11 @@ by the [roadmap](../roadmap/roadmap.md).
 
 The Go/Fiber API is implemented and validated as one modular process with
 lifecycle, health, development-only GraphQL device endpoints, the local/test
-MVP-005 MQTT telemetry consumer, and the MVP-006 local/test telemetry
-history/current-state projection on the feature branch. MVP-003 adds the first
-device-registry operator journey and a fixed same-origin Nuxt GraphQL transport
-adapter backed by the MVP-001 organization/device registry. Production
+MVP-005 MQTT telemetry consumer, and the merged MVP-006 local/test telemetry
+history/current-state projection. MVP-003 provides the first device-registry
+operator journey and a fixed same-origin Nuxt GraphQL transport adapter backed
+by the MVP-001 organization/device registry. MVP-007 is planned to expose the
+delivered telemetry reads on the existing device-detail route. Production
 identity, deployment exposure, durable broker replay, and later event
 contracts remain unimplemented.
 

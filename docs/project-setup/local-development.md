@@ -1,10 +1,10 @@
 # PulseGrid local development
 
 Status: Local repository workflow and merge-gate enforcement implemented;
-FND-004 readiness, the MVP-003 device-registry browser journey, and the
-MVP-005 local/test MQTT ingestion path are implemented and locally validated;
-MVP-006 telemetry persistence/current-state implementation is in progress on
-the feature branch with real PostgreSQL and MQTT-to-GraphQL evidence.
+FND-004 readiness, the MVP-003 device-registry browser journey, the MVP-005
+local/test MQTT ingestion path, and the merged MVP-006 telemetry
+persistence/current-state path are implemented and validated. MVP-007's
+operator-visible telemetry console remains planned.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
