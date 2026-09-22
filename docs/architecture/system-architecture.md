@@ -17,10 +17,12 @@ lifecycle, health, development-only GraphQL device endpoints, the local/test
 MVP-005 MQTT telemetry consumer, and the merged MVP-006 local/test telemetry
 history/current-state projection. MVP-003 provides the first device-registry
 operator journey and a fixed same-origin Nuxt GraphQL transport adapter backed
-by the MVP-001 organization/device registry. MVP-007 is planned to expose the
-delivered telemetry reads on the existing device-detail route. Production
-identity, deployment exposure, durable broker replay, and later event
-contracts remain unimplemented.
+by the MVP-001 organization/device registry. The MVP-007 implementation
+candidate now exposes the delivered telemetry reads on the existing
+device-detail route through a section-local panel; it is locally validated on
+its feature branch but not yet merged. Production identity, deployment
+exposure, durable broker replay, and later event contracts remain
+unimplemented.
 
 Architecture diagrams below describe an intended sequence of evolution. They
 must not be read as deployed topology.
@@ -228,6 +230,26 @@ The [API documentation index](../api/README.md) owns the human testing and
 contract map. Machine-readable contracts remain next to the application or
 producer that owns them. No REST CRUD surface is created merely to mirror the
 GraphQL product API.
+
+### MVP-007 telemetry console consumer
+
+The existing `/devices/:id` route remains the device identity and not-found
+authority. After a tenant-visible device resolves, `DeviceTelemetryPanel` owns
+only telemetry presentation state: the current-state read, the first bounded
+history page, manual refresh replacement, cursor-based history continuation,
+local recency time, and section-local loading/error/retry states. The
+feature-scoped typed GraphQL client accepts only `deviceId`, `first`, and the
+opaque `after` cursor; organization, tenant, topic, storage, and upstream
+authority remain server-side.
+
+The panel derives `Recent signal` (up to five minutes) or `Stale signal` (over
+five minutes) from `lastSeenAt` only. This is a reversible UI heuristic, not a
+connection, heartbeat, or `Online`/`Offline` authority. No automatic polling or
+realtime transport is introduced. `TelemetryTemperatureChart.client.vue` is a
+client-only presentation boundary: it dynamically loads the selected modular
+ECharts pieces, renders an SVG line chart only for two or more valid points, and
+keeps the visible summary and semantic history table as the inspectable source
+of truth.
 
 ## Event-driven evolution
 

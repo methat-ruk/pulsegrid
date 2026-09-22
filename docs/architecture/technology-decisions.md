@@ -40,7 +40,7 @@ or immediately required dependency.
 | Manrope and Noto Sans Thai delivery | Selected — Foundation | Package-managed local font assets avoid third-party font requests |
 | Light theme | Selected — Foundation | Only approved PulseGrid light tokens exist; dark-theme work remains deferred |
 | Native browser `fetch` with a feature-scoped typed GraphQL client | Selected — MVP | MVP-003 needs one bounded device journey; avoid a cache/SSR/client-runtime dependency until shared cache, polling, or schema-scale evidence justifies it |
-| Apache ECharts | Selected — MVP | Added when the telemetry console has a concrete chart requirement |
+| Apache ECharts | Selected — MVP | Direct `6.1.0` production dependency for the MVP-007 telemetry chart; modular client-only SVG imports keep SSR and bundle scope bounded |
 | GraphQL and gqlgen | Selected — MVP | Concrete device and operator API boundary; MVP-002 pins gqlgen `v0.17.95` and keeps the SDL as source of truth |
 | PostgreSQL 18.6 | Selected — MVP | Transactional authority for the MVP-001 organization/device registry and MVP-006 bounded telemetry/current-state projection; local and CI targets are pinned and isolated |
 | pgx v5 | Selected — MVP | Direct parameterized Go PostgreSQL driver and bounded pool for registry and telemetry projection boundaries |
@@ -192,6 +192,27 @@ retention period, aggregation, query latency, independent consumers, replay, or
 alert-linkage requirements exceed this local transactional boundary. A
 specialized time-series store, Redis idempotency layer, Kafka flow, or service
 split still requires its own evidence-backed adoption plan.
+
+## MVP-007 telemetry console decision
+
+MVP-007 selects direct Apache ECharts `6.1.0` for the concrete device-detail
+temperature chart. The console imports only the ECharts core, line chart, grid,
+tooltip, ARIA, and SVG-renderer modules from a `.client.vue` component; it does
+not add a wrapper library, canvas snapshot contract, polling library, GraphQL
+cache, or global state manager. The chart is eligible only after two valid
+observations, while a visible text summary and semantic history table remain
+the accessible and inspectable representation. The production dependency and
+lockfile closure passed the repository audit and production build without a
+new full-library chunk warning.
+
+The MVP also selects explicit manual refresh as the console update mechanism.
+Each refresh starts from the first history page and replaces current/history
+only after success; a failure preserves the previous values and exposes retry.
+No polling, subscription, SSE, WebSocket, retained MQTT state, or unqualified
+`Online`/`Offline` status is selected because the current simulator and
+`lastSeenAt` contract provide signal recency but no connection or heartbeat
+authority. Revisit the transport when an explicit freshness requirement,
+heartbeat contract, or measured unattended-update need exists.
 
 ## Foundation selection evidence
 

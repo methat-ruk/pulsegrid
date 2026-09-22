@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "moduleResolution": "Bundler",
+    "noEmit": true
+  },
+  "include": [
+    "./.nuxt/nuxt.d.ts",
+    "./test/vue.d.ts",
+    "./test/**/*.ts"
+  ]
+}

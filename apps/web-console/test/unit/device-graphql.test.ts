@@ -4,6 +4,8 @@ import type {
   DeviceGraphQLError } from '../../app/features/devices/device-graphql'
 import {
   executeDeviceGraphQL,
+  getDeviceTelemetryOverview,
+  getDeviceTelemetryPage,
   validateDeviceInput,
 } from '../../app/features/devices/device-graphql'
 
@@ -34,6 +36,8 @@ describe('device GraphQL client', () => {
     await expect(executeDeviceGraphQL('mutation Test { __typename }', {})).rejects.toMatchObject<DeviceGraphQLError>({
       code: 'CONFLICT',
       message: 'device key already exists',
+      name: 'DeviceGraphQLError',
+      status: 200,
     })
     expect(fetchMock).toHaveBeenCalledWith('/api/graphql', expect.objectContaining({
       method: 'POST',
@@ -66,6 +70,61 @@ describe('device GraphQL client', () => {
     })
   })
 
+  it('requests the telemetry overview with the bounded first page', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: {
+        deviceCurrentState: null,
+        deviceTelemetry: { edges: [], pageInfo: { endCursor: null, hasNextPage: false } },
+      },
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/graphql-response+json' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(getDeviceTelemetryOverview('device-1')).resolves.toEqual({
+      deviceCurrentState: null,
+      deviceTelemetry: { edges: [], pageInfo: { endCursor: null, hasNextPage: false } },
+    })
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const body = JSON.parse(init.body as string) as { query: string, variables: Record<string, unknown> }
+    expect(body.query).toContain('query DeviceTelemetryOverview')
+    expect(body.query).toContain('deviceCurrentState')
+    expect(body.query).toContain('deviceTelemetry')
+    expect(body.variables).toEqual({ deviceId: 'device-1', first: 50, after: null })
+  })
+
+  it('requests a history continuation without fetching current state again', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: {
+        deviceTelemetry: {
+          edges: [{ cursor: 'cursor-2', node: {
+            messageId: 'message-2',
+            observedAt: '2026-09-22T04:00:00Z',
+            receivedAt: '2026-09-22T04:00:01Z',
+            temperatureCelsius: 24,
+          } }],
+          pageInfo: { endCursor: 'cursor-2', hasNextPage: false },
+        },
+      },
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/graphql-response+json' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(getDeviceTelemetryPage('device-1', 50, 'cursor-1')).resolves.toMatchObject({
+      deviceTelemetry: { pageInfo: { endCursor: 'cursor-2', hasNextPage: false } },
+    })
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const body = JSON.parse(init.body as string) as { query: string, variables: Record<string, unknown> }
+    expect(body.query).toContain('query DeviceTelemetryPage')
+    expect(body.query).not.toContain('deviceCurrentState')
+    expect(body.variables).toEqual({ deviceId: 'device-1', first: 50, after: 'cursor-1' })
+  })
+
   it('maps malformed JSON responses to a safe service error', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response('{', {
       status: 200,
@@ -75,6 +134,8 @@ describe('device GraphQL client', () => {
 
     await expect(executeDeviceGraphQL('query Test { __typename }', {})).rejects.toMatchObject<DeviceGraphQLError>({
       code: 'SERVICE_UNAVAILABLE',
+      message: 'device service returned an invalid response',
+      name: 'DeviceGraphQLError',
       status: 200,
     })
   })

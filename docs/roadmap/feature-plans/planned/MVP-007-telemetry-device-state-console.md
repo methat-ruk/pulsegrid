@@ -1,13 +1,13 @@
 # MVP-007 — Telemetry and Device-State Console
 
-Status: Planned
+Status: Ready for review
 
-Review state: Reconciled on 2026-09-22 against merged MVP-003 and MVP-006,
-the current Nuxt device-detail route and feature-scoped GraphQL client, the
-delivered telemetry GraphQL contract, current package/lock state, the browser
-runner and CI job, the UI design system, and the M2 acceptance boundary. This
-revision closes the refresh, staleness, chart, async-state, browser-runtime,
-dependency, rollback, and documentation decisions needed before implementation.
+Review state: Implemented, self-reviewed, and locally validated on 2026-09-22
+against merged MVP-003 and MVP-006, the current Nuxt device-detail route and
+feature-scoped GraphQL client, the delivered telemetry GraphQL contract, the
+installed package/lock state, the browser runner and CI job, the UI design
+system, and the M2 acceptance boundary. The implementation candidate is ready
+for independent review; no PR merge or completion move is claimed.
 
 Branch: `feat/mvp-007-telemetry-device-state-console`
 
@@ -81,7 +81,7 @@ validated, committed, retained, and queried. This slice makes that result
 operator-visible and completes M2 without introducing realtime infrastructure
 before a freshness requirement justifies it.
 
-## Verified Repository Baseline (2026-09-22)
+## Verified Repository Baseline Before Implementation (2026-09-22)
 
 - The branch `feat/mvp-007-telemetry-device-state-console`, local `main`,
   locally known `origin/main`, and remote `main` all point to merged MVP-006
@@ -121,8 +121,8 @@ before a freshness requirement justifies it.
   the implementation candidate; inspection is not installation or
   compatibility proof.
 - Existing docs still contained several pre-merge MVP-006 status sentences.
-  This plan-review change corrects those current-state claims without claiming
-  any MVP-007 behavior is implemented.
+  The plan-review change corrected those current-state claims before MVP-007
+  implementation began.
 
 ## Scope
 
@@ -444,7 +444,8 @@ Expected new/changed surfaces include:
 - `apps/web-console/app/assets/css/main.css` for telemetry/card/history/chart
   layout using existing tokens;
 - `apps/web-console/test/unit/` and `apps/web-console/test/nuxt/` telemetry
-  client/component/route tests;
+  client/component/route tests, plus `tsconfig.tests.json` and its Vue module
+  shim so those TypeScript fixtures stay inside the static gate;
 - `tests/browser/`, `scripts/build-api-test.mjs` or a narrowly renamed/replaced
   test-binary builder, `scripts/test-browser.mjs`, and possibly the existing
   browser CI step when required to express the broker lifecycle;
@@ -658,6 +659,50 @@ expanding closeout prose.
 - Confidence is high that the current API and repository boundaries can support
   the slice without backend changes; rendered/browser and installed-dependency
   behavior remain implementation evidence, not planning facts.
+
+## Plan-to-Actual Reconciliation (2026-09-22)
+
+The implementation candidate stays within the reviewed boundary:
+
+- `DeviceTelemetryPanel.vue` is mounted from the existing device-detail route
+  and owns only telemetry loading, manual refresh, cursor continuation,
+  recency display, and recoverable UI state. The refresh/load-more abort race
+  is covered by an explicit regression test.
+- `device-graphql.ts` contains the typed current-plus-history overview operation
+  and history-only continuation operation. The GraphQL SDL, Go resolvers,
+  persistence, retention, identity, and tenant boundaries are unchanged.
+- `TelemetryTemperatureChart.client.vue` dynamically loads only the selected
+  modular ECharts pieces on the client, uses SVG/ARIA, renders for two or more
+  valid points, and keeps the table/summary as the non-visual representation.
+- The browser runner now owns the existing Mosquitto test service alongside its
+  disposable PostgreSQL project, builds the simulator, enables test ingestion,
+  and cleans up only its own Compose resources. No production configuration or
+  new runtime service was added.
+- The documentation updates record the actual console consumer boundary,
+  direct ECharts admission, manual-refresh choice, local test journey, and the
+  still-unmerged review state. No API contract or UI design-system owner was
+  duplicated.
+- TypeScript coverage now has an explicit `apps/web-console/tsconfig.tests.json`
+  and repository `web:test:typecheck` command. The root typecheck gate runs the
+  Nuxt application typecheck and this test-file typecheck, so the unit and Nuxt
+  fixtures cannot silently drift outside the static gate.
+
+Evidence collected on the candidate includes 52 frontend tests, the focused
+GraphQL client and Nuxt state-machine coverage, `check:fast`, the repository
+policy check, production build, dependency audit, Go race tests, MQTT/API
+integration, and the full browser suite. The final browser run passed 20/20:
+the real simulator -> Mosquitto -> ingestion -> PostgreSQL -> GraphQL -> Nuxt
+journey, empty/current/refresh/chart/stale behavior, 390 px and 320 px
+page-overflow checks, existing keyboard shell paths, and port-conflict cleanup.
+Visible Browser QA on the built route at 1440x900 and 390x844 showed meaningful
+DOM/current/history/chart states, keyboard-activated Refresh, no framework
+overlay, no page overflow, and no console warning/error entries. The build
+emits the repository's known generated Rollup annotation warning; no new
+application error or client chunk warning was observed.
+
+The plan remains in `planned/` with `Ready for review`: independent review,
+exact-head CI, merge/acceptance, and the completed-plan move are intentionally
+not claimed by this uncommitted worktree.
 
 ## Done Criteria
 

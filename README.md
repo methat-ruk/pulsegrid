@@ -12,9 +12,10 @@ Operate fleets
 > foundation, MVP-001 persistence, MVP-002 development GraphQL contract,
 > MVP-003 device-registry journey, MVP-004 local MQTT producer fixture,
 > MVP-005 local/test telemetry ingestion, and MVP-006 bounded telemetry
-> persistence/current state are implemented and validated. MVP-007 remains the
-> planned operator-visible telemetry console. Production identity and
-> production readiness remain deferred.
+> persistence/current state are implemented and validated. The MVP-007
+> operator-visible telemetry console has an implementation candidate locally
+> validated on its feature branch and is awaiting review/acceptance. Production
+> identity and production readiness remain deferred.
 
 ## What is PulseGrid?
 
@@ -102,7 +103,7 @@ The decision state and adoption trigger for each technology are maintained in
 
 ## Project status
 
-**Current phase: MVP telemetry console planned**
+**Current phase: MVP telemetry console implementation ready for review**
 
 - Product intent and MVP boundary: documented.
 - Architecture and technology adoption rules: documented.
@@ -115,15 +116,18 @@ The decision state and adoption trigger for each technology are maintained in
   real browser/DB smoke path for development/test only.
 - The MVP-004 local/test MQTT broker and one-shot simulator, MVP-005 telemetry
   ingestion, and MVP-006 bounded PostgreSQL history/current-state projection
-  are implemented and validated. The MVP-007 console consumer remains planned;
-  production identity and production readiness remain deferred.
+  are implemented and validated. MVP-007 now has a section-local console
+  consumer with explicit refresh, bounded history/chart presentation, and a
+  real simulator-to-browser test journey; its branch candidate is validated but
+  not merged. Production identity and production readiness remain deferred.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
   required checks include browser evidence for the real local API readiness
   journey.
 - Production readiness: out of current scope.
 
-Claims in this README should change from planned to implemented only after the
-corresponding behavior has been validated.
+Claims in this README should change from candidate/in progress to complete only
+after the corresponding behavior has been reviewed and accepted; local
+validation alone does not imply merge or production readiness.
 
 ## High-level roadmap
 
