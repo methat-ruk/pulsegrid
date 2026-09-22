@@ -1,14 +1,15 @@
 # MVP-006 — Telemetry and Current-State Projection
 
-Status: In progress
+Status: Complete
 
-Review state: Reviewed on 2026-09-22 against merged MVP-005, the current Go
-composition and telemetry handoff, PostgreSQL migrations/repositories, GraphQL
-contract and complexity controls, dependency pins, integration harnesses, CI
-gates, and downstream MVP-007/MVP-008 needs. The reviewed implementation has
-started within the boundary below. Local final validation has passed, and the
-latest independent re-review found no Blocker or High findings; exact-head CI
-and readiness/acceptance closeout remain in the PR workflow.
+Review state: Implemented, independently re-reviewed, and reconciled on
+2026-09-22 against merged MVP-005, the current Go composition and telemetry
+handoff, PostgreSQL migrations/repositories, GraphQL contract and complexity
+controls, dependency pins, integration harnesses, CI gates, and downstream
+MVP-007/MVP-008 needs. The latest independent re-review found no Blocker or
+High findings; the PR is Ready for review with exact-head CI green. Merge,
+production migration, and production identity/durability approval were not
+performed.
 
 Branch: `feat/mvp-006-telemetry-current-state-projection`
 
@@ -710,15 +711,19 @@ projection/recovery harness, the disposable PostgreSQL/API integration suite,
 and all 17 browser tests. The integration suites exercised migration
 up/down/up and cleanly removed their disposable resources.
 
-This checkpoint is not a closeout claim. Exact-head CI result, independent
-review, merge, production migration, and production identity/durability
-evidence remain open. Startup validation now rejects a pre-005 schema before
+This checkpoint records the completed PR candidate. The latest provider-reported
+PR head has all 14 required GitHub checks green, including the canonical
+PostgreSQL/API integration suite; the latest independent re-review found no
+Blocker or High findings, and PR #15 is Ready for review. Follow-up local
+validation also passed `corepack pnpm run api:test:integration`,
+`corepack pnpm run check:fast`, `node --check scripts/test-api-integration.mjs`,
+and `git diff --check`. Startup validation now rejects a pre-005 schema before
 the listener/ingestion path, and the live MQTT harness proves committed
 normal/duplicate/late/restart projection behavior; persistence-failure
 non-acceptance remains covered at the ingestion consumer-failure boundary and
-is not presented as a production broker replay guarantee. Any remaining
-evidence gap or material behavior change must be recorded before moving this
-plan to `completed/`.
+is not presented as a production broker replay guarantee. Merge, production
+migration, and production identity/durability evidence remain outside this
+closeout and were not performed.
 
 ## Done Criteria
 

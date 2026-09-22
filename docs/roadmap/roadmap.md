@@ -165,7 +165,7 @@ Plans:
 
 - [MVP-004 — MQTT local runtime and simulator](feature-plans/completed/MVP-004-mqtt-local-runtime-and-simulator.md)
 - [MVP-005 — MQTT telemetry ingestion](feature-plans/completed/MVP-005-mqtt-telemetry-ingestion.md)
-- [MVP-006 — Telemetry and current-state projection](feature-plans/planned/MVP-006-telemetry-current-state-projection.md)
+- [MVP-006 — Telemetry and current-state projection](feature-plans/completed/MVP-006-telemetry-current-state-projection.md)
 - [MVP-007 — Telemetry and device-state console](feature-plans/planned/MVP-007-telemetry-device-state-console.md)
 
 ### M3 — Rules and alerts

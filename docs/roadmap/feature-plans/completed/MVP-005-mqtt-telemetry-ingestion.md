@@ -564,7 +564,7 @@ The implementation and closeout updated:
   `apps/api/README.md`, and `docs/project-setup/local-development.md` with the
   new mode, shared broker URL use, startup order, health, logs, and stop/down
   behavior;
-- `docs/roadmap/feature-plans/planned/MVP-006-telemetry-current-state-projection.md`
+- `docs/roadmap/feature-plans/completed/MVP-006-telemetry-current-state-projection.md`
   with the exact accepted-input fields, durable duplicate ownership, and the
   MVP-005 non-durable handoff limitation; and
 - roadmap/feature-plan status and this plan's plan-to-actual evidence. The plan
