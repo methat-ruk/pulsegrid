@@ -1,6 +1,12 @@
 # MVP-006 — Telemetry and Current-State Projection
 
-Status: Planned; depends on the completed MVP-005 local/test ingestion boundary
+Status: Planned
+
+Review state: Reviewed on 2026-09-22 against merged MVP-005, the current Go
+composition and telemetry handoff, PostgreSQL migrations/repositories, GraphQL
+contract and complexity controls, dependency pins, integration harnesses, CI
+gates, and downstream MVP-007/MVP-008 needs. This plan is ready for
+implementation only within the boundary below. No implementation has started.
 
 Branch: `feat/mvp-006-telemetry-current-state-projection`
 
@@ -8,75 +14,629 @@ Intended PR: One backend-state PR
 
 Milestone: M2 — Telemetry and current state
 
+Impact: Material Change (Tier 2). This adds durable tenant-related data,
+idempotent and concurrent write behavior, a derived current-state authority,
+retention and ordering semantics, a migration, and additive GraphQL contracts.
+It remains a local/test MVP slice inside the existing Go process and PostgreSQL
+deployment. It does not add production identity, a new runtime, a new external
+dependency, or a specialized telemetry store.
+
 ## Goal
 
-Persist bounded recent telemetry and maintain a deterministic latest-device
-state from accepted ingestion inputs.
+Replace MVP-005's diagnostic telemetry sink with one transactional consumer
+that stores a bounded set of unique device observations and maintains a
+deterministic current-device-state projection. Expose the current state and a
+bounded recent history through the existing tenant-scoped development GraphQL
+API.
+
+An MQTT delivery is application-accepted only after this consumer commits or
+identifies an exact logical replay as an idempotent no-op. The slice must not
+claim durable delivery for messages dropped or failed before that commit.
+
+## Acceptance Boundary
+
+This PR is complete when a contributor can:
+
+1. start the existing isolated PostgreSQL and Mosquitto dependencies, migrate
+   and seed the database, enable the existing development identity and MQTT
+   ingestion modes, and start the existing API process;
+2. register a device and publish the existing telemetry-v1 message;
+3. query that device's current measurement, selected observation time,
+   selected receive time, and logical last-seen time through GraphQL;
+4. query a deterministic, cursor-paginated recent telemetry history with a
+   default of 50 and a maximum page size of 100;
+5. replay the same device/message pair without creating another history row,
+   advancing last-seen, or changing current state;
+6. submit late and equal-timestamp observations and observe the documented
+   deterministic projection behavior across restart;
+7. prove that another tenant cannot read or influence the device's history or
+   current state; and
+8. observe persistence failure as a processing failure rather than a false
+   `telemetry_accepted` result.
+
+The required runtime path is:
+
+```text
+MVP-005 AcceptedTelemetryConsumer port
+-> telemetry persistence/projection application boundary
+-> one PostgreSQL transaction
+   -> insert or classify logical observation
+   -> update last-seen for a new observation
+   -> conditionally advance current measurement
+   -> enforce the per-device history cap
+-> MVP-005 emits application acceptance after consumer success
+
+development GraphQL principal
+-> tenant-scoped telemetry read interface
+-> PostgreSQL device ownership join
+-> current state or bounded history DTO
+```
 
 ## Why
 
-Operators need evidence of recent behavior and a current state; raw MQTT
-receipt alone is not product value.
+MVP-005 deliberately stops at a synchronous, non-durable consumer port. The
+operator journey and later rule evaluation need restart-safe observation
+history, deterministic latest state, and an API contract that does not confuse
+MQTT delivery metadata with logical telemetry identity.
+
+## Verified Repository Baseline (2026-09-22)
+
+- The worktree was clean before this plan revision. The feature branch,
+  `main`, and locally known `origin/main` all point to `8715e61`, the merged
+  MVP-005 commit. MVP-001 through MVP-005 are recorded complete; MVP-006 is the
+  next dependency in the roadmap.
+- `cmd/api` already opens one PostgreSQL pool/repository whenever development
+  GraphQL or MQTT ingestion is enabled. The enabled MQTT path supplies a
+  validated, tenant-resolved `AcceptedTelemetry` value to a synchronous
+  `AcceptedTelemetryConsumer`; the current consumer is a no-op diagnostic sink.
+- `AcceptedTelemetry` already carries `IngestionID`, producer `MessageID`,
+  registry-authoritative `OrganizationID` and `DeviceID`, `ObservedAt`, queue
+  admission `ReceivedAt`, finite `TemperatureCelsius`, and transport-only
+  `MQTTDuplicate`. The topic tenant is not authoritative.
+- The current MQTT adapter has one worker and a 64-item queue. Broker
+  acknowledgement, queue admission, and registry resolution remain
+  non-durable; queue drops, consumer failures, and process interruption before
+  commit are not replayed automatically.
+- PostgreSQL 18.6, pgx v5.11.0, and Goose v3.28.0 are already selected and
+  pinned. Migrations are embedded SQL, executed explicitly outside API startup,
+  and the existing integration gate exercises up, idempotent up, down, and up.
+- gqlgen v0.17.95 is schema-first with committed generated files, POST-only
+  development exposure, fixed server-selected organization authority, opaque
+  versioned device cursors, a 1–100 list bound, parser/body/response limits, and
+  a fixed operation-complexity limit.
+- The existing MQTT integration harness already starts real PostgreSQL,
+  Mosquitto, the API, and simulator; enables both development identity and
+  ingestion; creates a device over GraphQL; and exercises duplicate, failure,
+  recovery, log-redaction, and shutdown paths. It is the correct end-to-end
+  owner to extend rather than creating another runtime harness.
+- No new third-party dependency is required. `go -C apps/api mod verify`, the
+  repository-policy check, and `corepack pnpm run check:fast` pass on this
+  baseline. Docker-backed, race, build, audit, and browser gates were not run as
+  part of this documentation-only review.
 
 ## Scope
 
-- Add PostgreSQL telemetry and current-state schema/migrations.
-- Persist accepted telemetry with a stable idempotency identifier.
-- Project latest accepted values and last-seen state.
-- Define duplicate and out-of-order timestamp behavior.
-- Add GraphQL read queries for bounded recent telemetry and current state.
+1. Add one forward/backward Goose migration for telemetry observations and the
+   per-device current-state projection, with the constraints and indexes needed
+   for idempotency, projection ordering, tenant-scoped reads, and bounded
+   history.
+2. Add a telemetry persistence/projection package behind the existing
+   `AcceptedTelemetryConsumer` port. Keep pgx and SQL inside this boundary; do
+   not move persistence into MQTT transport, ingestion validation, registry,
+   GraphQL resolvers, or `cmd/api`.
+3. Store each new logical observation and update its current-state projection
+   and per-device retention in one transaction. Exact replay is a successful
+   no-op; message-ID reuse with different logical content is a processing
+   failure.
+4. Retain at most 1,000 logical observations per device: the selected current
+   observation plus the 999 newest other rows by a database-generated internal
+   storage sequence. This is the MVP count bound, not a time-based retention
+   promise.
+5. Add narrow tenant-scoped repository reads for current state and recent
+   history. Keep storage records internal and map them to explicit GraphQL
+   models.
+6. Add additive GraphQL query fields, telemetry/current-state output types, and
+   a telemetry-specific opaque cursor. Bound `first` to 1–100 with a default of
+   50 and update operation-complexity weights for the new fields.
+7. Replace only the no-op consumer composition in `cmd/api`; preserve the
+   existing process, one shared pool, ingestion queue, readiness/liveness,
+   configuration, MQTT contract, and shutdown ownership.
+8. Add unit, race, real-PostgreSQL, GraphQL contract, migration/restart, and
+   real MQTT-to-GraphQL evidence for normal, duplicate, conflict, late,
+   equal-time, concurrent, retention-bound, empty, invalid-cursor, and
+   cross-tenant behavior.
+9. Reconcile the implementation and reviewed plan, complete author
+   self-review/fixes, run final validation, and close out the named project
+   documentation only after actual behavior is proven.
 
 ## Out of Scope
 
-- Permanent high-volume storage choice, Kafka, aggregation, downsampling,
-  retention automation, charts, or rules.
+- Production MQTT, public exposure, device credentials, production identity,
+  RBAC, row-level security, audit, TLS, broker durability, replay, offline
+  buffering, dead letters, or exactly-once delivery claims.
+- Changing the telemetry-v1 topic/payload/AsyncAPI contract, five-minute future
+  skew, input validation rules, Paho/Mosquitto configuration, ingress queue
+  capacity, worker count, readiness, or shutdown policy.
+- A time-based retention period, background retention job, aggregation,
+  downsampling, historical export, arbitrary metric model, long-range
+  analytics, performance/load claims, or permanent high-volume storage choice.
+- Frontend code, charting, refresh/staleness UI policy, subscriptions,
+  WebSockets, polling, cache infrastructure, rules, alerts, or commands.
+- Kafka, Redis, MongoDB, a time-series database, ORM/query builder, generic
+  repository framework, separate worker/service, or new deployment unit.
+- Persisting every MQTT delivery attempt. History stores one logical
+  observation; later delivery attempts retain diagnostic evidence only in the
+  existing bounded logs.
+- Backfill of pre-MVP-006 telemetry. MVP-005 persisted no telemetry, so the
+  additive migration starts empty.
 
 ## Dependencies
 
-- MVP-005.
+- MVP-001 supplies the device/organization authority, PostgreSQL pool,
+  migration runner, and real-store test pattern.
+- MVP-002 supplies the development-only fixed-principal GraphQL boundary,
+  schema generation, cursor/error conventions, complexity controls, and
+  tenant-isolation tests.
+- MVP-005 supplies the accepted application DTO, synchronous consumer port,
+  one-worker MQTT runtime, real-broker harness, and the explicit non-durable
+  pre-commit failure boundary.
+- MVP-007 consumes the GraphQL state/history contract. MVP-008 consumes only a
+  successfully stored logical observation and must not make bounded telemetry
+  retention unbounded; alert history must preserve the triggering context it
+  needs rather than depend on indefinite telemetry-row retention.
+
+No dependency upgrade, new package, environment key, Compose service, or CI
+context is expected. Discovery that correctness requires one is a re-plan
+condition with dependency, rollback, and validation review.
 
 ## Architecture / Boundaries
 
-MVP-005 hands this plan a validated, tenant-resolved `AcceptedTelemetry` value:
-`IngestionID`, producer `MessageID`, registry-authoritative `OrganizationID` and
-`DeviceID`, `ObservedAt`, server `ReceivedAt`, finite
-`TemperatureCelsius`, and transport-only `MQTTDuplicate`. The topic tenant is
-not an authority and must not be persisted as a substitute for the registry
-organization.
+### Ownership and dependency direction
 
-Telemetry history is the accepted-input record; current state is a derived read
-model with a named writer. The device registry remains authoritative for device
-ownership. MVP-005's diagnostic handoff is bounded and non-durable: queue drops,
-registry/consumer failures, process restarts, and transport acknowledgement do
-not produce a durable record. This plan owns the transactional persistence and
-logical `MessageID` idempotency needed to close that gap.
+```text
+cmd/api composition root
+├── device/registry                  organization/device authority
+├── telemetry/ingestion              untrusted input validation and handoff
+├── telemetry/projection             history + current-state write/read owner
+│   └── PostgreSQL                   module-owned tables in the shared database
+├── graph                            tenant-scoped public DTO/contract mapping
+└── telemetry/mqtttransport          unchanged delivery lifecycle
+```
+
+- The registry remains authoritative for device ownership. Telemetry tables
+  reference the globally unique device ID and do not duplicate an
+  independently writable organization authority. Every write and read still
+  receives the server-resolved organization ID and proves the device belongs
+  to that organization at the database boundary.
+- Telemetry history is the durable logical-observation record. Current state is
+  a derived, single-writer read model owned by the telemetry projection
+  boundary. GraphQL cannot mutate either table.
+- `telemetry/projection` may depend on `AcceptedTelemetry` as its input contract
+  and on pgx for storage. Ingestion and MQTT transport must not import the
+  projection package or storage types; `cmd/api` supplies the consumer.
+- GraphQL depends on narrow read interfaces and consumer-safe records, not SQL
+  rows. The API does not expose `OrganizationID`, `IngestionID`,
+  `MQTTDuplicate`, internal row identifiers, or storage errors.
+- The runtime remains one Go process, one PostgreSQL pool, one MQTT client, and
+  one ingestion worker. No service or database deployment boundary changes.
+
+### Durable model and invariants
+
+The migration adds two module-owned tables (names may follow the existing SQL
+naming convention, with `telemetry_observations` and `device_current_state` as
+the reviewed intent):
+
+- one observation row per `(device_id, message_id)`;
+- a database-generated monotonic storage sequence used only for bounded
+  retention and internal references, never as device/event time;
+- the first accepted delivery's `ingestion_id` as unique correlation identity;
+- `observed_at`, first `received_at`, finite `temperature_celsius`, and first
+  delivery's `mqtt_duplicate` diagnostic;
+- one current-state row per device, including the selected observation identity
+  and value, its observed/received times, and `last_seen_at`;
+- foreign keys to the registry device and from current state to its selected
+  observation, non-null checks, non-nil UUID checks, and finite-temperature
+  protection; and
+- indexes matching the exact idempotency lookup, projection/history order, and
+  tenant-scoped device read paths. Indexes must be justified by these queries;
+  no speculative time-series indexes are added.
+
+The migration is additive and has no backfill. Its down migration drops current
+state before history. Down is validated only against disposable local/test
+data; it is not the default rollback after real telemetry exists.
+
+### Logical identity and replay
+
+- Producer `MessageID` is the logical observation identifier only within one
+  registered device. The durable idempotency key is therefore
+  `(DeviceID, MessageID)`, not a global message ID, MQTT packet ID,
+  `IngestionID`, or DUP flag.
+- An exact replay has the same device, message ID, observed time, and
+  temperature. Differences in ingestion ID, receive time, or MQTT DUP are
+  delivery diagnostics and do not make a new logical observation.
+- Exact replay commits no new row and changes neither current state nor
+  `last_seen_at`; it returns success so the ingestion boundary can truthfully
+  report that the logical observation is accepted.
+- Reuse of `(DeviceID, MessageID)` with a different observed time or
+  temperature is a producer contract conflict. It fails safely with a stable
+  diagnostic classification, logs no measurement/raw payload/database detail,
+  and does not mutate history or state.
+
+### Projection order and last-seen semantics
+
+- Current measurement uses the total order `(ObservedAt, MessageID)`, compared
+  ascending; the maximum tuple wins. PostgreSQL UUID order is the tie-breaker
+  when distinct logical observations share the same observed time. This
+  tie-break is deterministic, not a claim that one equal-time value is more
+  physically recent.
+- A strictly older tuple is stored in history but cannot replace the current
+  measurement. A strictly newer tuple advances it. An equal tuple is possible
+  only for the same logical key and follows replay/conflict behavior above.
+- `last_seen_at` is the maximum `ReceivedAt` among newly stored logical
+  observations. A new late observation can advance last-seen without replacing
+  the selected current measurement. Exact replay cannot make a stale device
+  appear newly seen.
+- Current state exposes both the selected observation's `received_at` and the
+  independent `last_seen_at`, so consumers do not infer one meaning from the
+  other. Connectivity/staleness thresholds remain MVP-007 policy and are not
+  stored here.
+
+### Retention and query order
+
+- After a new logical observation, the same transaction retains the selected
+  current observation plus the 999 greatest internal storage sequences for
+  that device excluding that selected row, and removes older rows. This keeps
+  the current-state source valid and makes newly received late observations
+  inspectable without confusing receive order with device observation order.
+- The storage sequence is an internal retention mechanism, not a public
+  timestamp, ordering promise, or cursor. Application acceptance means the
+  bounded persistence policy completed; it does not promise a time period or
+  indefinite row retention.
+- Recent-history GraphQL order is `ObservedAt DESC, MessageID DESC`. Its opaque
+  telemetry cursor encodes exactly that continuation tuple, has a distinct
+  type/version marker from the device cursor, and rejects empty, oversized,
+  malformed, cross-type, or non-canonical values.
+- The 1,000-row cap is an MVP product-learning bound. A time window,
+  aggregation, specialized store, different cap, or retention of alert-linked
+  context requires measured volume/query needs and a reviewed migration.
+
+### Transaction and concurrency
+
+- New-observation insert/classification, conditional projection update,
+  last-seen update, and pruning are one PostgreSQL transaction. Any failure
+  rolls back the complete logical acceptance.
+- Database uniqueness is the final idempotency authority; application
+  pre-checks cannot replace it. Conflicting concurrent inserts must converge on
+  the same exact-replay or contract-conflict result.
+- Projection update uses a conditional database compare on the total-order
+  tuple. Per-device current-state row locking/upsert serializes state/pruning
+  work narrowly; no process-global lock, registry-table write, or unbounded
+  retry loop is introduced.
+- Use the selected engine's default transaction mode only if real-store tests
+  prove the invariant for concurrent order permutations. Otherwise the
+  implementation must document the narrow stronger lock/isolation mechanism
+  before proceeding; weakening the invariant is not an option.
+- Context cancellation or database unavailability before commit is a consumer
+  failure. Because MVP-005 may already have transport-acknowledged the message,
+  recovery is explicit republish with the same logical message ID; automatic
+  replay remains outside this slice.
+
+### GraphQL contract
+
+Add these additive query outcomes to the existing development-only schema:
+
+- `deviceCurrentState(deviceId: ID!): DeviceCurrentState` returns `null` when
+  the tenant-scoped device has no state or is not visible to the principal;
+- `deviceTelemetry(deviceId: ID!, first: Int! = 50, after: String):
+  TelemetryConnection!` returns a bounded ordered connection; missing,
+  cross-tenant, and no-history devices expose no telemetry rows; and
+- current-state and telemetry point types expose only `messageId`,
+  `observedAt`, `receivedAt`, `temperatureCelsius`, plus `lastSeenAt` on current
+  state. Connection edges use the telemetry-specific opaque cursor and existing
+  `PageInfo` shape.
+
+Canonical UUID validation, `first` bounds, cursor errors, safe public errors,
+fixed principal authority, POST/media/body/parser limits, and generated-artifact
+drift rules remain unchanged. Complexity weights must allow the canonical
+single-device MVP-007 query at the maximum page size while rejecting repeated
+aliases/fragments that multiply database or row work. No tenant argument,
+filter/sort builder, total count, arbitrary time range, diagnostic field, or
+mutation is added.
+
+## Security and Failure Model
+
+| Failure or abuse path | Required behavior and control | Evidence | Remaining risk |
+| --- | --- | --- | --- |
+| Cross-tenant read/write attempt | Server principal/registry IDs only; every SQL path proves organization/device association; absent and foreign devices disclose no telemetry | Two-tenant PostgreSQL and GraphQL negative tests | Production auth/RBAC/RLS remain deferred |
+| QoS replay or duplicate publish | Device-scoped unique key; exact replay succeeds without state/last-seen change | Sequential, concurrent, restart, and real-MQTT replay tests | Transport attempts are not retained as an audit log |
+| Message ID reused with different content | Detect conflict, roll back, emit safe stable diagnostic, preserve first logical observation | Real-store conflict tests and log-redaction assertion | Publisher repair is manual in the local fixture |
+| Late or equal-time input | Persist subject to cap; total-order conditional projection; independent last-seen update | Order-permutation and restart tests | Device clocks can still be inaccurate within MVP-005's accepted skew |
+| Database unavailable or transaction canceled | No partial history/state/retention mutation and no false acceptance; readiness already reports dependency unavailable | Fault/cancellation and runtime recovery evidence | Transport-acknowledged message can be lost until manually republished |
+| Concurrent writes race | Database uniqueness and narrow per-device serialization preserve one history row, total-order state, and cap | Race plus real-PostgreSQL concurrent tests | Current runtime has one worker; higher parallelism needs new measurements/review |
+| Unbounded history or query amplification | Hard 1,000 rows/device, page max 100, keyset cursor, selected fields, complexity limit | 1,001+ retention test, page/cursor/complexity contract tests | Overall tenant device count and long-term capacity are not scale-tested |
+| Sensitive diagnostic exposure | GraphQL allowlist; errors/logs omit temperature, payload, SQL, URLs, and credentials | Response/log assertions | Local operators can inspect their own database by design |
+
+## Decisions and Alternatives
+
+### Selected
+
+- Existing PostgreSQL/pgx/Goose/gqlgen stack and modular process; no new
+  dependency or runtime.
+- One transactional projection consumer behind the existing synchronous port.
+- Device-scoped producer message ID for durable idempotency.
+- `(ObservedAt, MessageID)` as the shared total order for projection, query
+  pagination, and deterministic restart behavior; retention separately uses an
+  internal storage sequence while always preserving the selected current row.
+- Separate selected-observation receive time and logical `lastSeenAt`.
+- A hard count cap of 1,000 observations/device, with GraphQL pages defaulting
+  to 50 and capped at 100.
+- Top-level single-device GraphQL read fields rather than nested list fan-out or
+  a second REST API.
+
+### Rejected for this slice
+
+- **Do nothing / keep diagnostic logs:** cannot support restart-safe state,
+  operator reads, or later rule evaluation.
+- **Global `MessageID` uniqueness:** lets another device's UUID collision or
+  misuse suppress a valid observation and makes producer identity broader than
+  its authority.
+- **`ReceivedAt` as current measurement order:** arrival order would let old
+  device observations replace newer device state.
+- **`ObservedAt` without a tie-breaker:** equal timestamps make the result
+  arrival/concurrency dependent and non-deterministic after rebuild.
+- **Update last-seen on replay:** broker redelivery could make a silent device
+  appear active.
+- **Unbounded storage with query-only limits:** violates the MVP's bounded
+  telemetry requirement and hides retention debt.
+- **Time-based retention or background cleanup:** no product period, scheduler,
+  or operational owner exists yet; a transactional count cap is smaller and
+  testable.
+- **Redis idempotency/cache, Kafka, or time-series storage:** PostgreSQL already
+  owns this bounded transactional MVP data; adoption triggers are unmet.
+- **Nested telemetry on every `Device`:** creates an avoidable N+1/amplification
+  path for the existing device list. Dedicated single-device fields match the
+  MVP-007 consumer and are easier to bound.
+
+### Re-plan triggers
+
+- a new dependency, process, database, configuration key, or CI context;
+- a need for production identity/exposure, broker durability, automatic
+  replay, more than one writer/consumer, or more than one metric;
+- inability to preserve transaction, concurrency, idempotency, tenant, or
+  retention invariants with the selected PostgreSQL boundary;
+- a GraphQL shape incompatible with the concrete MVP-007 device-detail journey;
+- alert linkage that requires telemetry rows beyond the reviewed retention
+  policy;
+- measured volume/query latency that challenges the 1,000-row count, selected
+  indexes, one worker, or PostgreSQL choice; or
+- a migration/rollback requirement for non-disposable existing telemetry data.
 
 ## Implementation Direction
 
-Use PostgreSQL for the bounded MVP dataset. Make ordering and deduplication
-rules explicit before optimizing storage. Persist `MessageID` as the logical
-idempotency key, retain `IngestionID` and `ReceivedAt` as delivery diagnostics,
-and define how late/out-of-order `ObservedAt` values affect current state.
+1. Change status to `In progress` only with the first implementation commit.
+   Add migration `005` and integration tests first, including up/down/up on a
+   disposable database, constraints, exact replay, conflicting reuse, and
+   tenant/device ownership.
+2. Add consumer-safe telemetry records, typed persistence errors, and the
+   transactional repository/consumer. Prove order, last-seen, rollback,
+   retention, and concurrent permutations at the real PostgreSQL boundary.
+3. Replace the no-op `cmd/api` consumer with the persistence consumer while
+   preserving one pool and existing lifecycle/readiness behavior. Add safe
+   failure classification without logging raw values.
+4. Add telemetry-specific cursor code and GraphQL read interfaces/types/
+   resolvers. Regenerate committed gqlgen artifacts; calibrate complexity for
+   canonical and amplified operations; keep storage types out of the schema.
+5. Extend GraphQL unit/HTTP/PostgreSQL tests for null/empty, default/min/max
+   page, page continuation, invalid/cross-type cursor, canonical IDs, safe
+   errors, selected fields, tenant isolation, and complexity.
+6. Extend the existing MQTT integration harness to publish normal, exact
+   replay, late, and newer observations; query GraphQL; restart the API; and
+   prove one logical history row, deterministic current state, last-seen,
+   durability, and log redaction. Do not create a competing harness.
+7. Update only the documentation listed below from the behavior and evidence
+   that actually landed. Reconcile requirement/plan to the final diff, perform
+   author self-review and fixes, and rerun final validation.
+8. Open the PR only after local final validation. Inspect required checks on the
+   exact head, complete independent review when required, and move this plan to
+   `completed/` only after implementation, evidence, review, and acceptance
+   support that status.
 
-## Validation
+## Expected File Boundary
 
-- Integration tests cover normal, duplicate, late, and cross-tenant inputs.
-- Projection tests prove a late event cannot incorrectly replace newer state.
-- GraphQL tests prove tenant scope and bounded result size.
-- Migration and restart behavior preserve accepted state.
+Expected new/changed surfaces include:
 
-## Documentation Updates
+- `apps/api/internal/platform/migrations/005_*.sql`;
+- a new `apps/api/internal/telemetry/projection/` package and tests;
+- `apps/api/cmd/api/` composition and lifecycle tests;
+- `apps/api/graph/schema/device.graphqls`, telemetry cursor/resolver/model
+  mappings, generated gqlgen artifacts, server complexity, and contract tests;
+- PostgreSQL/HTTP integration tests and `scripts/mqtt-integration.mjs`;
+- API/local-development, architecture, technology, roadmap, and affected
+  downstream feature-plan documentation named below.
 
-- Document MVP retention bounds and timestamp semantics.
-- Update data ownership and database commands.
+No `go.mod`, `go.sum`, `package.json`, lockfile, environment example, Compose,
+Mosquitto, AsyncAPI, OpenAPI, frontend, browser, registry schema ownership, or
+new CI-context change is expected. A diff outside this boundary needs impact
+review and re-planning when material.
 
-## Risks / Open Decisions
+## Validation Plan
 
-- Exact retention/count bound and timestamp-skew policy.
-- Idempotency key supplied by device versus derived at ingestion.
-- Specialized telemetry storage remains deferred.
+### Static and contract evidence
+
+- Migration review verifies table/constraint/index/down order and confirms no
+  destructive backfill or registry ownership change.
+- GraphQL SDL, generated Go, resolver DTOs, cursor representation, docs, and
+  MVP-007 assumptions agree; generated drift remains zero.
+- Existing format, modernization, Staticcheck, vet, lint, typecheck, build,
+  module verification, dependency audit, OpenAPI, and AsyncAPI checks remain
+  clean. No dependency diff is expected.
+
+### Unit/component evidence
+
+- Pure tests cover total-order comparison, exact replay versus content
+  conflict, late/equal/new state decisions, last-seen semantics, finite values,
+  safe error classification, and context cancellation.
+- Cursor/GraphQL tests cover default 50, explicit 1 and 100, zero/over-limit,
+  first/final page, empty history, malformed/oversized/wrong-type cursor,
+  canonical IDs, output timestamps/numbers, null current state, safe errors,
+  repeated aliases/fragments, and one canonical maximum-page operation.
+- API composition tests prove GraphQL-only, ingestion-only, combined, and
+  disabled modes reuse the existing pool correctly and preserve startup,
+  readiness, drain, and close ordering. Run applicable packages under `-race`.
+
+### Real-boundary integration evidence
+
+- PostgreSQL tests prove constraints, first insert, exact sequential and
+  concurrent replay, content conflict, transaction rollback, new/late/equal
+  order permutations, last-seen monotonicity, 1,000-row retention after 1,001+
+  unique observations, pagination without gaps/duplicates, restart rebuild
+  truth, and two-tenant isolation.
+- Migration evidence runs up, second up, down, and up on disposable data. A
+  populated-database down is destructive and is not presented as a safe
+  operational rollback.
+- The existing real MQTT/PostgreSQL/API/simulator harness proves publish to
+  committed query result, exact replay idempotency, late/new projection,
+  process restart persistence, persistence-failure non-acceptance, and absence
+  of raw telemetry/database details in logs.
+
+### Regression and final gates
+
+- Run targeted checks during implementation, then
+  `corepack pnpm run check:fast` after code/doc integration.
+- Run `corepack pnpm run check` as final local candidate validation. It composes
+  race, build, audits, MQTT, database, API contracts, and browser regressions.
+- Required GitHub checks on the exact PR head remain authoritative. Passing
+  compile/startup, migration, or MQTT PUBACK alone does not prove idempotency,
+  projection, tenant isolation, pagination, retention, or restart behavior.
+- Required real-store, real-MQTT, race, and contract evidence is incomplete if
+  skipped. Report unavailable, failed, skipped, and not-run gates separately.
+
+## Documentation and Closeout
+
+After implementation and evidence are reconciled, update:
+
+- `docs/api/README.md` with GraphQL field/type/bound/cursor semantics,
+  idempotent acceptance, current versus last-seen time, and local query
+  examples;
+- `docs/architecture/system-architecture.md` with implemented history/current
+  ownership, transaction and ordering rules, retained non-durable pre-commit
+  boundary, and data-flow status;
+- `docs/architecture/technology-decisions.md` with PostgreSQL's bounded MVP
+  telemetry use, the 1,000-row count policy, and the measured triggers for a
+  different retention/store decision while leaving time-based retention open;
+- `apps/api/README.md` and `docs/project-setup/local-development.md` with
+  migrate/start/publish/query/restart/troubleshoot steps and rollback warning;
+- `docs/roadmap/feature-plans/planned/MVP-007-telemetry-device-state-console.md`
+  with the delivered GraphQL contract and the fact that UI staleness derives
+  from `lastSeenAt`, not the current observation's time;
+- `docs/roadmap/feature-plans/planned/MVP-008-threshold-rule-alert-backend.md`
+  with the delivered stored-observation handoff and retention-safe triggering
+  context requirement; and
+- this plan, feature-plan index, and roadmap lifecycle/status only when the
+  implementation and merge state justify those changes.
+
+No environment key is expected, so environment strategy/examples change only
+if implementation discovers a real configuration need and the plan is reviewed
+again. Product scope, AsyncAPI, OpenAPI, UI design system, and frontend docs
+change only if actual behavior crosses their ownership boundary.
+
+## Rollback / Containment
+
+- Immediate local containment: set
+  `PULSEGRID_MQTT_INGESTION_MODE=disabled` and restart. This stops new telemetry
+  writes without weakening database/tenant/API invariants; existing reads may
+  remain available in development identity mode.
+- Code rollback: revert the application/GraphQL changes while leaving the
+  additive tables inert. Prefer a forward fix once telemetry exists.
+- Schema down is safe only for explicitly disposable local/test data because it
+  deletes telemetry history and current state. Do not run it against valued
+  data without explicit destructive approval and recovery evidence.
+- If the projection or retention invariant fails, disable ingestion and retain
+  the tables for diagnosis; do not continue accepting writes, delete evidence,
+  relax uniqueness/tenant constraints, or substitute arrival order.
+
+## Engineering Improvement Review
+
+- **Current scope:** device-scoped idempotency, conflicting-key detection,
+  total ordering, independent last-seen semantics, atomic projection/retention,
+  hard data/query bounds, type-specific cursor, complexity calibration,
+  real-store concurrency/tenant evidence, and MQTT-to-GraphQL restart evidence.
+  These are tightly coupled correctness, data-integrity, security,
+  maintainability, and operability requirements for the first durable
+  telemetry slice.
+- **Future enhancements:** production auth/device identity and durable replay;
+  time-based retention/aggregation/specialized storage from measured needs;
+  metrics and parallel consumers from observed pressure; UI refresh/charting in
+  MVP-007; rule/alert processing in MVP-008.
+- **Scope effect:** the work remains one backend-state PR with one additive
+  migration and no new dependency or runtime. Any future item above requires
+  its owning plan and review.
+
+## Final Plan Review (2026-09-22)
+
+### Findings resolved by this revision
+
+- **Blocker:** the original plan left retention, timestamp skew, and
+  idempotency ownership open. MVP-005 already owns future skew and supplies the
+  producer message ID; this plan now selects device-scoped idempotency and an
+  exact 1,000-observation count bound.
+- **Blocker:** current-state behavior for late or equal timestamps was
+  ambiguous. One total order now governs projection, pagination, restart, and
+  concurrent outcomes, while retention separately preserves the current source
+  plus the newest stored inputs.
+- **Blocker:** `last-seen` could have been incorrectly coupled to the selected
+  measurement or advanced by a broker replay. It is now defined independently
+  over new logical observations.
+- **Blocker:** transaction, conflict, concurrency, and partial-failure behavior
+  were unspecified. The plan now requires one atomic transaction, database
+  uniqueness, narrow per-device serialization, rollback, and real-store proof.
+- **Major:** “bounded GraphQL” did not define field shape, tenant behavior,
+  cursor, page bounds, selected fields, or amplification controls. The additive
+  single-device contract and evidence are now explicit.
+- **Major:** the prior validation could pass without concurrency, retention,
+  process restart, real MQTT-to-GraphQL, or migration recovery. The revised
+  matrix assigns each to an existing real boundary and final gate.
+- **Major:** rollback and documentation closeout did not distinguish reversible
+  code containment from destructive schema down. That distinction and the
+  affected downstream plans are now named.
+
+### Remaining non-blocking limitations
+
+- Transport-acknowledged messages can still be lost before database commit;
+  local manual republish with the same logical ID is the recovery path.
+- The 1,000-row bound and one-worker throughput are unmeasured MVP choices with
+  explicit revisit triggers, not capacity or production claims.
+- Equal observed timestamps use an arbitrary but deterministic UUID tie-break;
+  the model has no device sequence number.
+- PostgreSQL remains the bounded MVP store; a retention period and permanent
+  high-volume design intentionally remain open.
+- Development GraphQL and MQTT remain loopback/local-test surfaces without
+  production device or operator authentication.
+
+### Verdict
+
+Plan verdict: **Approved for implementation within the reviewed boundary.**
+
+Reasoning budget: Full for a Material Change (Tier 2).
+
+Confidence: High for current repository state, dependency reuse, ownership,
+contract, and available evidence surfaces; medium for the initial 1,000-row
+product-learning bound, which has no measured production workload and has a
+named revisit trigger.
+
+Implementation must stop for re-planning at any trigger above. This verdict
+does not authorize production deployment, destructive rollback of valued data,
+new infrastructure, or implementation beyond this plan.
 
 ## Done Criteria
 
-Accepted telemetry is deduplicated, tenant scoped, queryable within a documented
-bound, and produces deterministic current state across restart and late input.
+MVP-006 is complete only when the exact reviewed implementation stores each new
+device-scoped logical observation at most once; rejects conflicting reuse;
+atomically maintains the deterministic current measurement, independent
+last-seen, and 1,000-row bound; exposes only tenant-scoped bounded GraphQL
+reads; preserves state across restart and late/concurrent input; passes the
+required unit, race, real-PostgreSQL, real-MQTT, GraphQL, migration, regression,
+and exact-head CI evidence; reconciles plan to actual; completes author and any
+required independent review; updates the named documentation; and reports all
+skipped/unavailable checks and remaining risk without overstating durability,
+scale, security, or production readiness.
