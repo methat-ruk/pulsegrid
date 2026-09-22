@@ -37,7 +37,7 @@
     "api:format": "node scripts/go-format.mjs --write",
     "api:format:check": "node scripts/go-format.mjs",
     "api:lint": "go -C apps/api vet ./...",
-    "api:modernize": "GOFLAGS=-tags=integration go -C apps/api run golang.org/x/tools/go/analysis/passes/modernize/cmd/modernize@v0.48.0 -errorsastype -rangeint -waitgroupgo ./...",
+    "api:modernize": "GOFLAGS=-tags=integration go -C apps/api run golang.org/x/tools/go/analysis/passes/modernize/cmd/modernize@v0.48.0 -errorsastype -forvar -rangeint -stringsseq -waitgroupgo ./...",
     "api:staticcheck": "go -C apps/api run honnef.co/go/tools/cmd/staticcheck@v0.8.0 -tags integration ./...",
     "api:test": "PULSEGRID_ENV=test go -C apps/api test ./...",
     "api:test:race": "PULSEGRID_ENV=test go -C apps/api test -race ./...",

@@ -50,6 +50,14 @@ type ComplexityRoot struct {
 		PageInfo func(childComplexity int) int
 	}
 
+	DeviceCurrentState struct {
+		LastSeenAt         func(childComplexity int) int
+		MessageID          func(childComplexity int) int
+		ObservedAt         func(childComplexity int) int
+		ReceivedAt         func(childComplexity int) int
+		TemperatureCelsius func(childComplexity int) int
+	}
+
 	DeviceEdge struct {
 		Cursor func(childComplexity int) int
 		Node   func(childComplexity int) int
@@ -65,8 +73,27 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Device  func(childComplexity int, id string) int
-		Devices func(childComplexity int, first int, after *string) int
+		Device             func(childComplexity int, id string) int
+		DeviceCurrentState func(childComplexity int, deviceID string) int
+		DeviceTelemetry    func(childComplexity int, deviceID string, first int, after *string) int
+		Devices            func(childComplexity int, first int, after *string) int
+	}
+
+	TelemetryConnection struct {
+		Edges    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
+	}
+
+	TelemetryEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
+	TelemetryPoint struct {
+		MessageID          func(childComplexity int) int
+		ObservedAt         func(childComplexity int) int
+		ReceivedAt         func(childComplexity int) int
+		TemperatureCelsius func(childComplexity int) int
 	}
 }
 
@@ -80,6 +107,8 @@ type MutationResolver interface {
 type QueryResolver interface {
 	Device(ctx context.Context, id string) (*model.Device, error)
 	Devices(ctx context.Context, first int, after *string) (*model.DeviceConnection, error)
+	DeviceCurrentState(ctx context.Context, deviceID string) (*model.DeviceCurrentState, error)
+	DeviceTelemetry(ctx context.Context, deviceID string, first int, after *string) (*model.TelemetryConnection, error)
 }
 
 // endregion ************************** generated!.gotpl **************************
@@ -138,6 +167,37 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.DeviceConnection.PageInfo(childComplexity), true
 
+	case "DeviceCurrentState.lastSeenAt":
+		if e.ComplexityRoot.DeviceCurrentState.LastSeenAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DeviceCurrentState.LastSeenAt(childComplexity), true
+	case "DeviceCurrentState.messageId":
+		if e.ComplexityRoot.DeviceCurrentState.MessageID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DeviceCurrentState.MessageID(childComplexity), true
+	case "DeviceCurrentState.observedAt":
+		if e.ComplexityRoot.DeviceCurrentState.ObservedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DeviceCurrentState.ObservedAt(childComplexity), true
+	case "DeviceCurrentState.receivedAt":
+		if e.ComplexityRoot.DeviceCurrentState.ReceivedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DeviceCurrentState.ReceivedAt(childComplexity), true
+	case "DeviceCurrentState.temperatureCelsius":
+		if e.ComplexityRoot.DeviceCurrentState.TemperatureCelsius == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DeviceCurrentState.TemperatureCelsius(childComplexity), true
+
 	case "DeviceEdge.cursor":
 		if e.ComplexityRoot.DeviceEdge.Cursor == nil {
 			break
@@ -187,6 +247,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Device(childComplexity, args["id"].(string)), true
+	case "Query.deviceCurrentState":
+		if e.ComplexityRoot.Query.DeviceCurrentState == nil {
+			break
+		}
+
+		args, err := ec.field_Query_deviceCurrentState_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.DeviceCurrentState(childComplexity, args["deviceId"].(string)), true
+	case "Query.deviceTelemetry":
+		if e.ComplexityRoot.Query.DeviceTelemetry == nil {
+			break
+		}
+
+		args, err := ec.field_Query_deviceTelemetry_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.DeviceTelemetry(childComplexity, args["deviceId"].(string), args["first"].(int), args["after"].(*string)), true
 	case "Query.devices":
 		if e.ComplexityRoot.Query.Devices == nil {
 			break
@@ -198,6 +280,57 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Devices(childComplexity, args["first"].(int), args["after"].(*string)), true
+
+	case "TelemetryConnection.edges":
+		if e.ComplexityRoot.TelemetryConnection.Edges == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TelemetryConnection.Edges(childComplexity), true
+	case "TelemetryConnection.pageInfo":
+		if e.ComplexityRoot.TelemetryConnection.PageInfo == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TelemetryConnection.PageInfo(childComplexity), true
+
+	case "TelemetryEdge.cursor":
+		if e.ComplexityRoot.TelemetryEdge.Cursor == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TelemetryEdge.Cursor(childComplexity), true
+	case "TelemetryEdge.node":
+		if e.ComplexityRoot.TelemetryEdge.Node == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TelemetryEdge.Node(childComplexity), true
+
+	case "TelemetryPoint.messageId":
+		if e.ComplexityRoot.TelemetryPoint.MessageID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TelemetryPoint.MessageID(childComplexity), true
+	case "TelemetryPoint.observedAt":
+		if e.ComplexityRoot.TelemetryPoint.ObservedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TelemetryPoint.ObservedAt(childComplexity), true
+	case "TelemetryPoint.receivedAt":
+		if e.ComplexityRoot.TelemetryPoint.ReceivedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TelemetryPoint.ReceivedAt(childComplexity), true
+	case "TelemetryPoint.temperatureCelsius":
+		if e.ComplexityRoot.TelemetryPoint.TemperatureCelsius == nil {
+			break
+		}
+
+		return e.ComplexityRoot.TelemetryPoint.TemperatureCelsius(childComplexity), true
 
 	}
 	return 0, false
@@ -326,6 +459,22 @@ func (ec *executionContext) childFields_DeviceConnection(ctx context.Context, fi
 	return nil, fmt.Errorf("no field named %q was found under type DeviceConnection", field.Name)
 }
 
+func (ec *executionContext) childFields_DeviceCurrentState(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "messageId":
+		return ec.fieldContext_DeviceCurrentState_messageId(ctx, field)
+	case "observedAt":
+		return ec.fieldContext_DeviceCurrentState_observedAt(ctx, field)
+	case "receivedAt":
+		return ec.fieldContext_DeviceCurrentState_receivedAt(ctx, field)
+	case "temperatureCelsius":
+		return ec.fieldContext_DeviceCurrentState_temperatureCelsius(ctx, field)
+	case "lastSeenAt":
+		return ec.fieldContext_DeviceCurrentState_lastSeenAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type DeviceCurrentState", field.Name)
+}
+
 func (ec *executionContext) childFields_DeviceEdge(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "cursor":
@@ -344,6 +493,40 @@ func (ec *executionContext) childFields_PageInfo(ctx context.Context, field grap
 		return ec.fieldContext_PageInfo_hasNextPage(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
+}
+
+func (ec *executionContext) childFields_TelemetryConnection(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "edges":
+		return ec.fieldContext_TelemetryConnection_edges(ctx, field)
+	case "pageInfo":
+		return ec.fieldContext_TelemetryConnection_pageInfo(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type TelemetryConnection", field.Name)
+}
+
+func (ec *executionContext) childFields_TelemetryEdge(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "cursor":
+		return ec.fieldContext_TelemetryEdge_cursor(ctx, field)
+	case "node":
+		return ec.fieldContext_TelemetryEdge_node(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type TelemetryEdge", field.Name)
+}
+
+func (ec *executionContext) childFields_TelemetryPoint(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "messageId":
+		return ec.fieldContext_TelemetryPoint_messageId(ctx, field)
+	case "observedAt":
+		return ec.fieldContext_TelemetryPoint_observedAt(ctx, field)
+	case "receivedAt":
+		return ec.fieldContext_TelemetryPoint_receivedAt(ctx, field)
+	case "temperatureCelsius":
+		return ec.fieldContext_TelemetryPoint_temperatureCelsius(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type TelemetryPoint", field.Name)
 }
 
 func (ec *executionContext) childFields___Directive(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -487,6 +670,50 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		return nil, err
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_deviceCurrentState_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "deviceId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["deviceId"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_deviceTelemetry_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "deviceId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["deviceId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "first",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "after",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg2
 	return args, nil
 }
 
@@ -742,6 +969,121 @@ func (ec *executionContext) fieldContext_DeviceConnection_pageInfo(_ context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _DeviceCurrentState_messageId(ctx context.Context, field graphql.CollectedField, obj *model.DeviceCurrentState) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_DeviceCurrentState_messageId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MessageID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_DeviceCurrentState_messageId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("DeviceCurrentState", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _DeviceCurrentState_observedAt(ctx context.Context, field graphql.CollectedField, obj *model.DeviceCurrentState) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_DeviceCurrentState_observedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ObservedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_DeviceCurrentState_observedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("DeviceCurrentState", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
+func (ec *executionContext) _DeviceCurrentState_receivedAt(ctx context.Context, field graphql.CollectedField, obj *model.DeviceCurrentState) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_DeviceCurrentState_receivedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ReceivedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_DeviceCurrentState_receivedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("DeviceCurrentState", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
+func (ec *executionContext) _DeviceCurrentState_temperatureCelsius(ctx context.Context, field graphql.CollectedField, obj *model.DeviceCurrentState) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_DeviceCurrentState_temperatureCelsius(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TemperatureCelsius, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_DeviceCurrentState_temperatureCelsius(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("DeviceCurrentState", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _DeviceCurrentState_lastSeenAt(ctx context.Context, field graphql.CollectedField, obj *model.DeviceCurrentState) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_DeviceCurrentState_lastSeenAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LastSeenAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_DeviceCurrentState_lastSeenAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("DeviceCurrentState", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
 func (ec *executionContext) _DeviceEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.DeviceEdge) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -975,6 +1317,94 @@ func (ec *executionContext) fieldContext_Query_devices(ctx context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_deviceCurrentState(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_deviceCurrentState(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().DeviceCurrentState(ctx, fc.Args["deviceId"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.DeviceCurrentState) graphql.Marshaler {
+			return ec.marshalODeviceCurrentState2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐDeviceCurrentState(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Query_deviceCurrentState(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_DeviceCurrentState(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_deviceCurrentState_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_deviceTelemetry(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_deviceTelemetry(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().DeviceTelemetry(ctx, fc.Args["deviceId"].(string), fc.Args["first"].(int), fc.Args["after"].(*string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.TelemetryConnection) graphql.Marshaler {
+			return ec.marshalNTelemetryConnection2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐTelemetryConnection(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_deviceTelemetry(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_TelemetryConnection(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_deviceTelemetry_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1049,6 +1479,217 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 		},
 	}
 	return fc, nil
+}
+
+func (ec *executionContext) _TelemetryConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.TelemetryConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_TelemetryConnection_edges(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Edges, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.TelemetryEdge) graphql.Marshaler {
+			return ec.marshalNTelemetryEdge2ᚕᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐTelemetryEdgeᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_TelemetryConnection_edges(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TelemetryConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_TelemetryEdge(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TelemetryConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.TelemetryConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_TelemetryConnection_pageInfo(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PageInfo, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.PageInfo) graphql.Marshaler {
+			return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐPageInfo(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_TelemetryConnection_pageInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TelemetryConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_PageInfo(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TelemetryEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.TelemetryEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_TelemetryEdge_cursor(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Cursor, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_TelemetryEdge_cursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("TelemetryEdge", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _TelemetryEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.TelemetryEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_TelemetryEdge_node(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Node, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.TelemetryPoint) graphql.Marshaler {
+			return ec.marshalNTelemetryPoint2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐTelemetryPoint(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_TelemetryEdge_node(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TelemetryEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_TelemetryPoint(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TelemetryPoint_messageId(ctx context.Context, field graphql.CollectedField, obj *model.TelemetryPoint) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_TelemetryPoint_messageId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MessageID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_TelemetryPoint_messageId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("TelemetryPoint", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _TelemetryPoint_observedAt(ctx context.Context, field graphql.CollectedField, obj *model.TelemetryPoint) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_TelemetryPoint_observedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ObservedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_TelemetryPoint_observedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("TelemetryPoint", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
+func (ec *executionContext) _TelemetryPoint_receivedAt(ctx context.Context, field graphql.CollectedField, obj *model.TelemetryPoint) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_TelemetryPoint_receivedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ReceivedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_TelemetryPoint_receivedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("TelemetryPoint", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
+func (ec *executionContext) _TelemetryPoint_temperatureCelsius(ctx context.Context, field graphql.CollectedField, obj *model.TelemetryPoint) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_TelemetryPoint_temperatureCelsius(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TemperatureCelsius, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_TelemetryPoint_temperatureCelsius(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("TelemetryPoint", field, false, false, errors.New("field of type Float does not have child fields"))
 }
 
 func (ec *executionContext) ___Directive_name(ctx context.Context, field graphql.CollectedField, obj *introspection.Directive) (ret graphql.Marshaler) {
@@ -2251,6 +2892,64 @@ func (ec *executionContext) _DeviceConnection(ctx context.Context, sel ast.Selec
 	return out
 }
 
+var deviceCurrentStateImplementors = []string{"DeviceCurrentState"}
+
+func (ec *executionContext) _DeviceCurrentState(ctx context.Context, sel ast.SelectionSet, obj *model.DeviceCurrentState) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, deviceCurrentStateImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DeviceCurrentState")
+		case "messageId":
+			out.Values[i] = ec._DeviceCurrentState_messageId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "observedAt":
+			out.Values[i] = ec._DeviceCurrentState_observedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "receivedAt":
+			out.Values[i] = ec._DeviceCurrentState_receivedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "temperatureCelsius":
+			out.Values[i] = ec._DeviceCurrentState_temperatureCelsius(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lastSeenAt":
+			out.Values[i] = ec._DeviceCurrentState_lastSeenAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
 var deviceEdgeImplementors = []string{"DeviceEdge"}
 
 func (ec *executionContext) _DeviceEdge(ctx context.Context, sel ast.SelectionSet, obj *model.DeviceEdge) graphql.Marshaler {
@@ -2449,6 +3148,50 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "deviceCurrentState":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_deviceCurrentState(ctx, field)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "deviceTelemetry":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_deviceTelemetry(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -2462,6 +3205,145 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			})
 			if out.Values[i] == graphql.RequiredNull {
 				atomic.AddUint32(&out.Invalids, 1)
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var telemetryConnectionImplementors = []string{"TelemetryConnection"}
+
+func (ec *executionContext) _TelemetryConnection(ctx context.Context, sel ast.SelectionSet, obj *model.TelemetryConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, telemetryConnectionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TelemetryConnection")
+		case "edges":
+			out.Values[i] = ec._TelemetryConnection_edges(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pageInfo":
+			out.Values[i] = ec._TelemetryConnection_pageInfo(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var telemetryEdgeImplementors = []string{"TelemetryEdge"}
+
+func (ec *executionContext) _TelemetryEdge(ctx context.Context, sel ast.SelectionSet, obj *model.TelemetryEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, telemetryEdgeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TelemetryEdge")
+		case "cursor":
+			out.Values[i] = ec._TelemetryEdge_cursor(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "node":
+			out.Values[i] = ec._TelemetryEdge_node(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var telemetryPointImplementors = []string{"TelemetryPoint"}
+
+func (ec *executionContext) _TelemetryPoint(ctx context.Context, sel ast.SelectionSet, obj *model.TelemetryPoint) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, telemetryPointImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TelemetryPoint")
+		case "messageId":
+			out.Values[i] = ec._TelemetryPoint_messageId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "observedAt":
+			out.Values[i] = ec._TelemetryPoint_observedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "receivedAt":
+			out.Values[i] = ec._TelemetryPoint_receivedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "temperatureCelsius":
+			out.Values[i] = ec._TelemetryPoint_temperatureCelsius(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -2943,6 +3825,22 @@ func (ec *executionContext) marshalNDeviceEdge2ᚖgithubᚗcomᚋmethatᚑrukᚋ
 	return ec._DeviceEdge(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v any) (float64, error) {
+	res, err := graphql.UnmarshalFloatContext(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNFloat2float64(ctx context.Context, sel ast.SelectionSet, v float64) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalFloatContext(v)
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return graphql.WrapContextMarshaler(ctx, res)
+}
+
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v any) (string, error) {
 	res, err := graphql.UnmarshalID(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -2999,6 +3897,52 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNTelemetryConnection2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐTelemetryConnection(ctx context.Context, sel ast.SelectionSet, v *model.TelemetryConnection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TelemetryConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNTelemetryEdge2ᚕᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐTelemetryEdgeᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.TelemetryEdge) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNTelemetryEdge2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐTelemetryEdge(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNTelemetryEdge2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐTelemetryEdge(ctx context.Context, sel ast.SelectionSet, v *model.TelemetryEdge) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TelemetryEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNTelemetryPoint2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐTelemetryPoint(ctx context.Context, sel ast.SelectionSet, v *model.TelemetryPoint) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TelemetryPoint(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNTime2timeᚐTime(ctx context.Context, v any) (time.Time, error) {
@@ -3192,6 +4136,13 @@ func (ec *executionContext) marshalODevice2ᚖgithubᚗcomᚋmethatᚑrukᚋpuls
 		return graphql.Null
 	}
 	return ec._Device(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalODeviceCurrentState2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐDeviceCurrentState(ctx context.Context, sel ast.SelectionSet, v *model.DeviceCurrentState) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._DeviceCurrentState(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v any) (*string, error) {

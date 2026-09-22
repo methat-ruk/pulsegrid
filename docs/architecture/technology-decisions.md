@@ -42,8 +42,8 @@ or immediately required dependency.
 | Native browser `fetch` with a feature-scoped typed GraphQL client | Selected — MVP | MVP-003 needs one bounded device journey; avoid a cache/SSR/client-runtime dependency until shared cache, polling, or schema-scale evidence justifies it |
 | Apache ECharts | Selected — MVP | Added when the telemetry console has a concrete chart requirement |
 | GraphQL and gqlgen | Selected — MVP | Concrete device and operator API boundary; MVP-002 pins gqlgen `v0.17.95` and keeps the SDL as source of truth |
-| PostgreSQL 18.6 | Selected — MVP | Transactional authority for the MVP-001 organization/device registry; local and CI targets are pinned and isolated |
-| pgx v5 | Selected — MVP | Direct parameterized Go PostgreSQL driver and bounded pool for the registry boundary |
+| PostgreSQL 18.6 | Selected — MVP | Transactional authority for the MVP-001 organization/device registry and MVP-006 bounded telemetry/current-state projection; local and CI targets are pinned and isolated |
+| pgx v5 | Selected — MVP | Direct parameterized Go PostgreSQL driver and bounded pool for registry and telemetry projection boundaries |
 | Goose v3 SQL migrations | Selected — MVP | Explicit versioned SQL migrations with session locking; migration execution remains outside API startup |
 | MQTT 3.1.1 | Selected — MVP | MVP-004 and MVP-005 use QoS 1, non-retained telemetry over loopback TCP; durable duplicate handling remains with MVP-006 |
 | Eclipse Mosquitto 2.1.2 | Selected — MVP | Reviewed for the MVP-004 local/test broker and pinned by multi-platform image digest; production broker product/topology remains open |
@@ -163,6 +163,35 @@ different session/delivery needs, a patched image changes the risk decision,
 or broker operations become an owned production capability. The feature plan
 and current repository state own the implementation status; this record
 preserves the selected boundary and its revisit triggers.
+
+## MVP-006 bounded telemetry projection decision
+
+MVP-006 reuses the existing PostgreSQL 18.6, pgx, Goose, and gqlgen stack inside
+the existing Go modular process. It adds a compact append-only logical
+identity-authority table, a bounded observation-history table, and one derived
+current-state table, with no new dependency, service, broker, or configuration
+key. A single transaction inserts/classifies a logical
+`(device_id,message_id)`, conditionally advances current state by
+`(observed_at,message_id)`, updates independent `last_seen_at`, and enforces a
+1,000-observation-per-device history count bound. The selected current
+observation is always retained even when bounded history is pruned.
+
+The history count bound is an MVP product-learning mechanism, not a
+time-retention policy or permanent high-volume storage choice. The identity
+authority deliberately has no deletion policy in this MVP so the replay/conflict
+guarantee survives history pruning; its compact per-message growth is an
+explicit capacity trade-off and future retention/compaction requires a new
+reviewed contract. Recent GraphQL history uses a bounded keyset cursor ordered
+by `observedAt DESC, messageId DESC`; exact replay does not advance state or
+last-seen, and conflicting message-ID reuse fails without partial mutation. The
+API exposes only tenant-scoped development/test read fields and keeps
+ingestion/delivery identifiers internal.
+
+Revisit PostgreSQL, the count bound, or the storage shape when measured volume,
+retention period, aggregation, query latency, independent consumers, replay, or
+alert-linkage requirements exceed this local transactional boundary. A
+specialized time-series store, Redis idempotency layer, Kafka flow, or service
+split still requires its own evidence-backed adoption plan.
 
 ## Foundation selection evidence
 

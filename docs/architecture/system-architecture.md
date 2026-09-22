@@ -13,11 +13,12 @@ by the [roadmap](../roadmap/roadmap.md).
 ## Current state
 
 The Go/Fiber API is implemented and validated as one modular process with
-lifecycle, health, development-only GraphQL device endpoints, and the
-local/test MVP-005 MQTT telemetry consumer. MVP-003 adds the first
+lifecycle, health, development-only GraphQL device endpoints, the local/test
+MVP-005 MQTT telemetry consumer, and the MVP-006 local/test telemetry
+history/current-state projection on the feature branch. MVP-003 adds the first
 device-registry operator journey and a fixed same-origin Nuxt GraphQL transport
 adapter backed by the MVP-001 organization/device registry. Production
-identity, deployment exposure, telemetry persistence, and later event
+identity, deployment exposure, durable broker replay, and later event
 contracts remain unimplemented.
 
 Architecture diagrams below describe an intended sequence of evolution. They
@@ -94,7 +95,7 @@ process:
 ```text
 Mosquitto -> Paho adapter -> 64-item queue -> one worker
           -> strict topic/payload boundary -> registry resolution
-          -> diagnostic AcceptedTelemetry consumer -> safe structured log
+          -> AcceptedTelemetry handoff -> diagnostic sink (MVP-005 boundary)
 ```
 
 The Paho adapter copies delivery metadata and payload bytes before non-blocking
@@ -108,6 +109,46 @@ This handoff is intentionally non-durable: broker acknowledgement, enqueue
 success, and registry lookup are not application persistence. Queue saturation,
 registry failures, and consumer failures are explicit diagnostics, and a broker
 outage degrades readiness while bounded Paho reconnect/resubscribe proceeds.
+
+### MVP-006 telemetry persistence and current state
+
+MVP-006 replaces the diagnostic sink at the accepted-telemetry port with a
+PostgreSQL projection consumer in the same API process:
+
+```text
+AcceptedTelemetry
+-> one transaction
+   -> append-only device-scoped identity classification
+   -> bounded history insert for a new logical observation
+   -> current measurement compare by (ObservedAt, MessageID)
+   -> independent LastSeenAt maximum for new logical observations
+   -> selected current row + newest stored rows retained (max 1,000/device)
+-> telemetry_accepted log after commit or exact replay
+```
+
+The append-only identity authority is the durable logical-observation and
+conflict record; telemetry history is a bounded inspection view over newly
+accepted observations. Pruning history cannot make a replay or conflicting
+message-ID reuse look new. Current state is a derived read model with one
+projection writer. Exact replay is a successful no-op that does not advance
+state or last-seen. Reusing a logical ID with a different observed time or
+temperature is a conflict and rolls back without a partial write. PostgreSQL
+`timestamptz` values are normalized to its microsecond storage precision before
+logical replay comparison. The identity table is intentionally append-only in
+this MVP; its one compact row per accepted logical message is the explicit
+capacity trade-off for the durable replay guarantee.
+
+The API validates the required telemetry tables and columns before opening the
+development listener or MQTT subscription. A database below migration 005 is
+classified as `database_schema_unavailable` and fails startup rather than
+reporting readiness for an unusable telemetry path.
+
+The development GraphQL API exposes only bounded, tenant-scoped reads:
+`deviceCurrentState` and `deviceTelemetry` (default 50, maximum 100) with a
+telemetry-specific keyset cursor ordered by `observedAt DESC, messageId DESC`.
+It does not expose ingestion IDs, MQTT duplicate metadata, storage sequence,
+or organization authority. A database failure before commit is a processing
+failure; MQTT transport acknowledgement does not provide automatic replay.
 
 ## Conditional target architecture
 
@@ -156,7 +197,7 @@ ownership evidence identifies a separate scaling or failure unit.
 | Device registry | Device identity, tenant association, profile basics, lifecycle state | Telemetry history, alerts, command execution |
 | MQTT transport adapter | Paho connect/subscribe/reconnect, bounded admission, connection readiness, and shutdown drain | Tenant authority, payload business rules, persistence, retries, or projection |
 | Telemetry ingestion | MQTT input validation, device resolution, ingestion metadata, and the `AcceptedTelemetry` consumer port | Long-term analytics, persistence, current-state projection, or rule policy |
-| Device state | Latest accepted measurements, connectivity, last-seen projection | Device ownership or command state |
+| Device state / telemetry projection | Bounded telemetry history, latest measurement, and last-seen projection | Device ownership or command state |
 | Rules and alerts | Limited threshold definitions, evaluation result, alert lifecycle | General workflow automation |
 | Commands | Command intent, valid state transitions, delivery/ACK/result/timeout state | Device profile or transport-wide policy |
 | API/BFF | GraphQL contract and composition for the console | Direct ownership of domain persistence |
@@ -238,6 +279,16 @@ Telemetry retention must be deliberately bounded for the MVP. The initial
 schema is a product-learning mechanism, not a permanent high-volume storage
 decision.
 
+MVP-006 implements that boundary with a maximum of 1,000 logical history
+observations per device. The append-only durable identity key is
+`(device_id, message_id)` and stores the canonical observed time/value needed
+for replay/conflict classification after history pruning. Current measurement
+ordering is `(observed_at, message_id)` and `last_seen_at` is tracked separately
+from the selected measurement. GraphQL history is bounded and keyset-paginated;
+identity-authority growth is explicit and unbounded in this MVP, while
+time-based history retention, aggregation, and specialized storage remain open
+until volume and query evidence justify them.
+
 ### Conditional specialization
 
 - MongoDB remains a target option for heterogeneous device profiles and
@@ -283,10 +334,12 @@ Retries must be bounded. A retry must not create a second logical command or a
 second alert for the same accepted input. Exact delivery guarantees are defined
 by each feature plan and validated at the boundary where the behavior exists.
 
-MVP-005 deliberately stops before persistence: it logs diagnostic acceptance
-after tenant resolution and passes the validated `AcceptedTelemetry` shape to
-the next module boundary. MVP-006 owns durable idempotency by `messageId`,
-transactional history, and current-state ordering.
+MVP-005 deliberately stops at the validated `AcceptedTelemetry` handoff. The
+MVP-006 projection consumer owns device-scoped durable idempotency,
+transactional history, current-state ordering, independent last-seen, and the
+bounded retention policy. A transport-acknowledged message can still be lost
+before this transaction commits; local recovery is explicit republish rather
+than an automatic broker replay guarantee.
 
 Kafka retry and dead-letter mechanisms are Post-MVP concerns because the MVP
 does not yet have a Kafka boundary.

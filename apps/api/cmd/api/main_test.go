@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/device/registry"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/telemetry/projection"
 )
 
 func TestStartupFailureDetailsClassifySafeActionableMessages(t *testing.T) {
@@ -51,5 +52,13 @@ func TestStartupFailureDetailsDoNotExposeUnderlyingError(t *testing.T) {
 	_, message := startupFailureDetails(failure)
 	if message != "development database is unavailable" {
 		t.Fatalf("startup message = %q, want safe message", message)
+	}
+}
+
+func TestClassifyTelemetrySchemaFailureUsesSafeSchemaAction(t *testing.T) {
+	failure := classifyTelemetrySchemaFailure(projection.ErrSchemaUnavailable)
+	code, message := startupFailureDetails(failure)
+	if code != startupDatabaseSchemaUnavailable || message != "development database schema is unavailable; run migrations" {
+		t.Fatalf("telemetry schema failure details = (%q, %q)", code, message)
 	}
 }

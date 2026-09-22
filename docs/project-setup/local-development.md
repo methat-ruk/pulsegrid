@@ -2,7 +2,9 @@
 
 Status: Local repository workflow and merge-gate enforcement implemented;
 FND-004 readiness, the MVP-003 device-registry browser journey, and the
-MVP-005 local/test MQTT ingestion path are implemented and locally validated.
+MVP-005 local/test MQTT ingestion path are implemented and locally validated;
+MVP-006 telemetry persistence/current-state implementation is in progress on
+the feature branch with real PostgreSQL and MQTT-to-GraphQL evidence.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
@@ -145,19 +147,27 @@ corepack pnpm run dev:api
 ```
 
 Check `GET /health/ready` for `200`/`ready`; the enabled API is ready only when
-PostgreSQL is reachable and its MQTT subscription is connected. Publish with
-`mqtt:simulator` and inspect the API log for `reason_code=telemetry_accepted`.
-The log exposes correlation and registry IDs but never the raw payload or
-temperature. Invalid, retained, unknown-device, wrong-tenant, oversized, and
-future-skewed messages are rejected with stable reason codes. Stop with
-`Ctrl-C`; the API stops admission, drains its bounded queue, and then closes
-the database pool.
+PostgreSQL is reachable, the required MVP-006 schema was validated before
+listening, and its MQTT subscription is connected. A database below migration
+005 fails startup with `database_schema_unavailable` rather than exposing a
+partially usable telemetry API. Publish with
+`mqtt:simulator`, query `deviceCurrentState` and `deviceTelemetry`, and inspect
+the API log for `reason_code=telemetry_accepted`. The log exposes correlation
+and registry IDs but never the raw payload or temperature. Invalid, retained,
+unknown-device, wrong-tenant, oversized, and future-skewed messages are
+rejected with stable reason codes. Exact replay does not add a history row or
+advance `lastSeenAt`, including after the bounded history row has been pruned;
+late observations remain queryable but cannot replace a newer
+`(observedAt,messageId)` state. Stop with `Ctrl-C`; the API stops
+admission, drains its bounded queue, and then closes the database pool.
 
 Run the real API/broker/database integration evidence with a unique Compose
 project. It registers a device through GraphQL, publishes with the real
-simulator, checks strict rejection and duplicate semantics, exercises retained
-input and readiness recovery across broker stop/start, signals the API for
-drain, and removes only its own disposable resources on success or failure:
+simulator, verifies committed current state and bounded history through
+GraphQL, checks strict rejection, exact replay, and late-observation semantics,
+exercises retained input and readiness recovery across broker stop/start,
+signals the API for drain, and removes only its own disposable resources on
+success or failure:
 
 ```sh
 corepack pnpm run mqtt:test:integration

@@ -27,6 +27,12 @@ const GraphQLPath = "/graphql"
 // It deliberately registers only POST JSON and does not enable subscriptions,
 // GET, multipart uploads, APQ, or playground endpoints.
 func NewHandler(repository DeviceRepository, organizationID uuid.UUID, logger *slog.Logger) (http.Handler, error) {
+	return NewHandlerWithTelemetry(repository, nil, organizationID, logger)
+}
+
+// NewHandlerWithTelemetry constructs the development GraphQL transport with
+// the additive telemetry read boundary enabled.
+func NewHandlerWithTelemetry(repository DeviceRepository, telemetryRepository TelemetryRepository, organizationID uuid.UUID, logger *slog.Logger) (http.Handler, error) {
 	if repository == nil {
 		return nil, errors.New("graphql handler requires a device repository")
 	}
@@ -37,11 +43,20 @@ func NewHandler(repository DeviceRepository, organizationID uuid.UUID, logger *s
 		logger = slog.Default()
 	}
 
-	config := Config{Resolvers: NewResolver(repository, organizationID)}
+	config := Config{Resolvers: NewResolverWithTelemetry(repository, telemetryRepository, organizationID)}
 	config.Complexity.Query.Device = func(childComplexity int, id string) int {
 		return 1 + childComplexity
 	}
 	config.Complexity.Query.Devices = func(childComplexity int, first int, after *string) int {
+		if first < 1 {
+			return childComplexity + 1
+		}
+		return 1 + (first * childComplexity)
+	}
+	config.Complexity.Query.DeviceCurrentState = func(childComplexity int, deviceID string) int {
+		return 1 + childComplexity
+	}
+	config.Complexity.Query.DeviceTelemetry = func(childComplexity int, deviceID string, first int, after *string) int {
 		if first < 1 {
 			return childComplexity + 1
 		}
@@ -88,7 +103,7 @@ func acceptsGraphQLResponse(raw string) bool {
 	var exactFound bool
 	var applicationWildcardFound bool
 	var wildcardFound bool
-	for _, item := range strings.Split(raw, ",") {
+	for item := range strings.SplitSeq(raw, ",") {
 		item = strings.TrimSpace(item)
 		if item == "" {
 			return false

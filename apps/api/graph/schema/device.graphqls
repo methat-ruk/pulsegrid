@@ -22,6 +22,31 @@ type DeviceConnection {
   pageInfo: PageInfo!
 }
 
+type DeviceCurrentState {
+  messageId: ID!
+  observedAt: Time!
+  receivedAt: Time!
+  temperatureCelsius: Float!
+  lastSeenAt: Time!
+}
+
+type TelemetryPoint {
+  messageId: ID!
+  observedAt: Time!
+  receivedAt: Time!
+  temperatureCelsius: Float!
+}
+
+type TelemetryEdge {
+  cursor: String!
+  node: TelemetryPoint!
+}
+
+type TelemetryConnection {
+  edges: [TelemetryEdge!]!
+  pageInfo: PageInfo!
+}
+
 input CreateDeviceInput {
   deviceKey: String!
   displayName: String!
@@ -30,6 +55,8 @@ input CreateDeviceInput {
 type Query {
   device(id: ID!): Device
   devices(first: Int! = 20, after: String): DeviceConnection!
+  deviceCurrentState(deviceId: ID!): DeviceCurrentState
+  deviceTelemetry(deviceId: ID!, first: Int! = 50, after: String): TelemetryConnection!
 }
 
 type Mutation {
