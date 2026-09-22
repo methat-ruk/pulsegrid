@@ -675,8 +675,9 @@ new infrastructure, or implementation beyond this plan.
 
 ## Implementation Checkpoint and Plan-to-Actual Reconciliation (2026-09-22)
 
-The implementation is recorded in commit `42e114e` on the feature branch and
-is pushed to the open Draft PR #15. The changed surfaces stay inside the
+The implementation is recorded in commits `42e114e` and review-fix commit
+`82227de` on the feature branch, with `82227de` pushed as the current head of
+open Draft PR #15. The changed surfaces stay inside the
 reviewed boundary: migration `005`, the telemetry projection package and
 real-store tests, API composition, additive GraphQL schema/resolvers/cursors
 and generated artifacts, GraphQL tests, the existing MQTT integration harness,
