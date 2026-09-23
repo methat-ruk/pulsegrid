@@ -559,7 +559,7 @@ After implementation and evidence are reconciled, update:
   different retention/store decision while leaving time-based retention open;
 - `apps/api/README.md` and `docs/project-setup/local-development.md` with
   migrate/start/publish/query/restart/troubleshoot steps and rollback warning;
-- `docs/roadmap/feature-plans/planned/MVP-007-telemetry-device-state-console.md`
+- `docs/roadmap/feature-plans/completed/MVP-007-telemetry-device-state-console.md`
   with the delivered GraphQL contract and the fact that UI staleness derives
   from `lastSeenAt`, not the current observation's time;
 - `docs/roadmap/feature-plans/planned/MVP-008-threshold-rule-alert-backend.md`

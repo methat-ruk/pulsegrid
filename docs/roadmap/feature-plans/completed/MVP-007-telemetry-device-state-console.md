@@ -1,13 +1,11 @@
 # MVP-007 — Telemetry and Device-State Console
 
-Status: Ready for review
+Status: Complete
 
-Review state: Implemented, self-reviewed, and locally validated on 2026-09-22
-against merged MVP-003 and MVP-006, the current Nuxt device-detail route and
-feature-scoped GraphQL client, the delivered telemetry GraphQL contract, the
-installed package/lock state, the browser runner and CI job, the UI design
-system, and the M2 acceptance boundary. The implementation candidate is ready
-for independent review; no PR merge or completion move is claimed.
+Review state: The latest PR #16 review findings are addressed and verified.
+The user accepted the candidate as ready to merge and authorized this plan's
+completion move; the PR remains open and unmerged as requested. See the
+2026-09-23 post-review closeout below.
 
 Branch: `feat/mvp-007-telemetry-device-state-console`
 
@@ -249,6 +247,9 @@ change, or material transitive/advisory finding is a re-plan condition.
   While refreshing, preserve previously rendered data and expose a non-blocking
   `Refreshing telemetry…` status. On failure, preserve the prior successful
   data, show a retryable refresh error, and never claim it was updated.
+- Disable `Load more` while refreshing and retain a guard in its handler so a
+  pagination action cannot abort the first-page Refresh request or leave its
+  pending state stuck.
 - Keep `cache: no-store`, `credentials: omit`, the existing bounded client
   timeout, no automatic retry, and no persistent cache. One pending guard plus
   abort/sequence checks prevents duplicate or stale updates.
@@ -295,6 +296,9 @@ change, or material transitive/advisory finding is a re-plan condition.
   needed axes/grid/tooltip/ARIA components, and the SVG renderer. Disable or
   reduce nonessential animation, honor reduced motion, use existing PulseGrid
   chart tokens, and keep tooltips supplemental.
+- Hide time-axis tick labels that collide at narrow chart widths; this reduces
+  labels only, not observations, which remain available through the plotted
+  series, axis tooltip, and semantic history.
 - Keep a visible text summary near the chart describing loaded point count,
   temperature range, and newest observation. Register ECharts ARIA support,
   but do not treat generated chart ARIA as a replacement for the visible
@@ -508,8 +512,10 @@ boundary requires re-review before proceeding.
   controlled stale transition without sleeping five minutes.
 - Retain existing readiness restart and registry regressions. Verify the
   telemetry route at desktop, 390 px mobile, and 320 px reflow where behavior
-  changes; assert no unintended page-level horizontal scrolling, keyboard
-  reachability, reduced motion, and no relevant page/console errors.
+  changes; assert populated stacked-card history, no unintended page-level
+  horizontal scrolling, and no colliding dense-history chart time labels.
+  Preserve keyboard reachability, reduced motion, and relevant page/console
+  error checks.
 - Headless browser automation proves only its assertions; it does not replace
   the visible Browser inspection below.
 
@@ -700,9 +706,43 @@ overlay, no page overflow, and no console warning/error entries. The build
 emits the repository's known generated Rollup annotation warning; no new
 application error or client chunk warning was observed.
 
-The plan remains in `planned/` with `Ready for review`: independent review,
-exact-head CI, merge/acceptance, and the completed-plan move are intentionally
-not claimed by this uncommitted worktree.
+At this 2026-09-22 evidence snapshot, the plan remained in `planned/` with
+`Ready for review`; the then-current candidate did not claim exact-head CI,
+merge/acceptance, or the completed-plan move. This snapshot is superseded by
+the post-review completion update below.
+
+## Post-Review Completion Update (2026-09-23)
+
+The latest review comment on PR #16 reviewed published head `522d87d` and
+identified two actionable findings. Both were fixed in `e16ec4e` without
+changing the GraphQL contract, persistence, identity, or tenant boundary:
+
+- **Refresh/Load more ordering:** the button is disabled while Refresh is
+  pending and `loadMore()` rejects the same state. A component regression test
+  exercises Refresh -> Load more, confirms no pagination request starts, then
+  confirms Refresh settles; the existing Load more -> Refresh case remains
+  covered.
+- **Narrow history:** populated telemetry now uses a semantic stacked-card list
+  at 390 px and 320 px, while the table is hidden at those widths. Browser tests
+  use the real simulator/ingestion path and assert newest-first observations
+  with no page-level horizontal overflow.
+- **Additional user-requested chart issue:** the time axis enables ECharts
+  `hideOverlap`. A 320 px dense-history browser case reproduces overlapping
+  hour labels with that option disabled and verifies visible time-label bounds
+  do not collide after the fix; the series still contains all observations.
+
+Validation on the implementation candidate passed: `web:test` (8 files, 53
+tests), `web:typecheck` including the dedicated test-file TypeScript check,
+`browser:typecheck`, `web:lint`, `test:browser` (21/21), and `git diff --check`.
+All 14 required GitHub checks passed on implementation commit `e16ec4e`,
+including `browser-smoke` and `api-db-integration`. Branch protection requires
+zero approving reviews; the latest review findings are fixed, and the user has
+explicitly accepted the candidate as ready to merge. PR #16 is marked ready for
+review/merge and remains open and unmerged by instruction.
+
+The feature plan is moved to `completed/` under that explicit acceptance. M2
+remains `In progress` until the unmerged PR is integrated into the main branch;
+no merge or production-readiness claim is made.
 
 ## Done Criteria
 
@@ -713,11 +753,11 @@ line chart plus a visible non-visual summary when multiple points exist.
 
 The journey uses no client-selected tenant, no persistent cache or automatic
 polling, no unsupported online/offline claim, and no backend contract change.
-Focused tests, the real simulator-to-browser automated journey, visible Browser
-inspection, full required local gates, exact-head CI, plan-to-actual
-reconciliation, author self-review, and required independent review are
-complete. Documentation matches the implementation, and M2 lifecycle status
-changes only after merge or equivalent acceptance.
+Focused tests, the real simulator-to-browser automated journey, rendered
+Browser evidence, required local checks, exact implementation-head CI,
+plan-to-actual reconciliation, author self-review, and the latest review
+findings are complete. The user has accepted this PR as ready to merge, but it
+remains unmerged; M2 stays in progress until integration.
 
 ## Dependency References Reviewed
 

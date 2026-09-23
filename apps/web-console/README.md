@@ -70,11 +70,14 @@ persistent browser cache, or automatic retry.
 `Recent signal` and `Stale signal` are presentation labels derived only from
 `lastSeenAt` with a five-minute threshold. They describe signal recency and do
 not claim that an MQTT connection is currently online or offline. History stays
-available as a semantic table and visible text summary. When at least two valid
+available as a semantic table on wider layouts and a labeled stacked-card list
+on narrow layouts, alongside a visible text summary. When at least two valid
 observations are loaded, `TelemetryTemperatureChart.client.vue` loads the
 direct Apache ECharts dependency on the client, uses the SVG renderer and ARIA
-support, and disposes the chart on unmount; the chart is supplemental rather
-than the only source of telemetry information.
+support, and disposes the chart on unmount. Time-axis labels that would overlap
+are hidden on narrow charts; observations remain in the series, history, and
+axis tooltip. The chart is supplemental rather than the only source of
+telemetry information.
 
 ## Checks
 

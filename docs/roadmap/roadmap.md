@@ -103,8 +103,9 @@ MVP-004 provides the completed local MQTT transport and simulator fixture;
 MVP-005 provides the completed local/test telemetry ingestion boundary; and
 MVP-006 provides the completed bounded telemetry history/current-state
 projection. MVP-007 now has a locally validated operator-visible console
-implementation candidate on its feature branch; the telemetry milestone
-remains in progress until review and acceptance.
+implementation with the latest review findings fixed, and all required PR
+checks passed on its feature branch. PR #16 is ready to merge but remains
+unmerged by request; M2 remains in progress until the change is integrated.
 
 ## Milestones
 
@@ -170,7 +171,7 @@ Plans:
 - [MVP-004 — MQTT local runtime and simulator](feature-plans/completed/MVP-004-mqtt-local-runtime-and-simulator.md)
 - [MVP-005 — MQTT telemetry ingestion](feature-plans/completed/MVP-005-mqtt-telemetry-ingestion.md)
 - [MVP-006 — Telemetry and current-state projection](feature-plans/completed/MVP-006-telemetry-current-state-projection.md)
-- [MVP-007 — Telemetry and device-state console](feature-plans/planned/MVP-007-telemetry-device-state-console.md) — implementation candidate locally validated; review pending
+- [MVP-007 — Telemetry and device-state console](feature-plans/completed/MVP-007-telemetry-device-state-console.md) — accepted for merge; PR #16 remains open and unmerged
 
 ### M3 — Rules and alerts
 

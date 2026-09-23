@@ -4,8 +4,8 @@ Status: Local repository workflow and merge-gate enforcement implemented;
 FND-004 readiness, the MVP-003 device-registry browser journey, the MVP-005
 local/test MQTT ingestion path, and the merged MVP-006 telemetry
 persistence/current-state path are implemented and validated. The MVP-007
-operator-visible telemetry console is implemented and locally validated on its
-feature branch; merge/acceptance remains pending review.
+operator-visible telemetry console and review fixes are validated on its feature
+branch; PR #16 is ready to merge but remains unmerged.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
@@ -208,9 +208,11 @@ existing `mqtt-test` Mosquitto service, runs migrations and seed, builds both
 the API and device simulator, enables test-mode MQTT ingestion, starts the
 Nuxt server, and removes only its own containers, volume, and network. It
 asserts empty-to-current, explicit refresh, two-point chart/summary, the
-controlled stale transition, mobile overflow, the existing registry/readiness
-journeys, and port-conflict cleanup behavior. Headless assertions complement
-the required visible Browser inspection; they do not replace it.
+controlled stale transition, populated history cards at 390px and 320px,
+dense-chart time-label collision prevention at 320px, mobile overflow, the
+existing registry/readiness journeys, and port-conflict cleanup behavior.
+Headless assertions complement visible Browser inspection; they do not replace
+it.
 
 ### Local PostgreSQL, seed, and development GraphQL
 

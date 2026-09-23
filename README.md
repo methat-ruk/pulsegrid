@@ -5,7 +5,7 @@
 Connect devices · Stream telemetry · Detect conditions · Deliver commands ·
 Operate fleets
 
-![Status](https://img.shields.io/badge/status-mvp--telemetry--console--planned-yellow)
+![Status](https://img.shields.io/badge/status-mvp--telemetry--console--ready--to--merge-blue)
 
 > [!IMPORTANT]
 > PulseGrid's documentation foundation, Go API foundation, Nuxt console
@@ -13,9 +13,9 @@ Operate fleets
 > MVP-003 device-registry journey, MVP-004 local MQTT producer fixture,
 > MVP-005 local/test telemetry ingestion, and MVP-006 bounded telemetry
 > persistence/current state are implemented and validated. The MVP-007
-> operator-visible telemetry console has an implementation candidate locally
-> validated on its feature branch and is awaiting review/acceptance. Production
-> identity and production readiness remain deferred.
+> operator-visible telemetry console and latest review fixes are validated on
+> its feature branch. PR #16 is ready to merge but remains unmerged by request.
+> Production identity and production readiness remain deferred.
 
 ## What is PulseGrid?
 
@@ -117,9 +117,10 @@ The decision state and adoption trigger for each technology are maintained in
 - The MVP-004 local/test MQTT broker and one-shot simulator, MVP-005 telemetry
   ingestion, and MVP-006 bounded PostgreSQL history/current-state projection
   are implemented and validated. MVP-007 now has a section-local console
-  consumer with explicit refresh, bounded history/chart presentation, and a
-  real simulator-to-browser test journey; its branch candidate is validated but
-  not merged. Production identity and production readiness remain deferred.
+  consumer with explicit refresh, responsive history cards, collision-aware
+  chart labels, and a real simulator-to-browser test journey. PR #16 is ready
+  to merge but is not merged. Production identity and production readiness
+  remain deferred.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
   required checks include browser evidence for the real local API readiness
   journey.
