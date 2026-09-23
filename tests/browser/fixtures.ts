@@ -10,6 +10,7 @@ const apiHost = '127.0.0.1'
 const apiPort = 18080
 const apiURL = `http://${apiHost}:${apiPort}/health/ready`
 const apiBinary = join(process.cwd(), '.output', 'api-test')
+const simulatorBinary = join(process.cwd(), '.output', 'device-simulator-test')
 
 export type ApiProcess = {
   start: () => Promise<void>
@@ -78,6 +79,8 @@ async function createAPIProcess(): Promise<ApiProcess> {
         ...process.env,
         PULSEGRID_ENV: 'test',
         PULSEGRID_IDENTITY_MODE: 'development',
+        PULSEGRID_MQTT_INGESTION_MODE: 'development',
+        PULSEGRID_MQTT_BROKER_URL: 'mqtt://127.0.0.1:11883',
         PULSEGRID_DATABASE_URL: databaseURL,
         PULSEGRID_HTTP_HOST: '127.0.0.1',
         PULSEGRID_HTTP_PORT: '18080',
@@ -115,5 +118,32 @@ export const test = base.extend<{}, { apiProcess: ApiProcess }>({
     }
   }, { scope: 'worker', auto: true }],
 })
+
+export async function publishSimulatorTelemetry(deviceID: string, temperatureCelsius: number): Promise<{ messageID: string }> {
+  await access(simulatorBinary)
+  const child = spawn(simulatorBinary, [], {
+    env: {
+      ...process.env,
+      PULSEGRID_ENV: 'test',
+      PULSEGRID_MQTT_BROKER_URL: 'mqtt://127.0.0.1:11883',
+      PULSEGRID_MQTT_TENANT_SLUG: 'pulsegrid-dev',
+      PULSEGRID_MQTT_DEVICE_ID: deviceID,
+      PULSEGRID_SIMULATOR_TEMPERATURE_CELSIUS: String(temperatureCelsius),
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  let stdout = ''
+  let stderr = ''
+  child.stdout?.on('data', chunk => { stdout += chunk.toString() })
+  child.stderr?.on('data', chunk => { stderr += chunk.toString() })
+  const exit = await new Promise<{ status: number | null, signal: NodeJS.Signals | null }>((resolve, reject) => {
+    child.once('error', reject)
+    child.once('close', (status, signal) => resolve({ status, signal }))
+  })
+  if (exit.status !== 0) throw new Error(`simulator publish failed (${exit.status ?? exit.signal}): ${stderr}`)
+  const messageMatch = stdout.match(/message_id=([0-9a-f-]{36})/u)
+  if (!messageMatch) throw new Error(`simulator output did not contain message ID: ${stdout}`)
+  return { messageID: messageMatch[1] }
+}
 
 export { expect } from '@playwright/test'

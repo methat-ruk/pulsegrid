@@ -20,6 +20,36 @@ export interface DeviceConnection {
   pageInfo: DevicePageInfo
 }
 
+export interface DeviceCurrentState {
+  messageId: string
+  observedAt: string
+  receivedAt: string
+  temperatureCelsius: number
+  lastSeenAt: string
+}
+
+export interface TelemetryPoint {
+  messageId: string
+  observedAt: string
+  receivedAt: string
+  temperatureCelsius: number
+}
+
+export interface TelemetryEdge {
+  cursor: string
+  node: TelemetryPoint
+}
+
+export interface TelemetryConnection {
+  edges: TelemetryEdge[]
+  pageInfo: DevicePageInfo
+}
+
+export interface DeviceTelemetryOverview {
+  deviceCurrentState: DeviceCurrentState | null
+  deviceTelemetry: TelemetryConnection
+}
+
 interface GraphqlErrorPayload {
   message?: unknown
   extensions?: unknown
@@ -168,6 +198,49 @@ export const createDeviceMutation = `mutation CreateDevice($input: CreateDeviceI
   }
 }`
 
+export const deviceTelemetryOverviewQuery = `query DeviceTelemetryOverview($deviceId: ID!, $first: Int!, $after: String) {
+  deviceCurrentState(deviceId: $deviceId) {
+    messageId
+    observedAt
+    receivedAt
+    temperatureCelsius
+    lastSeenAt
+  }
+  deviceTelemetry(deviceId: $deviceId, first: $first, after: $after) {
+    edges {
+      cursor
+      node {
+        messageId
+        observedAt
+        receivedAt
+        temperatureCelsius
+      }
+    }
+    pageInfo {
+      endCursor
+      hasNextPage
+    }
+  }
+}`
+
+export const deviceTelemetryPageQuery = `query DeviceTelemetryPage($deviceId: ID!, $first: Int!, $after: String) {
+  deviceTelemetry(deviceId: $deviceId, first: $first, after: $after) {
+    edges {
+      cursor
+      node {
+        messageId
+        observedAt
+        receivedAt
+        temperatureCelsius
+      }
+    }
+    pageInfo {
+      endCursor
+      hasNextPage
+    }
+  }
+}`
+
 export function listDevices(first: number, after: string | null, signal?: AbortSignal) {
   return executeDeviceGraphQL<{ devices: DeviceConnection }, { first: number, after: string | null }>(
     listDevicesQuery,
@@ -178,6 +251,22 @@ export function listDevices(first: number, after: string | null, signal?: AbortS
 
 export function getDevice(id: string, signal?: AbortSignal) {
   return executeDeviceGraphQL<{ device: Device | null }, { id: string }>(deviceQuery, { id }, { signal })
+}
+
+export function getDeviceTelemetryOverview(deviceId: string, first = 50, after: string | null = null, signal?: AbortSignal) {
+  return executeDeviceGraphQL<DeviceTelemetryOverview, { deviceId: string, first: number, after: string | null }>(
+    deviceTelemetryOverviewQuery,
+    { deviceId, first, after },
+    { signal },
+  )
+}
+
+export function getDeviceTelemetryPage(deviceId: string, first = 50, after: string | null, signal?: AbortSignal) {
+  return executeDeviceGraphQL<{ deviceTelemetry: TelemetryConnection }, { deviceId: string, first: number, after: string | null }>(
+    deviceTelemetryPageQuery,
+    { deviceId, first, after },
+    { signal },
+  )
 }
 
 export function createDevice(input: { deviceKey: string, displayName: string }, signal?: AbortSignal) {

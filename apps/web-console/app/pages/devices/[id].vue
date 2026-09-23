@@ -194,6 +194,7 @@ onBeforeUnmount(() => {
           </dd>
         </div>
       </dl>
+      <DeviceTelemetryPanel :device-id="device.id" />
     </template>
   </section>
 </template>

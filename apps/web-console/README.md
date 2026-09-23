@@ -1,9 +1,10 @@
 # PulseGrid Web Console
 
-This directory owns the Vue/Nuxt console shell and the development-only device
-registry journey. It includes two narrow server-only adapters for the local Go
-API: process readiness and the fixed same-origin `/api/graphql` route. It does
-not expose product authority or a generic backend proxy.
+This directory owns the Vue/Nuxt console shell, the development-only device
+registry journey, and the device-detail telemetry console. It includes two
+narrow server-only adapters for the local Go API: process readiness and the
+fixed same-origin `/api/graphql` route. It does not expose product authority or
+a generic backend proxy.
 
 ## Requirements
 
@@ -56,6 +57,28 @@ The device pages use a feature-scoped typed client built on native browser
 do not retry or persist a client cache. The route is a development/test
 transport adapter only; the Go GraphQL contract remains the authority.
 
+## Telemetry console
+
+The `/devices/:id` detail route mounts a section-local telemetry panel after the
+device identity has resolved. It requests the current state and the newest
+history page together, uses the server cursor for `Load more history`, and
+offers an explicit `Refresh telemetry` action that replaces the current first
+page only after a successful response. A refresh or history failure keeps the
+last useful values visible and exposes a retry state; there is no polling,
+persistent browser cache, or automatic retry.
+
+`Recent signal` and `Stale signal` are presentation labels derived only from
+`lastSeenAt` with a five-minute threshold. They describe signal recency and do
+not claim that an MQTT connection is currently online or offline. History stays
+available as a semantic table on wider layouts and a labeled stacked-card list
+on narrow layouts, alongside a visible text summary. When at least two valid
+observations are loaded, `TelemetryTemperatureChart.client.vue` loads the
+direct Apache ECharts dependency on the client, uses the SVG renderer and ARIA
+support, and disposes the chart on unmount. Time-axis labels that would overlap
+are hidden on narrow charts; observations remain in the series, history, and
+axis tooltip. The chart is supplemental rather than the only source of
+telemetry information.
+
 ## Checks
 
 Run from the repository root:
@@ -63,18 +86,27 @@ Run from the repository root:
 ```sh
 corepack pnpm --filter @pulsegrid/web-console lint
 corepack pnpm --filter @pulsegrid/web-console typecheck
+corepack pnpm run web:test:typecheck
 corepack pnpm --filter @pulsegrid/web-console test
 corepack pnpm --filter @pulsegrid/web-console build
 ```
 
-Browser verification covers the overview and device registry at desktop, tablet,
-mobile, and 320px widths, including keyboard focus, mobile-menu containment,
-and reduced-motion behavior. It also covers readiness recovery, real GraphQL
-pagination, create/detail, duplicate conflict, malformed IDs, and API process
-restart. The repository-root `corepack pnpm run test:browser` command owns an
-isolated PostgreSQL migration/seed lifecycle when no database URL is supplied,
-the test-mode build, real Go API process, and server lifecycle for that
-evidence.
+The Nuxt typecheck covers application code. The repository-level
+`web:test:typecheck` command runs the dedicated `tsconfig.tests.json` so unit
+and Nuxt test TypeScript files are checked as well; `corepack pnpm run
+check:fast` includes both layers.
+
+Browser verification covers the overview, device registry, and telemetry detail
+journey at desktop, tablet, mobile, and 320px widths, including keyboard focus,
+mobile-menu containment, reduced motion, empty/current/stale states, explicit
+refresh, chart eligibility, textual history, and horizontal-overflow checks. It
+also covers readiness recovery, real GraphQL pagination, create/detail,
+duplicate conflict, malformed IDs, API process restart, and the real simulator
+-> Mosquitto -> ingestion -> PostgreSQL -> GraphQL -> Nuxt path. The
+repository-root `corepack pnpm run test:browser` command owns an isolated
+PostgreSQL and Mosquitto migration/seed lifecycle when no database URL is
+supplied, builds the API and simulator, runs the test-mode Nuxt server, and
+cleans up only its disposable resources.
 
 ## Known diagnostics and warnings
 

@@ -1,10 +1,11 @@
 # PulseGrid local development
 
 Status: Local repository workflow and merge-gate enforcement implemented;
-FND-004 readiness, the MVP-003 device-registry browser journey, and the
-MVP-005 local/test MQTT ingestion path are implemented and locally validated;
-MVP-006 telemetry persistence/current-state implementation is in progress on
-the feature branch with real PostgreSQL and MQTT-to-GraphQL evidence.
+FND-004 readiness, the MVP-003 device-registry browser journey, the MVP-005
+local/test MQTT ingestion path, and the merged MVP-006 telemetry
+persistence/current-state path are implemented and validated. The MVP-007
+operator-visible telemetry console and review fixes are validated on its feature
+branch; PR #16 is ready to merge but remains unmerged.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
@@ -182,6 +183,36 @@ With both processes running, open `http://127.0.0.1:3000` (or the port shown by
 Nuxt). The shell checks `GET /api/operational/ready` and offers a manual Retry
 when the local API is stopped or starting. This adapter covers process
 readiness only; it is not a product API or a generic proxy.
+
+### MVP-007 telemetry console journey
+
+The device detail route now consumes the existing MVP-006 GraphQL reads without
+changing the API schema. Open a registered device at `/devices/:id` after the
+local API and Nuxt console are running. The telemetry section initially shows an
+explicit empty state. Publish with the one-shot `mqtt:simulator`, then activate
+`Refresh telemetry`; the page shows the committed current value, observed and
+received times, independent `lastSeenAt`, and newest-first history. A second
+publish followed by another refresh makes the line chart eligible. `Load more
+history` uses the opaque server cursor, while the local five-minute
+`Recent signal`/`Stale signal` labels are derived only from `lastSeenAt`. The
+page does not poll or label a device `Online`/`Offline`.
+
+For the repeatable cross-boundary browser journey, use the repository command:
+
+```sh
+corepack pnpm run test:browser
+```
+
+The runner creates a unique Compose project with disposable PostgreSQL and the
+existing `mqtt-test` Mosquitto service, runs migrations and seed, builds both
+the API and device simulator, enables test-mode MQTT ingestion, starts the
+Nuxt server, and removes only its own containers, volume, and network. It
+asserts empty-to-current, explicit refresh, two-point chart/summary, the
+controlled stale transition, populated history cards at 390px and 320px,
+dense-chart time-label collision prevention at 320px, mobile overflow, the
+existing registry/readiness journeys, and port-conflict cleanup behavior.
+Headless assertions complement visible Browser inspection; they do not replace
+it.
 
 ### Local PostgreSQL, seed, and development GraphQL
 
