@@ -177,7 +177,7 @@ async function loadOverview(refresh = false) {
 }
 
 async function loadMore() {
-  if (state.value !== 'ready' || loadingMore.value || !hasNextPage.value || endCursor.value === null) return
+  if (state.value !== 'ready' || refreshing.value || loadingMore.value || !hasNextPage.value || endCursor.value === null) return
 
   requestController?.abort()
   const controller = new AbortController()
@@ -472,6 +472,32 @@ onBeforeUnmount(() => {
             </table>
           </div>
 
+          <ol
+            class="telemetry-history-cards"
+            aria-label="Recent telemetry observations, newest first"
+          >
+            <li
+              v-for="point in points"
+              :key="point.messageId"
+              class="telemetry-history-card"
+            >
+              <dl>
+                <div>
+                  <dt>Observed</dt>
+                  <dd>{{ formatDate(point.observedAt) }}</dd>
+                </div>
+                <div class="telemetry-history-card-temperature">
+                  <dt>Temperature</dt>
+                  <dd>{{ formatTemperature(point.temperatureCelsius) }}°C</dd>
+                </div>
+                <div>
+                  <dt>Received</dt>
+                  <dd>{{ formatDate(point.receivedAt) }}</dd>
+                </div>
+              </dl>
+            </li>
+          </ol>
+
           <p
             v-if="loadMoreError"
             class="telemetry-alert telemetry-alert--inline"
@@ -496,8 +522,8 @@ onBeforeUnmount(() => {
             v-if="hasNextPage"
             class="secondary-action pagination-actions telemetry-load-more"
             type="button"
-            :disabled="loadingMore"
-            :aria-busy="loadingMore"
+            :disabled="loadingMore || refreshing"
+            :aria-busy="loadingMore || refreshing"
             @click="loadMore"
           >
             <UIcon

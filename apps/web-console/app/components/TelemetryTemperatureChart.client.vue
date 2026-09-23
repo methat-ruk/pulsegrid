@@ -47,7 +47,7 @@ function chartOption(): EChartsOption {
     },
     xAxis: {
       type: 'time',
-      axisLabel: { color: '#7a8781' },
+      axisLabel: { color: '#7a8781', hideOverlap: true },
       axisLine: { lineStyle: { color: '#dde4de' } },
       splitLine: { show: false },
     },

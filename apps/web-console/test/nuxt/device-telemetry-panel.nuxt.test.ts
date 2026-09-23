@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, cleanup } from '@testing-library/vue'
+import { fireEvent, screen, waitFor, cleanup, within } from '@testing-library/vue'
 import { renderSuspended } from '@nuxt/test-utils/runtime'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -30,12 +30,12 @@ function overview(currentState: Record<string, unknown> | null, points: Array<Re
   }
 }
 
-function current(lastSeenAt = new Date().toISOString()) {
+function current(lastSeenAt = new Date().toISOString(), temperatureCelsius = 23.5) {
   return {
     messageId: 'message-current',
     observedAt: '2026-09-22T04:00:00Z',
     receivedAt: '2026-09-22T04:00:01Z',
-    temperatureCelsius: 23.5,
+    temperatureCelsius,
     lastSeenAt,
   }
 }
@@ -147,13 +147,13 @@ describe('device telemetry panel', () => {
 
     await waitFor(() => expect(screen.getByText('2 loaded')).toBeTruthy())
     expect(mocks.getDeviceTelemetryPage).toHaveBeenCalledWith(DEVICE_ID, 50, 'cursor-next', expect.any(AbortSignal))
-    expect(screen.getByText('24.5°C')).toBeTruthy()
+    expect(within(screen.getByRole('list', { name: 'Recent telemetry observations, newest first' })).getByText('24.5°C')).toBeTruthy()
   })
 
   it('clears an aborted load-more state when refresh replaces the page', async () => {
     mocks.getDeviceTelemetryOverview
       .mockResolvedValueOnce(overview(current(), [point('message-1', 23.5, '2026-09-22T04:00:00Z')], true))
-      .mockResolvedValueOnce(overview(current(), [point('message-2', 24.5, '2026-09-22T04:01:00Z')]))
+      .mockResolvedValueOnce(overview(current(new Date().toISOString(), 24.5), [point('message-2', 24.5, '2026-09-22T04:01:00Z')]))
     mocks.getDeviceTelemetryPage.mockReturnValue(new Promise(() => {}))
 
     await renderSuspended(DeviceTelemetryPanel, { props: { deviceId: DEVICE_ID } })
@@ -161,8 +161,35 @@ describe('device telemetry panel', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Load more history' }))
     await fireEvent.click(screen.getByRole('button', { name: 'Refresh telemetry' }))
 
-    await waitFor(() => expect(screen.getByText('24.5°C')).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('heading', { name: '24.5°C' })).toBeTruthy())
     expect(screen.queryByRole('button', { name: 'Load more history' })).toBeNull()
     expect((screen.getByRole('button', { name: 'Refresh telemetry' }) as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('prevents Load more from cancelling an in-flight refresh', async () => {
+    let resolveRefresh!: (value: ReturnType<typeof overview>) => void
+    mocks.getDeviceTelemetryOverview
+      .mockResolvedValueOnce(overview(current(), [point('message-1', 23.5, '2026-09-22T04:00:00Z')], true))
+      .mockReturnValueOnce(new Promise((resolve) => {
+        resolveRefresh = resolve
+      }))
+
+    await renderSuspended(DeviceTelemetryPanel, { props: { deviceId: DEVICE_ID } })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Load more history' })).toBeTruthy())
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Refresh telemetry' }))
+    await waitFor(() => expect(screen.getByText('Refreshing telemetry…')).toBeTruthy())
+
+    const loadMoreButton = screen.getByRole('button', { name: 'Load more history' }) as HTMLButtonElement
+    expect(loadMoreButton.disabled).toBe(true)
+    await fireEvent.click(loadMoreButton)
+    expect(mocks.getDeviceTelemetryPage).not.toHaveBeenCalled()
+
+    resolveRefresh(overview(current(new Date().toISOString(), 24.5), [point('message-2', 24.5, '2026-09-22T04:01:00Z')]))
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: '24.5°C' })).toBeTruthy())
+    expect(screen.queryByText('Refreshing telemetry…')).toBeNull()
+    expect((screen.getByRole('button', { name: 'Refresh telemetry' }) as HTMLButtonElement).disabled).toBe(false)
+    expect(mocks.getDeviceTelemetryPage).not.toHaveBeenCalled()
   })
 })

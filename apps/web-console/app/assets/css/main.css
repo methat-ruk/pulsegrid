@@ -922,6 +922,53 @@ a {
   box-shadow: var(--pulse-shadow-card);
 }
 
+.telemetry-history-cards {
+  display: none;
+}
+
+.telemetry-history-card {
+  border: 1px solid var(--pulse-border);
+  border-radius: 14px;
+  background: var(--pulse-surface);
+  box-shadow: var(--pulse-shadow-card);
+  padding: 16px;
+}
+
+.telemetry-history-card dl {
+  display: grid;
+  gap: 13px;
+  margin: 0;
+}
+
+.telemetry-history-card dl > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.telemetry-history-card dt {
+  color: var(--pulse-text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.telemetry-history-card dd {
+  margin: 0;
+  color: var(--pulse-text-secondary);
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.telemetry-history-card-temperature dd {
+  color: var(--pulse-text-primary);
+  font-weight: 800;
+}
+
 .telemetry-table {
   width: 100%;
   table-layout: fixed;
@@ -1120,6 +1167,18 @@ a {
     display: none;
   }
 
+  .telemetry-table-wrap {
+    display: none;
+  }
+
+  .telemetry-history-cards {
+    display: grid;
+    gap: 12px;
+    list-style: none;
+    margin: 20px 0 0;
+    padding: 0;
+  }
+
   .device-card-list {
     display: grid;
     gap: 12px;
@@ -1198,16 +1257,6 @@ a {
     padding-inline: 10px;
   }
 
-  .telemetry-table th,
-  .telemetry-table td {
-    padding: 13px 9px;
-    font-size: 13px;
-  }
-
-  .telemetry-table thead th {
-    font-size: 10px;
-    letter-spacing: 0.09em;
-  }
 }
 
 @media (max-width: 360px) {
