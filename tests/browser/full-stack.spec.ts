@@ -49,11 +49,16 @@ test.describe('full-stack API readiness', () => {
     const firstPending = new Promise<void>((resolve) => {
       releaseFirst = resolve
     })
+    let markFirstRequestStarted!: () => void
+    const firstRequestStarted = new Promise<void>((resolve) => {
+      markFirstRequestStarted = resolve
+    })
     let requestCount = 0
 
     await page.route('**/api/operational/ready', async (route) => {
       requestCount += 1
       if (requestCount === 1) {
+        markFirstRequestStarted()
         await firstPending
         try {
           await route.fulfill({
@@ -77,6 +82,7 @@ test.describe('full-stack API readiness', () => {
 
     await page.goto('/')
     await expect(page.getByRole('status')).toHaveText('Checking the local API…')
+    await firstRequestStarted
     await page.goto('about:blank')
     await page.goto('/')
     await expect.poll(() => requestCount).toBeGreaterThan(1)
