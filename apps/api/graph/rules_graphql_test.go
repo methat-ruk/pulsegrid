@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/rules"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/telemetry/projection"
 )
 
 type fakeThresholdRuleRepository struct {
@@ -233,6 +234,19 @@ func TestGraphQLAlertConnectionBindsCursorToTenantAndFilter(t *testing.T) {
 
 	wrongFilter := doGraphQL(t, handler, `{ "query": "query { alerts(first: 1, after: \"`+cursorString+`\", deviceId: \"44444444-4444-4444-8444-444444444444\") { edges { cursor } } }" }`, "")
 	assertErrorCode(t, wrongFilter, errorCodeBadUserInput)
+
+	malformedCursor := doGraphQL(t, handler, `{ "query": "query { alerts(first: 1, after: \"not-a-cursor\") { edges { cursor } } }" }`, "")
+	assertErrorCode(t, malformedCursor, errorCodeBadUserInput)
+
+	telemetryCursor, err := encodeTelemetryCursor(projection.Cursor{
+		ObservedAt: alert.ObservedAt,
+		MessageID:  alert.MessageID,
+	})
+	if err != nil {
+		t.Fatalf("encode telemetry cursor: %v", err)
+	}
+	wrongTypeCursor := doGraphQL(t, handler, `{ "query": "query { alerts(first: 1, after: \"`+telemetryCursor+`\") { edges { cursor } } }" }`, "")
+	assertErrorCode(t, wrongTypeCursor, errorCodeBadUserInput)
 
 	foreignOrganizationCursor, err := encodeAlertCursor(rules.AlertCursor{
 		CreatedAt: alert.CreatedAt, ID: alert.ID,

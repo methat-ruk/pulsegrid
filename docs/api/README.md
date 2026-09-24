@@ -3,8 +3,10 @@
 Status: MVP-002 development GraphQL device contract, MVP-003 console
 integration, MVP-004 local MQTT producer fixture, MVP-005 local/test telemetry
 ingestion, and MVP-006 local/test telemetry persistence/current-state projection
-are implemented on the feature branch and locally validated. Production
-identity, production MQTT, and permanent high-volume storage remain deferred.
+are implemented on the feature branch and locally validated. The MVP-008
+rules/alerts backend and review fixes are validated; PR #18 is ready to merge
+but remains unmerged. Production identity, production MQTT, and permanent
+high-volume storage remain deferred.
 
 ## Purpose and ownership
 
@@ -225,10 +227,12 @@ uploads, persisted queries, and playground routes are not enabled. Introspection
 is available only in this explicit development mode. The SDL is the source of
 truth; generated gqlgen files are committed and checked for drift.
 
-The development API validates the telemetry schema before it starts listening;
-a database below migration 005 fails startup with the safe
-`database_schema_unavailable` action rather than reporting ready and exposing a
-partially usable API.
+The MVP-008 candidate validates both the MVP-006 telemetry schema from
+migration `005` and the rules/alerts schema from migration `006` before the
+development API starts listening. A missing required schema fails startup with
+the safe `database_schema_unavailable` action rather than reporting ready and
+exposing a partially usable API. The documented migration command applies the
+latest migration before startup.
 
 The contract exposes `device`, bounded forward `devices` pagination
 (`first` 1–100 with opaque versioned cursors), `createDevice`, and the additive

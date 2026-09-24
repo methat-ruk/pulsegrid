@@ -19,10 +19,11 @@ history/current-state projection. MVP-003 provides the first device-registry
 operator journey and a fixed same-origin Nuxt GraphQL transport adapter backed
 by the MVP-001 organization/device registry. The merged MVP-007 console now
 exposes the telemetry reads on the existing device-detail route through a
-section-local panel. The MVP-008 rules/alerts implementation candidate is
-locally validated on its feature branch but is not merged; `main` still has no
-rule/alert runtime. Production identity, deployment exposure, durable broker
-replay, and later event contracts remain unimplemented.
+section-local panel. The MVP-008 rules/alerts implementation and review fixes
+passed local and CI validation; PR #18 is ready to merge but is not merged, so
+`main` still has no rule/alert runtime. Production identity, deployment
+exposure, durable broker replay, and later event contracts remain
+unimplemented.
 
 Architecture diagrams below describe an intended sequence of evolution. They
 must not be read as deployed topology.
@@ -141,10 +142,12 @@ logical replay comparison. The identity table is intentionally append-only in
 this MVP; its one compact row per accepted logical message is the explicit
 capacity trade-off for the durable replay guarantee.
 
-The API validates the required telemetry tables and columns before opening the
-development listener or MQTT subscription. A database below migration 005 is
-classified as `database_schema_unavailable` and fails startup rather than
-reporting readiness for an unusable telemetry path.
+The MVP-008 feature-branch candidate validates the MVP-006 telemetry tables
+from migration `005` and the threshold-rule/alert tables from migration `006`
+before opening the development listener or MQTT subscription. If either schema
+is missing, startup returns `database_schema_unavailable` rather than exposing
+an unusable telemetry/rules path. PR #18 is ready to merge but `main` remains
+pre-MVP-008 until it is merged.
 
 The development GraphQL API exposes only bounded, tenant-scoped reads:
 `deviceCurrentState` and `deviceTelemetry` (default 50, maximum 100) with a
@@ -163,9 +166,10 @@ that input and returns a processing failure; an exact replay skips evaluation.
 Successful matching input commits telemetry and immutable alert occurrences
 together. Each alert carries a rule/measurement snapshot and references the
 durable observation identity, so pruning history does not erase its context.
-The candidate is locally validated but not merged; `main` remains at the
-pre-MVP-008 runtime. The
-[MVP-008 plan](../roadmap/feature-plans/planned/MVP-008-threshold-rule-alert-backend.md)
+The candidate and its review fixes passed local and CI validation; PR #18 is
+ready to merge but not merged, and `main` remains at the pre-MVP-008 runtime.
+The
+[MVP-008 plan](../roadmap/feature-plans/completed/MVP-008-threshold-rule-alert-backend.md)
 owns the limits, GraphQL contract, recovery boundary, and evidence.
 
 ## Conditional target architecture

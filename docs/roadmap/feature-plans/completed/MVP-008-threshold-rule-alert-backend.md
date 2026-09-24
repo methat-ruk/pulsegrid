@@ -1,16 +1,17 @@
 # MVP-008 — Threshold Rule and Alert Backend
 
-Status: Ready for review — implementation and author review complete on
-2026-09-24; candidate is locally validated on its feature branch
+Status: Complete — implementation, review follow-up, and required local
+validation completed on 2026-09-24; PR #18 is ready to merge and remains
+unmerged by request
 
 Branch: `feat/mvp-008-threshold-rule-alert-backend`
 
-Intended PR: One backend-condition PR
+PR: [#18 — Threshold rule alert backend](https://github.com/methat-ruk/pulsegrid/pull/18)
 
 Milestone: M3 — Rules and alerts
 
-Impact: Material Change (Tier 2). The eventual PR adds durable data, an
-additive GraphQL contract, and rule evaluation inside the accepted-telemetry
+Impact: Material Change (Tier 2). This PR adds durable data, an additive
+GraphQL contract, and rule evaluation inside the accepted-telemetry
 transaction. It does not change production identity or deployment topology.
 
 ## Goal and acceptance boundary
@@ -281,17 +282,41 @@ The existing browser suite passed; no alert-console browser case was added
 because no frontend code changed and MVP-009 owns visible alert behavior. No
 production migration, production identity, deployment, or live external state
 was exercised. The known runtime risk remains pre-commit MQTT loss requiring
-explicit republish;
-durable telemetry identity and alert uniqueness make a same-message retry
-safe. Durable identity and alert tables remain unbounded by policy in this MVP.
+explicit republish; durable telemetry identity and alert uniqueness make a
+same-message retry safe. Durable identity and alert tables remain unbounded by
+policy in this MVP.
 The module-level `x/crypto` advisories have no reachable vulnerable call path
 in this scan; revisit them when dependency maintenance or crypto/SSH usage
 changes.
 
+## PR #18 review follow-up (2026-09-24)
+
+The review comment on PR #18 inspected base `5772b99` and candidate
+`12e3111` and found no confirmed merge blocker. It requested explicit startup
+documentation for migration `006` and identified missing negative evidence for
+malformed and wrong-type alert cursors. The local-development, API, and
+architecture docs now name both required schema versions, and the GraphQL
+contract test exercises malformed input and a telemetry cursor supplied to
+the alert connection; both return `BAD_USER_INPUT`.
+
+The reviewer also recorded two evidence limits rather than blockers:
+sustained write latency at the 20-rule cap and long-term identity/alert growth
+were not measured. This MVP has no workload SLO or retention policy, so no
+benchmark or capacity claim is added; revisit these when measured workload or
+retention requirements exist. Production migration/deployment remains outside
+scope. `Down` for migration `006` drops rule and alert data and is safe only
+for disposable local/test databases; production recovery requires a separate
+reviewed plan.
+
+The review reported all 14 required CI checks passing on its reviewed HEAD.
+The follow-up candidate was revalidated with the repository's full local
+pre-CI command after these fixes. The PR remains unmerged; no production
+migration or deployment was authorized or performed.
+
 Plan-to-actual reconciliation and author self-review found no scope or
-architecture deviation. The implementation candidate is based on the
-documentation commit `8b94019` on branch
-`feat/mvp-008-threshold-rule-alert-backend` and is ready for PR review; an
-independent review remains pending. This plan remains under `planned/` with
-status `Ready for review`. M3 remains in progress until the backend candidate
-is accepted and MVP-009 is complete.
+architecture deviation. The implementation is based on documentation commit
+`8b94019` and implementation commit `12e3111`, with review fixes on branch
+`feat/mvp-008-threshold-rule-alert-backend`. Following the requested review
+disposition and evidence, this plan is in `completed/`; PR #18 is ready to
+merge but has not been merged. M3 remains in progress until MVP-009 is
+complete.

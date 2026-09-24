@@ -5,9 +5,9 @@ FND-004 readiness, the MVP-003 device-registry browser journey, the MVP-005
 local/test MQTT ingestion path, and the merged MVP-006 telemetry
 persistence/current-state path are implemented and validated. The MVP-007
 operator-visible telemetry console and review fixes were merged as `9ce9e7c`
-(PR #16). The MVP-008 rules/alerts backend candidate is locally validated on
-its feature branch, ready for review, and not merged; the MVP-009 console is
-still planned.
+(PR #16). The MVP-008 rules/alerts backend and review fixes passed local and CI
+validation; PR #18 is ready to merge but remains unmerged. The MVP-009 console
+is still planned.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
@@ -150,10 +150,11 @@ corepack pnpm run dev:api
 ```
 
 Check `GET /health/ready` for `200`/`ready`; the enabled API is ready only when
-PostgreSQL is reachable, the required MVP-006 schema was validated before
-listening, and its MQTT subscription is connected. A database below migration
-005 fails startup with `database_schema_unavailable` rather than exposing a
-partially usable telemetry API. Publish with
+PostgreSQL is reachable, the MVP-006 telemetry schema (`005`) and MVP-008
+rules/alerts schema (`006`) are both validated before listening, and its MQTT
+subscription is connected. Missing either required schema fails startup with
+`database_schema_unavailable` rather than exposing a partially usable API.
+Publish with
 `mqtt:simulator`, query `deviceCurrentState` and `deviceTelemetry`, and inspect
 the API log for `reason_code=telemetry_accepted`. The log exposes correlation
 and registry IDs but never the raw payload or temperature. Invalid, retained,
@@ -233,8 +234,8 @@ evidence:
 corepack pnpm run mqtt:test:integration
 ```
 
-This candidate is not merged; `main` does not yet include the MVP-008 API or
-transaction behavior.
+PR #18 is ready to merge but not merged; `main` does not yet include the
+MVP-008 API or transaction behavior.
 
 ### Local PostgreSQL, seed, and development GraphQL
 

@@ -235,9 +235,9 @@ unbounded durable identity/alert growth in this MVP. A database-backed
 outbox/worker is deferred until automatic recovery, independent consumers, or
 measured workload justifies its added owner and retry policy.
 
-This decision is implemented and locally validated on
-`feat/mvp-008-threshold-rule-alert-backend`; it is not merged and makes no
-production migration or production-readiness claim. Revisit the transaction
+This decision and its review fixes passed local and CI validation on
+`feat/mvp-008-threshold-rule-alert-backend`; PR #18 is ready to merge but not
+merged and makes no production migration or production-readiness claim. Revisit the transaction
 boundary if telemetry must remain committed through rule failure, and revisit
 the rule cap/retention when measured workload or operator needs change.
 
