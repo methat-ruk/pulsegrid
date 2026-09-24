@@ -5,9 +5,8 @@ FND-004 readiness, the MVP-003 device-registry browser journey, the MVP-005
 local/test MQTT ingestion path, and the merged MVP-006 telemetry
 persistence/current-state path are implemented and validated. The MVP-007
 operator-visible telemetry console and review fixes were merged as `9ce9e7c`
-(PR #16). The MVP-008 rules/alerts backend and review fixes passed local and CI
-validation; PR #18 is ready to merge but remains unmerged. The MVP-009 console
-is still planned.
+(PR #16). The MVP-008 rules/alerts backend merged as `fd0a383` (PR #18).
+The MVP-009 console is under reviewed planning and is not implemented.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
@@ -217,9 +216,9 @@ existing registry/readiness journeys, and port-conflict cleanup behavior.
 Headless assertions complement visible Browser inspection; they do not replace
 it.
 
-### MVP-008 rules and alert backend candidate
+### MVP-008 rules and alert backend
 
-The current MVP-008 feature branch adds rule configuration and alert history to
+MVP-008 adds rule configuration and alert history to
 the development-only GraphQL API. The development example already enables the
 loopback MQTT consumer; after migration and seed, create a rule with the API
 contract, then publish with `corepack pnpm run mqtt:simulator`. A match should
@@ -234,8 +233,8 @@ evidence:
 corepack pnpm run mqtt:test:integration
 ```
 
-PR #18 is ready to merge but not merged; `main` does not yet include the
-MVP-008 API or transaction behavior.
+PR #18 merged into `main` as `fd0a383`; the commands above now exercise the
+MVP-008 API and transaction behavior from the current repository.
 
 ### Local PostgreSQL, seed, and development GraphQL
 

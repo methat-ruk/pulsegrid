@@ -1,74 +1,241 @@
 # MVP-009 — Alert Console
 
-Status: Planned
+Status: Proposed — reviewed and implementation-ready; awaiting approval to
+implement. No implementation has started.
 
 Branch: `feat/mvp-009-alert-console`
 
-Intended PR: One frontend-alert PR
+Intended PR: One frontend alert-console PR
 
 Milestone: M3 — Rules and alerts
 
+Impact: Material Change (Tier 2). This adds a tenant-scoped browser journey
+and protected navigation. Extracting the existing GraphQL transport affects
+the device console too; the server contract and tenant authority stay intact.
+
 ## Goal
 
-Let an operator see recent alert occurrences and trace each one to its device,
-rule, and stored triggering context.
+Let a development operator discover recent alert occurrences, open one, and
+understand its affected device and stored trigger after source history pruning.
 
 ## Why
 
-An alert is useful only when an operator can understand why it exists and where
-to continue investigation.
+MVP-008 stores immutable alert snapshots, but operators currently need to
+query GraphQL directly to discover and investigate them.
+
+## Verified baseline (2026-09-24)
+
+- At review start, `main` and the clean plan branch pointed to `fd0a383`;
+  PR #18 merged MVP-008 on
+  2026-09-24. MVP-007 was merged as `9ce9e7c`. No alert UI or client exists.
+- GraphQL exposes tenant-scoped `alerts(first, after, deviceId)` and
+  `alert(id)`. Lists are ordered by `(createdAt DESC, id DESC)`, allow 1–100
+  records, and use an opaque cursor bound to the device filter. Unknown and
+  foreign alert IDs both return `null`; foreign device filters return empty.
+- `AlertOccurrence` snapshots `deviceId`, `ruleId`, `messageId`, `observedAt`,
+  `receivedAt`, `temperatureCelsius`, `metric`, `comparator`,
+  `thresholdCelsius`, and `createdAt`. It has no device or rule name, severity,
+  lifecycle state, or direct telemetry-row link. `device(id)` can enrich one
+  detail view with a tenant-visible display name.
+- The Nuxt console already has `/devices/:id`, a fixed same-origin GraphQL
+  adapter, a client `fetch` helper with a six-second timeout, no-store caching,
+  omitted credentials, manual-refresh patterns, and a real browser
+  API/PostgreSQL/Mosquitto/simulator harness. Generic transport currently
+  lives in the device feature client.
+- Existing real PostgreSQL tests prove `GetAlert` survives history-row
+  removal; a GraphQL integration test proves `alerts` still returns the
+  snapshot after removal. A direct `alert(id)` post-pruning assertion is
+  still needed for this route. Pinned Nuxt/Vue/TypeScript,
+  Vitest, Playwright, and UI dependencies suffice; no new package, service,
+  schema, or environment key is required.
 
 ## Scope
 
-- Add alert list and alert detail/context presentation.
-- Link alerts to device detail and show the stored measurement/rule snapshot
-  even after telemetry history pruning. Direct navigation to one telemetry
-  row is not promised by MVP-008's GraphQL contract.
-- Present occurrence time and triggering comparison in text as well as visual
-  treatment; do not infer active/resolved status or severity.
-- Add loading, empty, error, and refresh behavior.
-- Add component and browser tests.
+1. Add `Alerts` to primary navigation and an `/alerts` route. Show newest
+   recorded occurrences with triggering measurement/comparison, recorded
+   time, affected device ID linked to `/devices/:id`, and a detail link. Use
+   the full device ID because the alert list has no device display name; avoid
+   one `device(id)` query per row.
+2. Add `/alerts/:id` with the immutable snapshot: device ID/link, rule ID,
+   message ID, measurement, metric, comparator, threshold, observed time,
+   received time, and recorded time. Make one tenant-scoped `device(id)`
+   lookup for the display name; its failure must not hide the snapshot.
+   Never read the current rule as the triggering rule state.
+3. Add a link on `/devices/:id` to `/alerts?deviceId=<id>`. Resolve the device
+   through `device(id)` before showing its name or loading the filtered list.
+   Unknown, foreign, and invalid IDs get one non-disclosing unavailable-device
+   state. This simple device scope is the only filter in this PR.
+4. Use `first: 50`, opaque cursor continuation, and explicit manual Refresh.
+   Cover initial loading, empty, failure/retry, refreshing, next-page pending,
+   and next-page failure/retry without losing previously loaded rows.
+5. Add focused frontend tests and a browser journey from rule creation and
+   simulator publication through GraphQL to the alert list and detail.
 
 ## Out of Scope
 
-- Notification delivery, acknowledgement workflow, active/resolved lifecycle,
-  severity, escalation, bulk actions, or advanced filtering.
+- Rule creation/edit UI, rule detail, notifications, acknowledgement,
+  severity, active/resolved lifecycle, escalation, suppression, bulk action,
+  arbitrary search, time-range filters, charts, and fleet dashboard counts.
+- Telemetry-row navigation, client-side alert evaluation, persistent cache,
+  automatic polling/realtime, and optimistic alert state.
+- Backend schema/resolver/SQL changes, tenant selector, new permissions or
+  identity, production deployment, and production migration.
 
 ## Dependencies
 
-- MVP-007 and MVP-008.
+- MVP-007 supplies device navigation, UI patterns, and the browser harness.
+- Merged MVP-008 supplies the alert snapshot/list/detail contract. Development
+  API startup requires migrations `005` and `006` before browser evidence.
+- Reuse the current same-origin adapter, fixed development tenant, pinned
+  packages, and repository commands.
 
 ## Architecture / Boundaries
 
-The console presents immutable alert-occurrence authority from the API and
-does not infer alert matches from cached telemetry. The `messageId` is a
-logical trace reference; a pruned telemetry row must not make the alert detail
-unusable.
+```text
+Alerts nav -> /alerts [optional deviceId URL scope] -> /alerts/:id
+Device detail -> /alerts?deviceId=<tenant-visible device ID>
+Alert routes -> alert feature client -> feature-neutral GraphQL transport
+             -> existing Nuxt same-origin adapter -> Go GraphQL API
+             -> tenant-scoped PostgreSQL alert/device reads
+```
+
+- PostgreSQL/MVP-008 remains alert authority. The browser owns only route,
+  request, pagination, and display state. It does not infer matches from
+  telemetry or treat the URL as tenant authority.
+- Extract the generic GraphQL request/error/timeout behavior into a small
+  feature-neutral frontend module consumed by device and alert clients.
+  Keep alert documents/types in an alert feature module and preserve existing
+  device-client behavior and proxy safeguards. Add no GraphQL framework or
+  global server-state store.
+- Reuse client-side route loading. The list fetches only displayed fields;
+  detail fetches the full snapshot. Its optional device-name read follows
+  the alert response. Neither route fetches telemetry or current rule state.
+- `createdAt` controls list order and is labeled **Recorded**. Label
+  `observedAt` **Observed** and `receivedAt` **Received**; late telemetry can
+  make Observed earlier than Recorded. Format dates with the existing locale
+  pattern and an unavailable fallback. Render the returned finite numbers
+  without rounding that could reverse the apparent comparison. Show the
+  stored metric/comparator/threshold and measurement in text, without a
+  severity color or status badge.
+- Treat route IDs, filters, and cursors as untrusted. Pass opaque cursors
+  unchanged; encode path/query IDs; render API values as escaped text. The
+  server-selected organization and tenant-scoped SQL remain authorization.
+
+## Request and failure behavior
+
+- Initial load or a global/device scope change clears old rows and cursors,
+  cancels or ignores older requests, then reaches success, empty, or error.
+  A filtered route resolves its device first and never confirms a foreign ID.
+- Refresh cancels a pending page, starts at `after: null`, keeps previous
+  successful rows visible with **Refreshing alerts**, and replaces rows/cursor
+  only on success. Failure preserves the old rows, labels them previously
+  loaded, and offers Retry. No automatic retry or polling is implied.
+- `Load more` requires `hasNextPage` and a non-null end cursor. Disable and
+  guard it during Refresh or another page request. Failure preserves rows and
+  cursor for Retry. New head occurrences appear after Refresh; pagination
+  does not promise a frozen historical snapshot during concurrent inserts.
+- `alert(id) == null` shows one not-found state for unknown and foreign IDs.
+  Invalid IDs and service errors receive safe feedback and a list link. A
+  failed device-name lookup does not replace a loaded alert with an error.
+  Navigation/unmount prevents late responses from overwriting new route state.
 
 ## Implementation Direction
 
-Prioritize traceability over dashboard breadth. Reuse device navigation and
-the alert snapshot rather than adding a separate investigation subsystem.
+1. Extract/regression-test the GraphQL transport without changing same-origin
+   POST, timeout/cancellation, error mapping, no-store, or credential policy.
+2. Add alert client, list/detail routes, navigation, device entry link, and
+   accessible responsive presentation using existing design tokens.
+3. Reconcile the actual diff with this plan, self-review changed/impacted
+   paths, run final validation, update docs for proven behavior, and hand off
+   the PR for independent review when required.
 
 ## Validation
 
-- Browser test shows a simulator-triggered alert and follows its stored
-  context, including when the source history row is unavailable.
-- Empty/error/stale states are visible.
-- Triggering condition never relies on color alone.
-- Tenant-scoped navigation cannot expose another tenant's identifiers.
+- Frontend tests cover query/response behavior, empty/error/not-found,
+  global/device scope, refresh replacement and failure preservation, page
+  continuation/failure/retry, Refresh versus Load-more races, navigation
+  cancellation, device-name failure, exact comparison text, and time labels.
+  Existing device-client tests protect the transport extraction.
+- Add a focused real PostgreSQL/GraphQL assertion that `alert(id)` returns
+  the same snapshot after its history row is removed. This closes the exact
+  detail-route contract gap without changing backend behavior.
+- Real browser journey creates a visible device and rule, publishes matching
+  telemetry through the simulator, Refreshes `/alerts`, follows detail and
+  device links, and verifies stored context. Cover direct detail navigation,
+  filtered entry, keyboard focus, and 390 px/320 px reflow. A browser fixture
+  can exercise missing source history; the existing real PostgreSQL/GraphQL
+  pruning test is the authority for actual persistence after pruning. The UI
+  must not request the source history row.
+- Negative evidence checks unknown/foreign alert and device behavior,
+  malformed IDs/cursors, safe errors, and no stale protected content. Reuse
+  existing API integration tests for server isolation/cursor rejection and
+  add browser checks for the new presentation.
+- On the implementation candidate run applicable `web:lint`,
+  `web:typecheck`, `web:test`, `browser:typecheck`, `web:build`,
+  `test:browser`, `repository-policy`, and final repository `check`/CI gates.
+  Inspect list/detail, focus, and narrow layout in a visible browser. Report
+  passed, failed, skipped, unavailable, and not-run evidence separately.
 
 ## Documentation Updates
 
-- Update UI reference only for reusable alert patterns.
-- Document the limited MVP alert behavior.
+- At implementation closeout, document the actual operator alert journey in
+  local development, and update README, roadmap, index, and system
+  architecture for proven behavior. M3 remains in progress until MVP-009 is
+  accepted along with MVP-008.
+- Update the UI reference only for a reusable occurrence pattern; its target
+  dashboard sketch does not authorize MVP active-alert lifecycle or severity.
+  Do not change API/technology decisions unless implementation changes them.
+- Move this plan to `completed/` and update inbound links only after outcome
+  and evidence are accepted. Keep dated review evidence as history.
 
 ## Risks / Open Decisions
 
-- Refresh behavior before realtime transport exists.
+- Full device IDs on a global list are less friendly than names. Revisit a
+  server projection only if operator evidence shows that ID/link and one
+  detail enrichment are insufficient. Avoid client N+1 reads.
+- Manual Refresh can leave the list behind new occurrences. Revisit realtime
+  only with a measured unattended-update requirement and reviewed lifecycle.
+- Stop and re-plan if backend contract, identity/tenant model, dependency,
+  persistent cache, automatic delivery, or alert lifecycle must change.
+  Production deployment/migration needs separate explicit approval.
+- Recovery is a revert of this frontend PR; no alert data or schema changes.
+  Revisit if implementation changes that reversibility assumption.
 
 ## Done Criteria
 
-An operator can identify what happened, which device was affected, and which
-measurement/rule snapshot triggered the occurrence without relying on
-infrastructure logs or a retained telemetry history row.
+An operator can discover a recent occurrence globally or from device
+context, inspect its stored trigger and times, identify and open the affected
+device, and do so without logs, the current rule, or retained telemetry row.
+Loading, empty, error, refresh, pagination, responsive, accessible, and
+tenant-safe navigation have proportionate evidence. Plan-to-actual review,
+documentation closeout, final gates, and required independent review precede
+marking this plan Complete.
+
+## Plan review verdict (2026-09-24)
+
+The original plan left routes, request lifecycle, event-time labels, device
+naming, and filtered navigation open. It also assigned actual pruning proof to
+a browser case; the existing real PostgreSQL/GraphQL test owns that guarantee.
+This revision selects a bounded frontend consumer of merged MVP-008. An alert
+panel only on device detail was considered but would not provide discovery
+across devices. A server join or realtime transport has no demonstrated MVP
+need. No implementation, runtime validation, or PR action occurred in this
+review. The remaining assumptions fit the development-only slice; approval
+of this reviewed version is the next gate before implementation.
+
+The second pass found no remaining plan blocker. The main assumptions are
+manual freshness, full device IDs in global rows, and reuse of the existing
+development-only tenant/API boundary. Confidence is high in the available
+contract and repository fit, with rendered UI and browser behavior still
+unproven until implementation. The direct `alert(id)` post-pruning assertion
+is a required evidence gap assigned to the implementation PR.
+
+Engineering Improvement Review: current scope includes bounded pagination,
+recoverable refresh, stale-response cancellation, non-disclosing filtered
+navigation, and the exact detail contract test because omitting them would
+leave the new journey ambiguous or fragile. Frontend patterns, UX states, web
+security baseline, and test strategy own their design and evidence. Device
+name projection and realtime updates remain future enhancements with the
+operator-evidence and unattended-update triggers above. This review changes
+only the planned frontend slice and its tests; implementation approval is
+still pending.

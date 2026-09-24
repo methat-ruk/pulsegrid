@@ -769,5 +769,5 @@ remains unmerged; M2 stays in progress until integration.
 
 PR #16 subsequently merged into `main` as `9ce9e7c`. The earlier unmerged
 statements above are retained as dated review and closeout history. The
-current roadmap records M2 as complete; MVP-008 is accepted for merge in PR
-#18 but remains unmerged.
+current roadmap records M2 as complete. MVP-008 subsequently merged in PR #18
+as `fd0a383`; the earlier acceptance statement was its state at this review.

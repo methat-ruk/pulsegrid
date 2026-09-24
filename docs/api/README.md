@@ -3,10 +3,9 @@
 Status: MVP-002 development GraphQL device contract, MVP-003 console
 integration, MVP-004 local MQTT producer fixture, MVP-005 local/test telemetry
 ingestion, and MVP-006 local/test telemetry persistence/current-state projection
-are implemented on the feature branch and locally validated. The MVP-008
-rules/alerts backend and review fixes are validated; PR #18 is ready to merge
-but remains unmerged. Production identity, production MQTT, and permanent
-high-volume storage remain deferred.
+are implemented and validated. The MVP-008 rules/alerts backend merged in PR
+#18 as `fd0a383`. The MVP-009 alert console is in planning. Production
+identity, production MQTT, and permanent high-volume storage remain deferred.
 
 ## Purpose and ownership
 
@@ -87,8 +86,8 @@ API subscribes to the loopback broker at QoS 1 with a bounded 64-item in-memory
 queue. It accepts only the exact telemetry-v1 topic and four-field payload,
 resolves the tenant/device pair through PostgreSQL, and passes the accepted DTO
 to the synchronous consumer. MVP-006 replaced the original diagnostic sink
-with a PostgreSQL transaction before writing `telemetry_accepted`; the MVP-008
-candidate additionally evaluates rules and writes alerts in that transaction.
+with a PostgreSQL transaction before writing `telemetry_accepted`; MVP-008
+additionally evaluates rules and writes alerts in that transaction.
 The accepted log contains safe IDs and timestamps, never the raw payload or
 temperature. Unknown devices, wrong-tenant topics,
 malformed/oversized/future/retained messages, queue drops, and dependency
@@ -96,7 +95,7 @@ failures use stable `reason_code` values.
 
 MQTT PUBACK and queue admission are transport evidence only. The original
 MVP-005 handoff was non-durable; MVP-006 now provides durable logical
-idempotency, and the MVP-008 candidate makes telemetry and alert writes atomic.
+idempotency, and MVP-008 makes telemetry and alert writes atomic.
 The in-memory queue still does not promise automatic replay after a failure or
 crash. Enabled ingestion participates in readiness, so a broker disconnect
 returns `503 dependency_unavailable` while bounded reconnect and resubscription
@@ -227,7 +226,7 @@ uploads, persisted queries, and playground routes are not enabled. Introspection
 is available only in this explicit development mode. The SDL is the source of
 truth; generated gqlgen files are committed and checked for drift.
 
-The MVP-008 candidate validates both the MVP-006 telemetry schema from
+The development API validates both the MVP-006 telemetry schema from
 migration `005` and the rules/alerts schema from migration `006` before the
 development API starts listening. A missing required schema fails startup with
 the safe `database_schema_unavailable` action rather than reporting ready and
