@@ -214,6 +214,33 @@ No polling, subscription, SSE, WebSocket, retained MQTT state, or unqualified
 authority. Revisit the transport when an explicit freshness requirement,
 heartbeat contract, or measured unattended-update need exists.
 
+## MVP-008 rules and alert transaction decision
+
+The locally validated MVP-008 candidate keeps rules and alerts in the existing
+Go process and PostgreSQL deployment. It adds Goose migration `006`, uses the
+existing pgx pool, and adds no dependency, environment key, queue, worker,
+broker consumer, or service boundary. The projection repository keeps ownership
+of the accepted-telemetry transaction and invokes a narrow rules evaluator
+before commit. New telemetry, current state, retention pruning, and all
+matching immutable alerts commit together; an exact replay skips evaluation.
+
+The candidate limits each device to 20 stored rules, evaluates finite
+`float64` Celsius values with `GT`, `GTE`, `LT`, or `LTE`, and records one
+immutable alert per matching rule/message pair. The occurrence stores the rule
+and measurement snapshot and references the append-only telemetry identity,
+not the bounded history row. Rule creation/update never backfills history.
+This preserves the local modular boundary and alert traceability while
+accepting explicit republish as recovery for a pre-commit failure and
+unbounded durable identity/alert growth in this MVP. A database-backed
+outbox/worker is deferred until automatic recovery, independent consumers, or
+measured workload justifies its added owner and retry policy.
+
+This decision and its review fixes passed local and CI validation on
+`feat/mvp-008-threshold-rule-alert-backend`; PR #18 is ready to merge but not
+merged and makes no production migration or production-readiness claim. Revisit the transaction
+boundary if telemetry must remain committed through rule failure, and revisit
+the rule cap/retention when measured workload or operator needs change.
+
 ## Foundation selection evidence
 
 - [Go release history](https://go.dev/doc/devel/release) identifies Go 1.27 as

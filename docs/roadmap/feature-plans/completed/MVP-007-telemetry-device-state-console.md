@@ -2,10 +2,10 @@
 
 Status: Complete
 
-Review state: The latest PR #16 review findings are addressed and verified.
+Review state: The latest PR #16 review findings were addressed and verified.
 The user accepted the candidate as ready to merge and authorized this plan's
-completion move; the PR remains open and unmerged as requested. See the
-2026-09-23 post-review closeout below.
+completion move. PR #16 subsequently merged as `9ce9e7c`; the 2026-09-23
+post-review closeout below records its earlier unmerged state.
 
 Branch: `feat/mvp-007-telemetry-device-state-console`
 
@@ -764,3 +764,10 @@ remains unmerged; M2 stays in progress until integration.
 - [Apache ECharts import and tree-shaking guidance](https://echarts.apache.org/handbook/en/basics/import/)
 - [Apache ECharts accessibility guidance](https://echarts.apache.org/handbook/en/best-practices/aria/)
 - [npm registry entry for ECharts](https://www.npmjs.com/package/echarts)
+
+## Merge status update (2026-09-24)
+
+PR #16 subsequently merged into `main` as `9ce9e7c`. The earlier unmerged
+statements above are retained as dated review and closeout history. The
+current roadmap records M2 as complete; MVP-008 is accepted for merge in PR
+#18 but remains unmerged.

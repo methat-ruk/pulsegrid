@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/device/registry"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/rules"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/telemetry/projection"
 )
 
@@ -29,6 +30,16 @@ type TelemetryRepository interface {
 	ListTelemetry(context.Context, uuid.UUID, uuid.UUID, int, *projection.Cursor) (projection.TelemetryPage, error)
 }
 
+// ThresholdRuleRepository is the tenant-scoped application boundary for
+// rule configuration and immutable alert history.
+type ThresholdRuleRepository interface {
+	CreateRule(context.Context, uuid.UUID, rules.CreateRuleInput) (rules.Rule, error)
+	UpdateRule(context.Context, uuid.UUID, rules.UpdateRuleInput) (rules.Rule, error)
+	ListRules(context.Context, uuid.UUID, uuid.UUID) ([]rules.Rule, error)
+	GetAlert(context.Context, uuid.UUID, uuid.UUID) (rules.Alert, error)
+	ListAlerts(context.Context, uuid.UUID, int, *uuid.UUID, *rules.AlertCursor) (rules.AlertPage, error)
+}
+
 // Principal is the trusted server-selected GraphQL authority. No GraphQL
 // argument, header, cookie, or client state can replace it.
 type Principal struct {
@@ -39,6 +50,7 @@ type Principal struct {
 type Resolver struct {
 	repository          DeviceRepository
 	telemetryRepository TelemetryRepository
+	rulesRepository     ThresholdRuleRepository
 	organizationID      uuid.UUID
 }
 
@@ -50,9 +62,16 @@ func NewResolver(repository DeviceRepository, organizationID uuid.UUID) *Resolve
 // NewResolverWithTelemetry constructs the GraphQL resolver root with the
 // additive telemetry read boundary enabled.
 func NewResolverWithTelemetry(repository DeviceRepository, telemetryRepository TelemetryRepository, organizationID uuid.UUID) *Resolver {
+	return NewResolverWithRules(repository, telemetryRepository, nil, organizationID)
+}
+
+// NewResolverWithRules constructs the GraphQL resolver root with telemetry
+// and threshold-rule boundaries enabled.
+func NewResolverWithRules(repository DeviceRepository, telemetryRepository TelemetryRepository, rulesRepository ThresholdRuleRepository, organizationID uuid.UUID) *Resolver {
 	return &Resolver{
 		repository:          repository,
 		telemetryRepository: telemetryRepository,
+		rulesRepository:     rulesRepository,
 		organizationID:      organizationID,
 	}
 }

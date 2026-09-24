@@ -92,11 +92,11 @@ platform foundation” is not an acceptable PR boundary.
 ### MVP — Telemetry and current state
 
 - [MVP-006 — Telemetry and current-state projection](completed/MVP-006-telemetry-current-state-projection.md)
-- [MVP-007 — Telemetry and device-state console](completed/MVP-007-telemetry-device-state-console.md) — accepted for merge; PR #16 remains open and unmerged
+- [MVP-007 — Telemetry and device-state console](completed/MVP-007-telemetry-device-state-console.md) — merged as `9ce9e7c` (PR #16)
 
 ### MVP — Rules and alerts
 
-- [MVP-008 — Threshold rule and alert backend](planned/MVP-008-threshold-rule-alert-backend.md)
+- [MVP-008 — Threshold rule and alert backend](completed/MVP-008-threshold-rule-alert-backend.md) — implementation and review fixes validated; PR #18 ready to merge, not merged
 - [MVP-009 — Alert console](planned/MVP-009-alert-console.md)
 
 ### MVP — Remote commands

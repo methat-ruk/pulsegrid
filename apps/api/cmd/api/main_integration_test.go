@@ -11,6 +11,7 @@ import (
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/device/registry"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/database"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/databaseconfig"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/rules"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/telemetry/projection"
 )
 
@@ -81,5 +82,39 @@ func TestOpenDevelopmentGraphQLRejectsMissingTelemetrySchema(t *testing.T) {
 	code, message := startupFailureDetails(err)
 	if code != startupDatabaseSchemaUnavailable || message != "development database schema is unavailable; run migrations" {
 		t.Fatalf("pre-telemetry startup failure = (%q, %q), want schema-unavailable", code, message)
+	}
+}
+
+func TestOpenDevelopmentGraphQLRejectsMissingThresholdRulesSchema(t *testing.T) {
+	databaseConfiguration, err := databaseconfig.Load()
+	if err != nil {
+		t.Fatalf("load integration database configuration: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	pool, err := database.Open(ctx, databaseConfiguration.URL)
+	if err != nil {
+		t.Fatalf("open integration database: %v", err)
+	}
+	rulesRepository, err := rules.NewRepository(pool)
+	if err != nil {
+		pool.Close()
+		t.Fatalf("create threshold rules repository: %v", err)
+	}
+	if err := rulesRepository.ValidateSchema(ctx); err == nil {
+		pool.Close()
+		t.Skip("integration database has migration 006; run this test after rolling back only that migration")
+	} else if !errors.Is(err, rules.ErrSchemaUnavailable) {
+		pool.Close()
+		t.Fatalf("validate threshold rules schema: %v", err)
+	}
+	pool.Close()
+	_, _, _, err = openDevelopmentGraphQL(ctx)
+	if err == nil {
+		t.Fatal("openDevelopmentGraphQL succeeded without the threshold rules schema")
+	}
+	code, message := startupFailureDetails(err)
+	if code != startupDatabaseSchemaUnavailable || message != "development database schema is unavailable; run migrations" {
+		t.Fatalf("pre-006 startup failure = (%q, %q), want schema-unavailable", code, message)
 	}
 }

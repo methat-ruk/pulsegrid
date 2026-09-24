@@ -38,6 +38,30 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	AlertConnection struct {
+		Edges    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
+	}
+
+	AlertEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
+	AlertOccurrence struct {
+		Comparator         func(childComplexity int) int
+		CreatedAt          func(childComplexity int) int
+		DeviceID           func(childComplexity int) int
+		ID                 func(childComplexity int) int
+		MessageID          func(childComplexity int) int
+		Metric             func(childComplexity int) int
+		ObservedAt         func(childComplexity int) int
+		ReceivedAt         func(childComplexity int) int
+		RuleID             func(childComplexity int) int
+		TemperatureCelsius func(childComplexity int) int
+		ThresholdCelsius   func(childComplexity int) int
+	}
+
 	Device struct {
 		CreatedAt   func(childComplexity int) int
 		DeviceKey   func(childComplexity int) int
@@ -64,7 +88,9 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
-		CreateDevice func(childComplexity int, input model.CreateDeviceInput) int
+		CreateDevice        func(childComplexity int, input model.CreateDeviceInput) int
+		CreateThresholdRule func(childComplexity int, input model.CreateThresholdRuleInput) int
+		UpdateThresholdRule func(childComplexity int, input model.UpdateThresholdRuleInput) int
 	}
 
 	PageInfo struct {
@@ -73,10 +99,13 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		Alert              func(childComplexity int, id string) int
+		Alerts             func(childComplexity int, first int, after *string, deviceID *string) int
 		Device             func(childComplexity int, id string) int
 		DeviceCurrentState func(childComplexity int, deviceID string) int
 		DeviceTelemetry    func(childComplexity int, deviceID string, first int, after *string) int
 		Devices            func(childComplexity int, first int, after *string) int
+		ThresholdRules     func(childComplexity int, deviceID string) int
 	}
 
 	TelemetryConnection struct {
@@ -95,6 +124,18 @@ type ComplexityRoot struct {
 		ReceivedAt         func(childComplexity int) int
 		TemperatureCelsius func(childComplexity int) int
 	}
+
+	ThresholdRule struct {
+		Comparator       func(childComplexity int) int
+		CreatedAt        func(childComplexity int) int
+		DeviceID         func(childComplexity int) int
+		Enabled          func(childComplexity int) int
+		ID               func(childComplexity int) int
+		Metric           func(childComplexity int) int
+		Revision         func(childComplexity int) int
+		ThresholdCelsius func(childComplexity int) int
+		UpdatedAt        func(childComplexity int) int
+	}
 }
 
 // endregion ***************************** api!.gotpl *****************************
@@ -103,12 +144,17 @@ type ComplexityRoot struct {
 
 type MutationResolver interface {
 	CreateDevice(ctx context.Context, input model.CreateDeviceInput) (*model.Device, error)
+	CreateThresholdRule(ctx context.Context, input model.CreateThresholdRuleInput) (*model.ThresholdRule, error)
+	UpdateThresholdRule(ctx context.Context, input model.UpdateThresholdRuleInput) (*model.ThresholdRule, error)
 }
 type QueryResolver interface {
 	Device(ctx context.Context, id string) (*model.Device, error)
 	Devices(ctx context.Context, first int, after *string) (*model.DeviceConnection, error)
 	DeviceCurrentState(ctx context.Context, deviceID string) (*model.DeviceCurrentState, error)
 	DeviceTelemetry(ctx context.Context, deviceID string, first int, after *string) (*model.TelemetryConnection, error)
+	ThresholdRules(ctx context.Context, deviceID string) ([]*model.ThresholdRule, error)
+	Alert(ctx context.Context, id string) (*model.AlertOccurrence, error)
+	Alerts(ctx context.Context, first int, after *string, deviceID *string) (*model.AlertConnection, error)
 }
 
 // endregion ************************** generated!.gotpl **************************
@@ -128,6 +174,99 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	ec := newExecutionContext(nil, e, nil)
 	_ = ec
 	switch typeName + "." + field {
+
+	case "AlertConnection.edges":
+		if e.ComplexityRoot.AlertConnection.Edges == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AlertConnection.Edges(childComplexity), true
+	case "AlertConnection.pageInfo":
+		if e.ComplexityRoot.AlertConnection.PageInfo == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AlertConnection.PageInfo(childComplexity), true
+
+	case "AlertEdge.cursor":
+		if e.ComplexityRoot.AlertEdge.Cursor == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AlertEdge.Cursor(childComplexity), true
+	case "AlertEdge.node":
+		if e.ComplexityRoot.AlertEdge.Node == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AlertEdge.Node(childComplexity), true
+
+	case "AlertOccurrence.comparator":
+		if e.ComplexityRoot.AlertOccurrence.Comparator == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AlertOccurrence.Comparator(childComplexity), true
+	case "AlertOccurrence.createdAt":
+		if e.ComplexityRoot.AlertOccurrence.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AlertOccurrence.CreatedAt(childComplexity), true
+	case "AlertOccurrence.deviceId":
+		if e.ComplexityRoot.AlertOccurrence.DeviceID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AlertOccurrence.DeviceID(childComplexity), true
+	case "AlertOccurrence.id":
+		if e.ComplexityRoot.AlertOccurrence.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AlertOccurrence.ID(childComplexity), true
+	case "AlertOccurrence.messageId":
+		if e.ComplexityRoot.AlertOccurrence.MessageID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AlertOccurrence.MessageID(childComplexity), true
+	case "AlertOccurrence.metric":
+		if e.ComplexityRoot.AlertOccurrence.Metric == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AlertOccurrence.Metric(childComplexity), true
+	case "AlertOccurrence.observedAt":
+		if e.ComplexityRoot.AlertOccurrence.ObservedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AlertOccurrence.ObservedAt(childComplexity), true
+	case "AlertOccurrence.receivedAt":
+		if e.ComplexityRoot.AlertOccurrence.ReceivedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AlertOccurrence.ReceivedAt(childComplexity), true
+	case "AlertOccurrence.ruleId":
+		if e.ComplexityRoot.AlertOccurrence.RuleID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AlertOccurrence.RuleID(childComplexity), true
+	case "AlertOccurrence.temperatureCelsius":
+		if e.ComplexityRoot.AlertOccurrence.TemperatureCelsius == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AlertOccurrence.TemperatureCelsius(childComplexity), true
+	case "AlertOccurrence.thresholdCelsius":
+		if e.ComplexityRoot.AlertOccurrence.ThresholdCelsius == nil {
+			break
+		}
+
+		return e.ComplexityRoot.AlertOccurrence.ThresholdCelsius(childComplexity), true
 
 	case "Device.createdAt":
 		if e.ComplexityRoot.Device.CreatedAt == nil {
@@ -222,6 +361,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.CreateDevice(childComplexity, args["input"].(model.CreateDeviceInput)), true
+	case "Mutation.createThresholdRule":
+		if e.ComplexityRoot.Mutation.CreateThresholdRule == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createThresholdRule_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CreateThresholdRule(childComplexity, args["input"].(model.CreateThresholdRuleInput)), true
+	case "Mutation.updateThresholdRule":
+		if e.ComplexityRoot.Mutation.UpdateThresholdRule == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_updateThresholdRule_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.UpdateThresholdRule(childComplexity, args["input"].(model.UpdateThresholdRuleInput)), true
 
 	case "PageInfo.endCursor":
 		if e.ComplexityRoot.PageInfo.EndCursor == nil {
@@ -236,6 +397,28 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.PageInfo.HasNextPage(childComplexity), true
 
+	case "Query.alert":
+		if e.ComplexityRoot.Query.Alert == nil {
+			break
+		}
+
+		args, err := ec.field_Query_alert_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.Alert(childComplexity, args["id"].(string)), true
+	case "Query.alerts":
+		if e.ComplexityRoot.Query.Alerts == nil {
+			break
+		}
+
+		args, err := ec.field_Query_alerts_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.Alerts(childComplexity, args["first"].(int), args["after"].(*string), args["deviceId"].(*string)), true
 	case "Query.device":
 		if e.ComplexityRoot.Query.Device == nil {
 			break
@@ -280,6 +463,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Devices(childComplexity, args["first"].(int), args["after"].(*string)), true
+
+	case "Query.thresholdRules":
+		if e.ComplexityRoot.Query.ThresholdRules == nil {
+			break
+		}
+
+		args, err := ec.field_Query_thresholdRules_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.ThresholdRules(childComplexity, args["deviceId"].(string)), true
 
 	case "TelemetryConnection.edges":
 		if e.ComplexityRoot.TelemetryConnection.Edges == nil {
@@ -332,6 +527,61 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.TelemetryPoint.TemperatureCelsius(childComplexity), true
 
+	case "ThresholdRule.comparator":
+		if e.ComplexityRoot.ThresholdRule.Comparator == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ThresholdRule.Comparator(childComplexity), true
+	case "ThresholdRule.createdAt":
+		if e.ComplexityRoot.ThresholdRule.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ThresholdRule.CreatedAt(childComplexity), true
+	case "ThresholdRule.deviceId":
+		if e.ComplexityRoot.ThresholdRule.DeviceID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ThresholdRule.DeviceID(childComplexity), true
+	case "ThresholdRule.enabled":
+		if e.ComplexityRoot.ThresholdRule.Enabled == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ThresholdRule.Enabled(childComplexity), true
+	case "ThresholdRule.id":
+		if e.ComplexityRoot.ThresholdRule.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ThresholdRule.ID(childComplexity), true
+	case "ThresholdRule.metric":
+		if e.ComplexityRoot.ThresholdRule.Metric == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ThresholdRule.Metric(childComplexity), true
+	case "ThresholdRule.revision":
+		if e.ComplexityRoot.ThresholdRule.Revision == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ThresholdRule.Revision(childComplexity), true
+	case "ThresholdRule.thresholdCelsius":
+		if e.ComplexityRoot.ThresholdRule.ThresholdCelsius == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ThresholdRule.ThresholdCelsius(childComplexity), true
+	case "ThresholdRule.updatedAt":
+		if e.ComplexityRoot.ThresholdRule.UpdatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ThresholdRule.UpdatedAt(childComplexity), true
+
 	}
 	return 0, false
 }
@@ -341,6 +591,8 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	ec := newExecutionContext(opCtx, e, make(chan graphql.DeferredResult))
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
 		ec.unmarshalInputCreateDeviceInput,
+		ec.unmarshalInputCreateThresholdRuleInput,
+		ec.unmarshalInputUpdateThresholdRuleInput,
 	)
 	first := true
 
@@ -435,6 +687,54 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // Each function is generated once per unique object type, deduplicating the
 // switch statements that were previously inlined in every fieldContext_* function.
 
+func (ec *executionContext) childFields_AlertConnection(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "edges":
+		return ec.fieldContext_AlertConnection_edges(ctx, field)
+	case "pageInfo":
+		return ec.fieldContext_AlertConnection_pageInfo(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type AlertConnection", field.Name)
+}
+
+func (ec *executionContext) childFields_AlertEdge(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "cursor":
+		return ec.fieldContext_AlertEdge_cursor(ctx, field)
+	case "node":
+		return ec.fieldContext_AlertEdge_node(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type AlertEdge", field.Name)
+}
+
+func (ec *executionContext) childFields_AlertOccurrence(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_AlertOccurrence_id(ctx, field)
+	case "deviceId":
+		return ec.fieldContext_AlertOccurrence_deviceId(ctx, field)
+	case "ruleId":
+		return ec.fieldContext_AlertOccurrence_ruleId(ctx, field)
+	case "messageId":
+		return ec.fieldContext_AlertOccurrence_messageId(ctx, field)
+	case "observedAt":
+		return ec.fieldContext_AlertOccurrence_observedAt(ctx, field)
+	case "receivedAt":
+		return ec.fieldContext_AlertOccurrence_receivedAt(ctx, field)
+	case "temperatureCelsius":
+		return ec.fieldContext_AlertOccurrence_temperatureCelsius(ctx, field)
+	case "metric":
+		return ec.fieldContext_AlertOccurrence_metric(ctx, field)
+	case "comparator":
+		return ec.fieldContext_AlertOccurrence_comparator(ctx, field)
+	case "thresholdCelsius":
+		return ec.fieldContext_AlertOccurrence_thresholdCelsius(ctx, field)
+	case "createdAt":
+		return ec.fieldContext_AlertOccurrence_createdAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type AlertOccurrence", field.Name)
+}
+
 func (ec *executionContext) childFields_Device(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "id":
@@ -527,6 +827,30 @@ func (ec *executionContext) childFields_TelemetryPoint(ctx context.Context, fiel
 		return ec.fieldContext_TelemetryPoint_temperatureCelsius(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type TelemetryPoint", field.Name)
+}
+
+func (ec *executionContext) childFields_ThresholdRule(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_ThresholdRule_id(ctx, field)
+	case "deviceId":
+		return ec.fieldContext_ThresholdRule_deviceId(ctx, field)
+	case "metric":
+		return ec.fieldContext_ThresholdRule_metric(ctx, field)
+	case "comparator":
+		return ec.fieldContext_ThresholdRule_comparator(ctx, field)
+	case "thresholdCelsius":
+		return ec.fieldContext_ThresholdRule_thresholdCelsius(ctx, field)
+	case "enabled":
+		return ec.fieldContext_ThresholdRule_enabled(ctx, field)
+	case "revision":
+		return ec.fieldContext_ThresholdRule_revision(ctx, field)
+	case "createdAt":
+		return ec.fieldContext_ThresholdRule_createdAt(ctx, field)
+	case "updatedAt":
+		return ec.fieldContext_ThresholdRule_updatedAt(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ThresholdRule", field.Name)
 }
 
 func (ec *executionContext) childFields___Directive(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -659,6 +983,34 @@ func (ec *executionContext) field_Mutation_createDevice_args(ctx context.Context
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_createThresholdRule_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.CreateThresholdRuleInput, error) {
+			return ec.unmarshalNCreateThresholdRuleInput2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCreateThresholdRuleInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_updateThresholdRule_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.UpdateThresholdRuleInput, error) {
+			return ec.unmarshalNUpdateThresholdRuleInput2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐUpdateThresholdRuleInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -670,6 +1022,50 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		return nil, err
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_alert_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_alerts_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "first",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "after",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "deviceId",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOID2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["deviceId"] = arg2
 	return args, nil
 }
 
@@ -753,6 +1149,20 @@ func (ec *executionContext) field_Query_devices_args(ctx context.Context, rawArg
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_thresholdRules_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "deviceId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["deviceId"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field___Directive_args_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -812,6 +1222,378 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 // endregion ***************************** args.gotpl *****************************
 
 // region    **************************** field.gotpl *****************************
+
+func (ec *executionContext) _AlertConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.AlertConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AlertConnection_edges(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Edges, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.AlertEdge) graphql.Marshaler {
+			return ec.marshalNAlertEdge2ᚕᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐAlertEdgeᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AlertConnection_edges(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AlertConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_AlertEdge(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AlertConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.AlertConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AlertConnection_pageInfo(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PageInfo, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.PageInfo) graphql.Marshaler {
+			return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐPageInfo(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AlertConnection_pageInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AlertConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_PageInfo(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AlertEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.AlertEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AlertEdge_cursor(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Cursor, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AlertEdge_cursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AlertEdge", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _AlertEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.AlertEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AlertEdge_node(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Node, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.AlertOccurrence) graphql.Marshaler {
+			return ec.marshalNAlertOccurrence2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐAlertOccurrence(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AlertEdge_node(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "AlertEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_AlertOccurrence(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _AlertOccurrence_id(ctx context.Context, field graphql.CollectedField, obj *model.AlertOccurrence) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AlertOccurrence_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AlertOccurrence_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AlertOccurrence", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _AlertOccurrence_deviceId(ctx context.Context, field graphql.CollectedField, obj *model.AlertOccurrence) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AlertOccurrence_deviceId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DeviceID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AlertOccurrence_deviceId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AlertOccurrence", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _AlertOccurrence_ruleId(ctx context.Context, field graphql.CollectedField, obj *model.AlertOccurrence) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AlertOccurrence_ruleId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.RuleID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AlertOccurrence_ruleId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AlertOccurrence", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _AlertOccurrence_messageId(ctx context.Context, field graphql.CollectedField, obj *model.AlertOccurrence) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AlertOccurrence_messageId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MessageID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AlertOccurrence_messageId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AlertOccurrence", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _AlertOccurrence_observedAt(ctx context.Context, field graphql.CollectedField, obj *model.AlertOccurrence) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AlertOccurrence_observedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ObservedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AlertOccurrence_observedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AlertOccurrence", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
+func (ec *executionContext) _AlertOccurrence_receivedAt(ctx context.Context, field graphql.CollectedField, obj *model.AlertOccurrence) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AlertOccurrence_receivedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ReceivedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AlertOccurrence_receivedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AlertOccurrence", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
+func (ec *executionContext) _AlertOccurrence_temperatureCelsius(ctx context.Context, field graphql.CollectedField, obj *model.AlertOccurrence) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AlertOccurrence_temperatureCelsius(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TemperatureCelsius, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AlertOccurrence_temperatureCelsius(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AlertOccurrence", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _AlertOccurrence_metric(ctx context.Context, field graphql.CollectedField, obj *model.AlertOccurrence) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AlertOccurrence_metric(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Metric, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model.ThresholdMetric) graphql.Marshaler {
+			return ec.marshalNThresholdMetric2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐThresholdMetric(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AlertOccurrence_metric(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AlertOccurrence", field, false, false, errors.New("field of type ThresholdMetric does not have child fields"))
+}
+
+func (ec *executionContext) _AlertOccurrence_comparator(ctx context.Context, field graphql.CollectedField, obj *model.AlertOccurrence) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AlertOccurrence_comparator(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Comparator, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model.ThresholdComparator) graphql.Marshaler {
+			return ec.marshalNThresholdComparator2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐThresholdComparator(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AlertOccurrence_comparator(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AlertOccurrence", field, false, false, errors.New("field of type ThresholdComparator does not have child fields"))
+}
+
+func (ec *executionContext) _AlertOccurrence_thresholdCelsius(ctx context.Context, field graphql.CollectedField, obj *model.AlertOccurrence) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AlertOccurrence_thresholdCelsius(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ThresholdCelsius, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AlertOccurrence_thresholdCelsius(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AlertOccurrence", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _AlertOccurrence_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.AlertOccurrence) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_AlertOccurrence_createdAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_AlertOccurrence_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("AlertOccurrence", field, false, false, errors.New("field of type Time does not have child fields"))
+}
 
 func (ec *executionContext) _Device_id(ctx context.Context, field graphql.CollectedField, obj *model.Device) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
@@ -1183,6 +1965,94 @@ func (ec *executionContext) fieldContext_Mutation_createDevice(ctx context.Conte
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_createThresholdRule(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_createThresholdRule(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CreateThresholdRule(ctx, fc.Args["input"].(model.CreateThresholdRuleInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ThresholdRule) graphql.Marshaler {
+			return ec.marshalNThresholdRule2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐThresholdRule(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_createThresholdRule(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ThresholdRule(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createThresholdRule_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_updateThresholdRule(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_updateThresholdRule(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().UpdateThresholdRule(ctx, fc.Args["input"].(model.UpdateThresholdRuleInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.ThresholdRule) graphql.Marshaler {
+			return ec.marshalNThresholdRule2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐThresholdRule(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_updateThresholdRule(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ThresholdRule(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_updateThresholdRule_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PageInfo_endCursor(ctx context.Context, field graphql.CollectedField, obj *model.PageInfo) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -1399,6 +2269,138 @@ func (ec *executionContext) fieldContext_Query_deviceTelemetry(ctx context.Conte
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_deviceTelemetry_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_thresholdRules(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_thresholdRules(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().ThresholdRules(ctx, fc.Args["deviceId"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.ThresholdRule) graphql.Marshaler {
+			return ec.marshalNThresholdRule2ᚕᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐThresholdRuleᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_thresholdRules(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ThresholdRule(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_thresholdRules_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_alert(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_alert(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().Alert(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.AlertOccurrence) graphql.Marshaler {
+			return ec.marshalOAlertOccurrence2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐAlertOccurrence(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Query_alert(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_AlertOccurrence(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_alert_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_alerts(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_alerts(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().Alerts(ctx, fc.Args["first"].(int), fc.Args["after"].(*string), fc.Args["deviceId"].(*string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.AlertConnection) graphql.Marshaler {
+			return ec.marshalNAlertConnection2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐAlertConnection(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_alerts(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_AlertConnection(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_alerts_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -1690,6 +2692,213 @@ func (ec *executionContext) _TelemetryPoint_temperatureCelsius(ctx context.Conte
 }
 func (ec *executionContext) fieldContext_TelemetryPoint_temperatureCelsius(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("TelemetryPoint", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _ThresholdRule_id(ctx context.Context, field graphql.CollectedField, obj *model.ThresholdRule) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ThresholdRule_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ThresholdRule_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ThresholdRule", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _ThresholdRule_deviceId(ctx context.Context, field graphql.CollectedField, obj *model.ThresholdRule) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ThresholdRule_deviceId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DeviceID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ThresholdRule_deviceId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ThresholdRule", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _ThresholdRule_metric(ctx context.Context, field graphql.CollectedField, obj *model.ThresholdRule) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ThresholdRule_metric(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Metric, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model.ThresholdMetric) graphql.Marshaler {
+			return ec.marshalNThresholdMetric2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐThresholdMetric(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ThresholdRule_metric(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ThresholdRule", field, false, false, errors.New("field of type ThresholdMetric does not have child fields"))
+}
+
+func (ec *executionContext) _ThresholdRule_comparator(ctx context.Context, field graphql.CollectedField, obj *model.ThresholdRule) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ThresholdRule_comparator(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Comparator, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model.ThresholdComparator) graphql.Marshaler {
+			return ec.marshalNThresholdComparator2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐThresholdComparator(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ThresholdRule_comparator(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ThresholdRule", field, false, false, errors.New("field of type ThresholdComparator does not have child fields"))
+}
+
+func (ec *executionContext) _ThresholdRule_thresholdCelsius(ctx context.Context, field graphql.CollectedField, obj *model.ThresholdRule) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ThresholdRule_thresholdCelsius(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ThresholdCelsius, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ThresholdRule_thresholdCelsius(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ThresholdRule", field, false, false, errors.New("field of type Float does not have child fields"))
+}
+
+func (ec *executionContext) _ThresholdRule_enabled(ctx context.Context, field graphql.CollectedField, obj *model.ThresholdRule) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ThresholdRule_enabled(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Enabled, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ThresholdRule_enabled(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ThresholdRule", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _ThresholdRule_revision(ctx context.Context, field graphql.CollectedField, obj *model.ThresholdRule) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ThresholdRule_revision(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Revision, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ThresholdRule_revision(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ThresholdRule", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _ThresholdRule_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.ThresholdRule) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ThresholdRule_createdAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ThresholdRule_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ThresholdRule", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
+func (ec *executionContext) _ThresholdRule_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.ThresholdRule) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ThresholdRule_updatedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ThresholdRule_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ThresholdRule", field, false, false, errors.New("field of type Time does not have child fields"))
 }
 
 func (ec *executionContext) ___Directive_name(ctx context.Context, field graphql.CollectedField, obj *introspection.Directive) (ret graphql.Marshaler) {
@@ -2788,6 +3997,119 @@ func (ec *executionContext) unmarshalInputCreateDeviceInput(ctx context.Context,
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputCreateThresholdRuleInput(ctx context.Context, obj any) (model.CreateThresholdRuleInput, error) {
+	var it model.CreateThresholdRuleInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	if _, present := asMap["enabled"]; !present {
+		asMap["enabled"] = true
+	}
+
+	fieldsInOrder := [...]string{"deviceId", "comparator", "thresholdCelsius", "enabled"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "deviceId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("deviceId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.DeviceID = data
+		case "comparator":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("comparator"))
+			data, err := ec.unmarshalNThresholdComparator2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐThresholdComparator(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Comparator = data
+		case "thresholdCelsius":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("thresholdCelsius"))
+			data, err := ec.unmarshalNFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ThresholdCelsius = data
+		case "enabled":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("enabled"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Enabled = data
+		}
+	}
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputUpdateThresholdRuleInput(ctx context.Context, obj any) (model.UpdateThresholdRuleInput, error) {
+	var it model.UpdateThresholdRuleInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"id", "expectedRevision", "comparator", "thresholdCelsius", "enabled"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "id":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ID = data
+		case "expectedRevision":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("expectedRevision"))
+			data, err := ec.unmarshalNInt2int(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ExpectedRevision = data
+		case "comparator":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("comparator"))
+			data, err := ec.unmarshalNThresholdComparator2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐThresholdComparator(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Comparator = data
+		case "thresholdCelsius":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("thresholdCelsius"))
+			data, err := ec.unmarshalNFloat2float64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ThresholdCelsius = data
+		case "enabled":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("enabled"))
+			data, err := ec.unmarshalNBoolean2bool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Enabled = data
+		}
+	}
+	return it, nil
+}
+
 // endregion **************************** input.gotpl *****************************
 
 // region    ************************** interface.gotpl ***************************
@@ -2795,6 +4117,180 @@ func (ec *executionContext) unmarshalInputCreateDeviceInput(ctx context.Context,
 // endregion ************************** interface.gotpl ***************************
 
 // region    **************************** object.gotpl ****************************
+
+var alertConnectionImplementors = []string{"AlertConnection"}
+
+func (ec *executionContext) _AlertConnection(ctx context.Context, sel ast.SelectionSet, obj *model.AlertConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, alertConnectionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AlertConnection")
+		case "edges":
+			out.Values[i] = ec._AlertConnection_edges(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pageInfo":
+			out.Values[i] = ec._AlertConnection_pageInfo(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var alertEdgeImplementors = []string{"AlertEdge"}
+
+func (ec *executionContext) _AlertEdge(ctx context.Context, sel ast.SelectionSet, obj *model.AlertEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, alertEdgeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AlertEdge")
+		case "cursor":
+			out.Values[i] = ec._AlertEdge_cursor(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "node":
+			out.Values[i] = ec._AlertEdge_node(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var alertOccurrenceImplementors = []string{"AlertOccurrence"}
+
+func (ec *executionContext) _AlertOccurrence(ctx context.Context, sel ast.SelectionSet, obj *model.AlertOccurrence) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, alertOccurrenceImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("AlertOccurrence")
+		case "id":
+			out.Values[i] = ec._AlertOccurrence_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deviceId":
+			out.Values[i] = ec._AlertOccurrence_deviceId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "ruleId":
+			out.Values[i] = ec._AlertOccurrence_ruleId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "messageId":
+			out.Values[i] = ec._AlertOccurrence_messageId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "observedAt":
+			out.Values[i] = ec._AlertOccurrence_observedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "receivedAt":
+			out.Values[i] = ec._AlertOccurrence_receivedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "temperatureCelsius":
+			out.Values[i] = ec._AlertOccurrence_temperatureCelsius(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "metric":
+			out.Values[i] = ec._AlertOccurrence_metric(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "comparator":
+			out.Values[i] = ec._AlertOccurrence_comparator(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "thresholdCelsius":
+			out.Values[i] = ec._AlertOccurrence_thresholdCelsius(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._AlertOccurrence_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
 
 var deviceImplementors = []string{"Device"}
 
@@ -3020,6 +4516,20 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "createThresholdRule":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createThresholdRule(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updateThresholdRule":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_updateThresholdRule(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -3192,6 +4702,72 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "thresholdRules":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_thresholdRules(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "alert":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_alert(ctx, field)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "alerts":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_alerts(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "__type":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___type(ctx, field)
@@ -3342,6 +4918,84 @@ func (ec *executionContext) _TelemetryPoint(ctx context.Context, sel ast.Selecti
 			}
 		case "temperatureCelsius":
 			out.Values[i] = ec._TelemetryPoint_temperatureCelsius(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var thresholdRuleImplementors = []string{"ThresholdRule"}
+
+func (ec *executionContext) _ThresholdRule(ctx context.Context, sel ast.SelectionSet, obj *model.ThresholdRule) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, thresholdRuleImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ThresholdRule")
+		case "id":
+			out.Values[i] = ec._ThresholdRule_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deviceId":
+			out.Values[i] = ec._ThresholdRule_deviceId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "metric":
+			out.Values[i] = ec._ThresholdRule_metric(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "comparator":
+			out.Values[i] = ec._ThresholdRule_comparator(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "thresholdCelsius":
+			out.Values[i] = ec._ThresholdRule_thresholdCelsius(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "enabled":
+			out.Values[i] = ec._ThresholdRule_enabled(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "revision":
+			out.Values[i] = ec._ThresholdRule_revision(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._ThresholdRule_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatedAt":
+			out.Values[i] = ec._ThresholdRule_updatedAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -3758,6 +5412,52 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 
 // region    ***************************** type.gotpl *****************************
 
+func (ec *executionContext) marshalNAlertConnection2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐAlertConnection(ctx context.Context, sel ast.SelectionSet, v *model.AlertConnection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AlertConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNAlertEdge2ᚕᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐAlertEdgeᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.AlertEdge) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNAlertEdge2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐAlertEdge(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNAlertEdge2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐAlertEdge(ctx context.Context, sel ast.SelectionSet, v *model.AlertEdge) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AlertEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNAlertOccurrence2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐAlertOccurrence(ctx context.Context, sel ast.SelectionSet, v *model.AlertOccurrence) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._AlertOccurrence(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v any) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -3776,6 +5476,11 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 
 func (ec *executionContext) unmarshalNCreateDeviceInput2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCreateDeviceInput(ctx context.Context, v any) (model.CreateDeviceInput, error) {
 	res, err := ec.unmarshalInputCreateDeviceInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNCreateThresholdRuleInput2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCreateThresholdRuleInput(ctx context.Context, v any) (model.CreateThresholdRuleInput, error) {
+	res, err := ec.unmarshalInputCreateThresholdRuleInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
@@ -3945,6 +5650,52 @@ func (ec *executionContext) marshalNTelemetryPoint2ᚖgithubᚗcomᚋmethatᚑru
 	return ec._TelemetryPoint(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNThresholdComparator2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐThresholdComparator(ctx context.Context, v any) (model.ThresholdComparator, error) {
+	var res model.ThresholdComparator
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNThresholdComparator2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐThresholdComparator(ctx context.Context, sel ast.SelectionSet, v model.ThresholdComparator) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) unmarshalNThresholdMetric2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐThresholdMetric(ctx context.Context, v any) (model.ThresholdMetric, error) {
+	var res model.ThresholdMetric
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNThresholdMetric2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐThresholdMetric(ctx context.Context, sel ast.SelectionSet, v model.ThresholdMetric) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) marshalNThresholdRule2ᚕᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐThresholdRuleᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ThresholdRule) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNThresholdRule2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐThresholdRule(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNThresholdRule2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐThresholdRule(ctx context.Context, sel ast.SelectionSet, v *model.ThresholdRule) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ThresholdRule(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNTime2timeᚐTime(ctx context.Context, v any) (time.Time, error) {
 	res, err := graphql.UnmarshalTime(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -3959,6 +5710,11 @@ func (ec *executionContext) marshalNTime2timeᚐTime(ctx context.Context, sel as
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNUpdateThresholdRuleInput2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐUpdateThresholdRuleInput(ctx context.Context, v any) (model.UpdateThresholdRuleInput, error) {
+	res, err := ec.unmarshalInputUpdateThresholdRuleInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler {
@@ -4101,6 +5857,13 @@ func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel a
 	return res
 }
 
+func (ec *executionContext) marshalOAlertOccurrence2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐAlertOccurrence(ctx context.Context, sel ast.SelectionSet, v *model.AlertOccurrence) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._AlertOccurrence(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v any) (bool, error) {
 	res, err := graphql.UnmarshalBoolean(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -4143,6 +5906,24 @@ func (ec *executionContext) marshalODeviceCurrentState2ᚖgithubᚗcomᚋmethat�
 		return graphql.Null
 	}
 	return ec._DeviceCurrentState(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOID2ᚖstring(ctx context.Context, v any) (*string, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalID(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOID2ᚖstring(ctx context.Context, sel ast.SelectionSet, v *string) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalID(*v)
+	return res
 }
 
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v any) (*string, error) {

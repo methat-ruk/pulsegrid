@@ -47,9 +47,71 @@ type TelemetryConnection {
   pageInfo: PageInfo!
 }
 
+enum ThresholdComparator {
+  GT
+  GTE
+  LT
+  LTE
+}
+
+enum ThresholdMetric {
+  TEMPERATURE_CELSIUS
+}
+
+type ThresholdRule {
+  id: ID!
+  deviceId: ID!
+  metric: ThresholdMetric!
+  comparator: ThresholdComparator!
+  thresholdCelsius: Float!
+  enabled: Boolean!
+  revision: Int!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type AlertOccurrence {
+  id: ID!
+  deviceId: ID!
+  ruleId: ID!
+  messageId: ID!
+  observedAt: Time!
+  receivedAt: Time!
+  temperatureCelsius: Float!
+  metric: ThresholdMetric!
+  comparator: ThresholdComparator!
+  thresholdCelsius: Float!
+  createdAt: Time!
+}
+
+type AlertEdge {
+  cursor: String!
+  node: AlertOccurrence!
+}
+
+type AlertConnection {
+  edges: [AlertEdge!]!
+  pageInfo: PageInfo!
+}
+
 input CreateDeviceInput {
   deviceKey: String!
   displayName: String!
+}
+
+input CreateThresholdRuleInput {
+  deviceId: ID!
+  comparator: ThresholdComparator!
+  thresholdCelsius: Float!
+  enabled: Boolean! = true
+}
+
+input UpdateThresholdRuleInput {
+  id: ID!
+  expectedRevision: Int!
+  comparator: ThresholdComparator!
+  thresholdCelsius: Float!
+  enabled: Boolean!
 }
 
 type Query {
@@ -57,8 +119,13 @@ type Query {
   devices(first: Int! = 20, after: String): DeviceConnection!
   deviceCurrentState(deviceId: ID!): DeviceCurrentState
   deviceTelemetry(deviceId: ID!, first: Int! = 50, after: String): TelemetryConnection!
+  thresholdRules(deviceId: ID!): [ThresholdRule!]!
+  alert(id: ID!): AlertOccurrence
+  alerts(first: Int! = 50, after: String, deviceId: ID): AlertConnection!
 }
 
 type Mutation {
   createDevice(input: CreateDeviceInput!): Device!
+  createThresholdRule(input: CreateThresholdRuleInput!): ThresholdRule!
+  updateThresholdRule(input: UpdateThresholdRuleInput!): ThresholdRule!
 }

@@ -67,7 +67,14 @@ type TelemetryPage struct {
 
 // Repository owns telemetry persistence and tenant-scoped reads.
 type Repository struct {
-	pool *pgxpool.Pool
+	pool      *pgxpool.Pool
+	evaluator RuleEvaluator
+}
+
+// RuleEvaluator evaluates one newly persisted observation within the
+// transaction owned by the telemetry projection repository.
+type RuleEvaluator interface {
+	Evaluate(context.Context, pgx.Tx, ingestion.AcceptedTelemetry) error
 }
 
 // NewRepository constructs the projection repository over an existing pool.
@@ -76,6 +83,20 @@ func NewRepository(pool *pgxpool.Pool) (*Repository, error) {
 		return nil, errors.New("telemetry projection requires a database pool")
 	}
 	return &Repository{pool: pool}, nil
+}
+
+// NewRepositoryWithEvaluator adds rule evaluation to the existing projection
+// transaction. The evaluator must use the supplied transaction for all writes.
+func NewRepositoryWithEvaluator(pool *pgxpool.Pool, evaluator RuleEvaluator) (*Repository, error) {
+	if evaluator == nil {
+		return nil, errors.New("telemetry projection requires a rule evaluator")
+	}
+	repository, err := NewRepository(pool)
+	if err != nil {
+		return nil, err
+	}
+	repository.evaluator = evaluator
+	return repository, nil
 }
 
 // ValidateSchema verifies the tables and columns required by the projection
@@ -311,6 +332,13 @@ func (r *Repository) Consume(ctx context.Context, accepted ingestion.AcceptedTel
 		  )
 	`, accepted.DeviceID, currentSequence, retainedOtherRows); err != nil {
 		return fmt.Errorf("enforce telemetry history bound: %w", err)
+	}
+	if r.evaluator != nil {
+		accepted.ObservedAt = observedAt
+		accepted.ReceivedAt = receivedAt
+		if err := r.evaluator.Evaluate(ctx, tx, accepted); err != nil {
+			return fmt.Errorf("evaluate telemetry threshold rules: %w", err)
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {

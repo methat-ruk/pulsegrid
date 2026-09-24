@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 
 const generatedPaths = [
@@ -5,6 +6,7 @@ const generatedPaths = [
   'apps/api/graph/model/models_gen.go',
   'apps/api/graph/device.resolvers.go',
 ]
+const beforeGeneration = new Map(generatedPaths.map((path) => [path, readFileSync(path)]))
 
 const generation = spawnSync('go', ['-C', 'apps/api', 'generate', './graph'], {
   cwd: process.cwd(),
@@ -16,15 +18,8 @@ if (generation.error) {
 }
 if (generation.status !== 0) process.exit(generation.status ?? 1)
 
-const diff = spawnSync('git', ['diff', '--exit-code', '--', ...generatedPaths], {
-  cwd: process.cwd(),
-  stdio: 'inherit',
-})
-if (diff.error) {
-  console.error(`unable to inspect generated GraphQL files: ${diff.error.message}`)
+const stalePaths = generatedPaths.filter((path) => !beforeGeneration.get(path).equals(readFileSync(path)))
+if (stalePaths.length > 0) {
+  console.error(`GraphQL generated files are stale; regenerate and review: ${stalePaths.join(', ')}`)
   process.exit(1)
-}
-if (diff.status !== 0) {
-  console.error('GraphQL generated files are stale; run `corepack pnpm run api:generate` and commit the result')
-  process.exit(diff.status ?? 1)
 }

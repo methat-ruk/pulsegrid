@@ -19,6 +19,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/methat-ruk/pulsegrid/apps/api/graph/model"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/requestcontext"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/rules"
 )
 
 const GraphQLPath = "/graphql"
@@ -33,6 +34,12 @@ func NewHandler(repository DeviceRepository, organizationID uuid.UUID, logger *s
 // NewHandlerWithTelemetry constructs the development GraphQL transport with
 // the additive telemetry read boundary enabled.
 func NewHandlerWithTelemetry(repository DeviceRepository, telemetryRepository TelemetryRepository, organizationID uuid.UUID, logger *slog.Logger) (http.Handler, error) {
+	return NewHandlerWithRules(repository, telemetryRepository, nil, organizationID, logger)
+}
+
+// NewHandlerWithRules constructs the constrained development GraphQL
+// transport with telemetry reads and threshold-rule/alert operations.
+func NewHandlerWithRules(repository DeviceRepository, telemetryRepository TelemetryRepository, rulesRepository ThresholdRuleRepository, organizationID uuid.UUID, logger *slog.Logger) (http.Handler, error) {
 	if repository == nil {
 		return nil, errors.New("graphql handler requires a device repository")
 	}
@@ -43,7 +50,7 @@ func NewHandlerWithTelemetry(repository DeviceRepository, telemetryRepository Te
 		logger = slog.Default()
 	}
 
-	config := Config{Resolvers: NewResolverWithTelemetry(repository, telemetryRepository, organizationID)}
+	config := Config{Resolvers: NewResolverWithRules(repository, telemetryRepository, rulesRepository, organizationID)}
 	config.Complexity.Query.Device = func(childComplexity int, id string) int {
 		return 1 + childComplexity
 	}
@@ -62,7 +69,25 @@ func NewHandlerWithTelemetry(repository DeviceRepository, telemetryRepository Te
 		}
 		return 1 + (first * childComplexity)
 	}
+	config.Complexity.Query.ThresholdRules = func(childComplexity int, deviceID string) int {
+		return 1 + (rules.MaxRulesPerDevice * childComplexity)
+	}
+	config.Complexity.Query.Alert = func(childComplexity int, id string) int {
+		return 1 + childComplexity
+	}
+	config.Complexity.Query.Alerts = func(childComplexity int, first int, after *string, deviceID *string) int {
+		if first < 1 {
+			return childComplexity + 1
+		}
+		return 1 + (first * childComplexity)
+	}
 	config.Complexity.Mutation.CreateDevice = func(childComplexity int, input model.CreateDeviceInput) int {
+		return 1 + childComplexity
+	}
+	config.Complexity.Mutation.CreateThresholdRule = func(childComplexity int, input model.CreateThresholdRuleInput) int {
+		return 1 + childComplexity
+	}
+	config.Complexity.Mutation.UpdateThresholdRule = func(childComplexity int, input model.UpdateThresholdRuleInput) int {
 		return 1 + childComplexity
 	}
 

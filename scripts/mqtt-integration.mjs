@@ -54,10 +54,14 @@ try {
     await startApi()
     await waitForReady()
     const deviceID = await createDevice()
+    await createThresholdRule(deviceID)
     const simulatorTelemetry = await publishSimulator(deviceID)
     const duplicateMessageID = await publishInvalidCases(deviceID)
     await assertPersistedObservation(deviceID, simulatorTelemetry.messageID, 23.5, 1)
     await assertPersistedObservation(deviceID, duplicateMessageID, 24.5, 1)
+    await assertAlertForMessage(deviceID, simulatorTelemetry.messageID, 23.5, 20)
+    await assertAlertForMessage(deviceID, duplicateMessageID, 24.5, 20)
+    await testAlertPersistenceFailure(deviceID)
     const projectionTelemetry = await testPersistenceProjection(deviceID, simulatorTelemetry)
     await testBrokerPayloadCap(deviceID)
     assertNoRawTelemetryInLogs()
@@ -174,6 +178,23 @@ async function createDevice() {
   return deviceID
 }
 
+async function createThresholdRule(deviceID) {
+  const response = await fetch(`http://127.0.0.1:${apiPort}/graphql`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      query: 'mutation CreateThresholdRule($input: CreateThresholdRuleInput!) { createThresholdRule(input: $input) { id enabled revision comparator thresholdCelsius } }',
+      variables: { input: { deviceId: deviceID, comparator: 'GT', thresholdCelsius: 20 } },
+    }),
+  })
+  const body = await response.json()
+  const rule = body?.data?.createThresholdRule
+  if (response.status !== 200 || typeof rule?.id !== 'string' || rule.enabled !== true || rule.revision !== 1 || rule.thresholdCelsius !== 20) {
+    throw new Error(`threshold rule creation failed: ${JSON.stringify(body)}`)
+  }
+  return rule.id
+}
+
 async function publishSimulator(deviceID) {
   const result = await runCapture(simulatorBinary, [], {
     ...environment,
@@ -250,6 +271,65 @@ async function queryTelemetry(deviceID) {
   return body.data
 }
 
+async function queryAlerts(deviceID) {
+  const response = await fetch(`http://127.0.0.1:${apiPort}/graphql`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      query: 'query Alerts($deviceID: ID!) { alerts(first: 20, deviceId: $deviceID) { edges { node { id ruleId deviceId messageId observedAt receivedAt temperatureCelsius metric comparator thresholdCelsius createdAt } } pageInfo { hasNextPage } } }',
+      variables: { deviceID },
+    }),
+  })
+  const body = await response.json()
+  if (response.status !== 200 || body.errors || !body.data) {
+    throw new Error(`alert GraphQL query failed: ${JSON.stringify(body)}`)
+  }
+  return body.data.alerts.edges.map((edge) => edge.node)
+}
+
+async function assertAlertForMessage(deviceID, messageID, temperature, threshold) {
+  const matches = (await queryAlerts(deviceID)).filter((alert) => alert.messageId === messageID)
+  if (matches.length !== 1) throw new Error(`alert count for ${messageID} = ${matches.length}, want 1`)
+  const alert = matches[0]
+  if (alert.temperatureCelsius !== temperature || alert.thresholdCelsius !== threshold || alert.comparator !== 'GT' || alert.metric !== 'TEMPERATURE_CELSIUS') {
+    throw new Error(`alert snapshot for ${messageID} = ${JSON.stringify(alert)}`)
+  }
+}
+
+async function testAlertPersistenceFailure(deviceID) {
+  const messageID = '77777777-7777-4777-8777-777777777777'
+  const topic = `pulsegrid/v1/tenants/pulsegrid-dev/devices/${deviceID}/telemetry`
+  const triggerSQL = `CREATE OR REPLACE FUNCTION test_reject_threshold_alert() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.message_id = '${messageID}'::uuid THEN RAISE EXCEPTION 'forced alert persistence failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER test_reject_threshold_alert BEFORE INSERT ON threshold_alerts FOR EACH ROW EXECUTE FUNCTION test_reject_threshold_alert();`
+  const dropSQL = 'DROP TRIGGER IF EXISTS test_reject_threshold_alert ON threshold_alerts; DROP FUNCTION IF EXISTS test_reject_threshold_alert();'
+  const created = await runPSQL(triggerSQL)
+  if (created.status !== 0) throw new Error(`could not install alert failure trigger: ${created.stderr}`)
+  try {
+    const logOffset = apiOutput.length
+    const payload = JSON.stringify({ schemaVersion: 1, messageId: messageID, observedAt: pastObservedAt(), temperatureCelsius: 27 })
+    const published = await publishRaw(topic, payload, false)
+    if (published.status !== 0) throw new Error(`failed to publish alert failure case: ${published.stderr}`)
+    await waitForLogSince(logOffset, 'reason_code=telemetry_alert_persistence_failed', 10_000, 'alert persistence failure')
+    const failureLines = apiOutput.slice(logOffset).split('\n')
+    if (!failureLines.some((line) => line.includes('reason_code=telemetry_alert_persistence_failed') && line.includes('ingestion_id='))) {
+      throw new Error(`alert failure did not identify its message safely: ${apiOutput.slice(logOffset)}`)
+    }
+    if (failureLines.some((line) => line.includes('reason_code=telemetry_accepted'))) {
+      throw new Error('failed alert input was logged as accepted')
+    }
+    const counts = await runPSQL(`SELECT (SELECT count(*) FROM telemetry_observation_keys WHERE device_id = '${deviceID}' AND message_id = '${messageID}') || ':' || (SELECT count(*) FROM telemetry_observations WHERE device_id = '${deviceID}' AND message_id = '${messageID}') || ':' || (SELECT count(*) FROM threshold_alerts WHERE device_id = '${deviceID}' AND message_id = '${messageID}');`)
+    if (counts.status !== 0 || counts.stdout.trim() !== '0:0:0') {
+      throw new Error(`failed alert transaction left partial rows: ${counts.stdout}${counts.stderr}`)
+    }
+  } finally {
+    const dropped = await runPSQL(dropSQL)
+    if (dropped.status !== 0) throw new Error(`could not remove alert failure trigger: ${dropped.stderr}`)
+  }
+  const retry = await publishRaw(topic, JSON.stringify({ schemaVersion: 1, messageId: messageID, observedAt: pastObservedAt(), temperatureCelsius: 27 }), false)
+  if (retry.status !== 0) throw new Error(`failed to republish repaired alert input: ${retry.stderr}`)
+  await waitForLogFields(['reason_code=telemetry_accepted', `message_id=${messageID}`], 10_000, 're-published alert acceptance')
+  await assertAlertForMessage(deviceID, messageID, 27, 20)
+}
+
 async function assertPersistedObservation(deviceID, messageID, temperature, expectedCount) {
   const data = await queryTelemetry(deviceID)
   const points = data.deviceTelemetry?.edges?.map((edge) => edge.node).filter((point) => point.messageId === messageID) ?? []
@@ -310,6 +390,13 @@ async function publishRaw(topic, payload, retained) {
   ]
   if (retained) args.push('-r')
   return runCapture(args[0], args.slice(1), environment, 15_000)
+}
+
+async function runPSQL(statement) {
+  return runCapture('docker', [
+    'compose', '-p', projectName, '--profile', 'test', 'exec', '-T', '-e', `PGPASSWORD=${environment.PULSEGRID_POSTGRES_PASSWORD}`,
+    'postgres-test', 'psql', '-U', 'pulsegrid', '-d', 'pulsegrid_test', '-v', 'ON_ERROR_STOP=1', '-Atc', statement,
+  ], environment, 15_000)
 }
 
 async function waitForLog(text, timeout, label) {

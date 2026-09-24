@@ -3,12 +3,47 @@
 package model
 
 import (
+	"bytes"
+	"fmt"
+	"io"
+	"strconv"
 	"time"
 )
+
+type AlertConnection struct {
+	Edges    []*AlertEdge `json:"edges"`
+	PageInfo *PageInfo    `json:"pageInfo"`
+}
+
+type AlertEdge struct {
+	Cursor string           `json:"cursor"`
+	Node   *AlertOccurrence `json:"node"`
+}
+
+type AlertOccurrence struct {
+	ID                 string              `json:"id"`
+	DeviceID           string              `json:"deviceId"`
+	RuleID             string              `json:"ruleId"`
+	MessageID          string              `json:"messageId"`
+	ObservedAt         time.Time           `json:"observedAt"`
+	ReceivedAt         time.Time           `json:"receivedAt"`
+	TemperatureCelsius float64             `json:"temperatureCelsius"`
+	Metric             ThresholdMetric     `json:"metric"`
+	Comparator         ThresholdComparator `json:"comparator"`
+	ThresholdCelsius   float64             `json:"thresholdCelsius"`
+	CreatedAt          time.Time           `json:"createdAt"`
+}
 
 type CreateDeviceInput struct {
 	DeviceKey   string `json:"deviceKey"`
 	DisplayName string `json:"displayName"`
+}
+
+type CreateThresholdRuleInput struct {
+	DeviceID         string              `json:"deviceId"`
+	Comparator       ThresholdComparator `json:"comparator"`
+	ThresholdCelsius float64             `json:"thresholdCelsius"`
+	Enabled          bool                `json:"enabled"`
 }
 
 type Device struct {
@@ -62,4 +97,136 @@ type TelemetryPoint struct {
 	ObservedAt         time.Time `json:"observedAt"`
 	ReceivedAt         time.Time `json:"receivedAt"`
 	TemperatureCelsius float64   `json:"temperatureCelsius"`
+}
+
+type ThresholdRule struct {
+	ID               string              `json:"id"`
+	DeviceID         string              `json:"deviceId"`
+	Metric           ThresholdMetric     `json:"metric"`
+	Comparator       ThresholdComparator `json:"comparator"`
+	ThresholdCelsius float64             `json:"thresholdCelsius"`
+	Enabled          bool                `json:"enabled"`
+	Revision         int                 `json:"revision"`
+	CreatedAt        time.Time           `json:"createdAt"`
+	UpdatedAt        time.Time           `json:"updatedAt"`
+}
+
+type UpdateThresholdRuleInput struct {
+	ID               string              `json:"id"`
+	ExpectedRevision int                 `json:"expectedRevision"`
+	Comparator       ThresholdComparator `json:"comparator"`
+	ThresholdCelsius float64             `json:"thresholdCelsius"`
+	Enabled          bool                `json:"enabled"`
+}
+
+type ThresholdComparator string
+
+const (
+	ThresholdComparatorGt  ThresholdComparator = "GT"
+	ThresholdComparatorGte ThresholdComparator = "GTE"
+	ThresholdComparatorLt  ThresholdComparator = "LT"
+	ThresholdComparatorLte ThresholdComparator = "LTE"
+)
+
+var AllThresholdComparator = []ThresholdComparator{
+	ThresholdComparatorGt,
+	ThresholdComparatorGte,
+	ThresholdComparatorLt,
+	ThresholdComparatorLte,
+}
+
+func (e ThresholdComparator) IsValid() bool {
+	switch e {
+	case ThresholdComparatorGt, ThresholdComparatorGte, ThresholdComparatorLt, ThresholdComparatorLte:
+		return true
+	}
+	return false
+}
+
+func (e ThresholdComparator) String() string {
+	return string(e)
+}
+
+func (e *ThresholdComparator) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ThresholdComparator(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ThresholdComparator", str)
+	}
+	return nil
+}
+
+func (e ThresholdComparator) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *ThresholdComparator) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e ThresholdComparator) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type ThresholdMetric string
+
+const (
+	ThresholdMetricTemperatureCelsius ThresholdMetric = "TEMPERATURE_CELSIUS"
+)
+
+var AllThresholdMetric = []ThresholdMetric{
+	ThresholdMetricTemperatureCelsius,
+}
+
+func (e ThresholdMetric) IsValid() bool {
+	switch e {
+	case ThresholdMetricTemperatureCelsius:
+		return true
+	}
+	return false
+}
+
+func (e ThresholdMetric) String() string {
+	return string(e)
+}
+
+func (e *ThresholdMetric) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ThresholdMetric(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ThresholdMetric", str)
+	}
+	return nil
+}
+
+func (e ThresholdMetric) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *ThresholdMetric) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e ThresholdMetric) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }

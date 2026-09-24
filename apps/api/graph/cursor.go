@@ -7,11 +7,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/device/registry"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/rules"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/telemetry/projection"
 )
 
 const cursorVersion = "v1"
 const telemetryCursorVersion = "telemetry-v1"
+const alertCursorVersion = "alerts-v1"
 
 func encodeCursor(cursor registry.Cursor) (string, error) {
 	if cursor.ID == uuid.Nil || cursor.CreatedAt.IsZero() {
@@ -89,4 +91,69 @@ func decodeTelemetryCursor(raw string) (*projection.Cursor, error) {
 		return nil, protocolError("after must be a valid telemetry cursor")
 	}
 	return &projection.Cursor{ObservedAt: observedAt.UTC(), MessageID: messageID}, nil
+}
+
+func encodeAlertCursor(cursor rules.AlertCursor) (string, error) {
+	if cursor.ID == uuid.Nil || cursor.OrganizationID == uuid.Nil || cursor.CreatedAt.IsZero() {
+		return "", newPublicError(errorCodeInternal, "alert cursor is unavailable", rules.ErrInvalidInput)
+	}
+	deviceFilter := "-"
+	if cursor.DeviceFilter != nil {
+		if *cursor.DeviceFilter == uuid.Nil {
+			return "", newPublicError(errorCodeInternal, "alert cursor is unavailable", rules.ErrInvalidInput)
+		}
+		deviceFilter = cursor.DeviceFilter.String()
+	}
+	payload := strings.Join([]string{
+		alertCursorVersion,
+		cursor.CreatedAt.UTC().Format(time.RFC3339Nano),
+		cursor.ID.String(),
+		cursor.OrganizationID.String(),
+		deviceFilter,
+	}, "|")
+	encoded := base64.RawURLEncoding.EncodeToString([]byte(payload))
+	if len(encoded) > maxCursorSize {
+		return "", newPublicError(errorCodeInternal, "alert cursor is unavailable", rules.ErrInvalidInput)
+	}
+	return encoded, nil
+}
+
+func decodeAlertCursor(raw string) (*rules.AlertCursor, error) {
+	if raw == "" || len(raw) > maxCursorSize {
+		return nil, protocolError("after must be a valid alert cursor")
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(raw)
+	if err != nil || len(decoded) > maxCursorSize {
+		return nil, protocolError("after must be a valid alert cursor")
+	}
+	parts := strings.Split(string(decoded), "|")
+	if len(parts) != 5 || parts[0] != alertCursorVersion {
+		return nil, protocolError("after must be a valid alert cursor")
+	}
+	createdAt, err := time.Parse(time.RFC3339Nano, parts[1])
+	if err != nil || createdAt.UTC().Format(time.RFC3339Nano) != parts[1] {
+		return nil, protocolError("after must be a valid alert cursor")
+	}
+	alertID, err := uuid.Parse(parts[2])
+	if err != nil || alertID == uuid.Nil || alertID.String() != parts[2] {
+		return nil, protocolError("after must be a valid alert cursor")
+	}
+	organizationID, err := uuid.Parse(parts[3])
+	if err != nil || organizationID == uuid.Nil || organizationID.String() != parts[3] {
+		return nil, protocolError("after must be a valid alert cursor")
+	}
+	var deviceFilter *uuid.UUID
+	if parts[4] != "-" {
+		parsedDeviceID, parseErr := uuid.Parse(parts[4])
+		if parseErr != nil || parsedDeviceID == uuid.Nil || parsedDeviceID.String() != parts[4] {
+			return nil, protocolError("after must be a valid alert cursor")
+		}
+		deviceFilter = &parsedDeviceID
+	}
+	return &rules.AlertCursor{
+		CreatedAt:      createdAt.UTC(),
+		ID:             alertID,
+		OrganizationID: organizationID,
+		DeviceFilter:   deviceFilter,
+	}, nil
 }

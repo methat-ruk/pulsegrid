@@ -3,8 +3,10 @@
 Status: MVP-002 development GraphQL device contract, MVP-003 console
 integration, MVP-004 local MQTT producer fixture, MVP-005 local/test telemetry
 ingestion, and MVP-006 local/test telemetry persistence/current-state projection
-are implemented on the feature branch and locally validated. Production
-identity, production MQTT, and permanent high-volume storage remain deferred.
+are implemented on the feature branch and locally validated. The MVP-008
+rules/alerts backend and review fixes are validated; PR #18 is ready to merge
+but remains unmerged. Production identity, production MQTT, and permanent
+high-volume storage remain deferred.
 
 ## Purpose and ownership
 
@@ -83,17 +85,22 @@ validation and registry resolution before emitting diagnostic acceptance.
 When `PULSEGRID_MQTT_INGESTION_MODE=development` is explicitly enabled, the
 API subscribes to the loopback broker at QoS 1 with a bounded 64-item in-memory
 queue. It accepts only the exact telemetry-v1 topic and four-field payload,
-resolves the tenant/device pair through PostgreSQL, and writes one structured
-`telemetry_accepted` log after the diagnostic consumer returns. The log contains
-safe IDs and timestamps, never the raw payload or temperature. Unknown devices,
-wrong-tenant topics, malformed/oversized/future/retained messages, queue drops,
-and dependency failures use stable `reason_code` values.
+resolves the tenant/device pair through PostgreSQL, and passes the accepted DTO
+to the synchronous consumer. MVP-006 replaced the original diagnostic sink
+with a PostgreSQL transaction before writing `telemetry_accepted`; the MVP-008
+candidate additionally evaluates rules and writes alerts in that transaction.
+The accepted log contains safe IDs and timestamps, never the raw payload or
+temperature. Unknown devices, wrong-tenant topics,
+malformed/oversized/future/retained messages, queue drops, and dependency
+failures use stable `reason_code` values.
 
-MQTT PUBACK and queue admission are transport evidence only. MVP-005 is
-intentionally non-durable and does not deduplicate logical `messageId`; those
-guarantees belong to MVP-006. Enabled ingestion participates in readiness, so a
-broker disconnect returns `503 dependency_unavailable` while bounded reconnect
-and resubscription proceed. Liveness remains process-only.
+MQTT PUBACK and queue admission are transport evidence only. The original
+MVP-005 handoff was non-durable; MVP-006 now provides durable logical
+idempotency, and the MVP-008 candidate makes telemetry and alert writes atomic.
+The in-memory queue still does not promise automatic replay after a failure or
+crash. Enabled ingestion participates in readiness, so a broker disconnect
+returns `503 dependency_unavailable` while bounded reconnect and resubscription
+proceed. Liveness remains process-only.
 
 Validate the real API, PostgreSQL, Mosquitto, simulator, rejection, duplicate,
 readiness-recovery, and shutdown paths with:
@@ -141,6 +148,31 @@ The local API-to-database-to-GraphQL evidence is included in:
 corepack pnpm run api:test:integration
 corepack pnpm run mqtt:test:integration
 ```
+
+## MVP-008 threshold rules and alerts
+
+The development GraphQL API configures up to 20 temperature rules per device
+and exposes immutable matching alert occurrences. The only metric is
+`TEMPERATURE_CELSIUS`; comparators are `GT`, `GTE`, `LT`, and `LTE`, applied
+directly to finite Celsius values. Rule updates require the expected revision.
+Rule creation/update does not backfill prior telemetry; every newly stored
+observation, including late observations, uses the enabled rule configuration
+visible to its evaluation query. Exact replay skips evaluation.
+
+Rule evaluation and alert insertion share the MVP-006 PostgreSQL transaction.
+A rule/alert persistence failure rolls back the new observation and prevents
+`telemetry_accepted`; earlier telemetry remains readable. The current MQTT
+queue does not replay failed work, so recovery may require explicit republish
+with the same `messageId`. Identity and alert uniqueness make that retry
+idempotent. No notification, suppression, severity, acknowledgement, or
+active/resolved lifecycle is exposed.
+
+The additive operations are `createThresholdRule`, `updateThresholdRule`,
+`thresholdRules`, `alert`, and paginated `alerts`. Rule and alert reads/writes
+use the server-selected organization and tenant-scoped SQL; alert detail
+includes its measurement/rule snapshot and remains readable after source
+history pruning. The API contract and local PostgreSQL/MQTT integration
+evidence are verified by the MVP-008 plan and its implementation tests.
 
 ## Current operational contract
 
@@ -195,10 +227,12 @@ uploads, persisted queries, and playground routes are not enabled. Introspection
 is available only in this explicit development mode. The SDL is the source of
 truth; generated gqlgen files are committed and checked for drift.
 
-The development API validates the telemetry schema before it starts listening;
-a database below migration 005 fails startup with the safe
-`database_schema_unavailable` action rather than reporting ready and exposing a
-partially usable API.
+The MVP-008 candidate validates both the MVP-006 telemetry schema from
+migration `005` and the rules/alerts schema from migration `006` before the
+development API starts listening. A missing required schema fails startup with
+the safe `database_schema_unavailable` action rather than reporting ready and
+exposing a partially usable API. The documented migration command applies the
+latest migration before startup.
 
 The contract exposes `device`, bounded forward `devices` pagination
 (`first` 1–100 with opaque versioned cursors), `createDevice`, and the additive

@@ -4,8 +4,10 @@ Status: Local repository workflow and merge-gate enforcement implemented;
 FND-004 readiness, the MVP-003 device-registry browser journey, the MVP-005
 local/test MQTT ingestion path, and the merged MVP-006 telemetry
 persistence/current-state path are implemented and validated. The MVP-007
-operator-visible telemetry console and review fixes are validated on its feature
-branch; PR #16 is ready to merge but remains unmerged.
+operator-visible telemetry console and review fixes were merged as `9ce9e7c`
+(PR #16). The MVP-008 rules/alerts backend and review fixes passed local and CI
+validation; PR #18 is ready to merge but remains unmerged. The MVP-009 console
+is still planned.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
@@ -148,10 +150,11 @@ corepack pnpm run dev:api
 ```
 
 Check `GET /health/ready` for `200`/`ready`; the enabled API is ready only when
-PostgreSQL is reachable, the required MVP-006 schema was validated before
-listening, and its MQTT subscription is connected. A database below migration
-005 fails startup with `database_schema_unavailable` rather than exposing a
-partially usable telemetry API. Publish with
+PostgreSQL is reachable, the MVP-006 telemetry schema (`005`) and MVP-008
+rules/alerts schema (`006`) are both validated before listening, and its MQTT
+subscription is connected. Missing either required schema fails startup with
+`database_schema_unavailable` rather than exposing a partially usable API.
+Publish with
 `mqtt:simulator`, query `deviceCurrentState` and `deviceTelemetry`, and inspect
 the API log for `reason_code=telemetry_accepted`. The log exposes correlation
 and registry IDs but never the raw payload or temperature. Invalid, retained,
@@ -213,6 +216,26 @@ dense-chart time-label collision prevention at 320px, mobile overflow, the
 existing registry/readiness journeys, and port-conflict cleanup behavior.
 Headless assertions complement visible Browser inspection; they do not replace
 it.
+
+### MVP-008 rules and alert backend candidate
+
+The current MVP-008 feature branch adds rule configuration and alert history to
+the development-only GraphQL API. The development example already enables the
+loopback MQTT consumer; after migration and seed, create a rule with the API
+contract, then publish with `corepack pnpm run mqtt:simulator`. A match should
+create one immutable alert with the stored rule/measurement snapshot. Replaying
+the same message ID does not create a second alert. If a rule or alert write
+fails before commit, that telemetry input rolls back and may need explicit
+republish after repair. See the [API contract guide](../api/README.md) and use
+the real integration command for migration, failure, duplicate, and recovery
+evidence:
+
+```sh
+corepack pnpm run mqtt:test:integration
+```
+
+PR #18 is ready to merge but not merged; `main` does not yet include the
+MVP-008 API or transaction behavior.
 
 ### Local PostgreSQL, seed, and development GraphQL
 

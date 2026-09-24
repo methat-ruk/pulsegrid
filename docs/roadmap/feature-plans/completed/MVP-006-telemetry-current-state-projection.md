@@ -562,7 +562,7 @@ After implementation and evidence are reconciled, update:
 - `docs/roadmap/feature-plans/completed/MVP-007-telemetry-device-state-console.md`
   with the delivered GraphQL contract and the fact that UI staleness derives
   from `lastSeenAt`, not the current observation's time;
-- `docs/roadmap/feature-plans/planned/MVP-008-threshold-rule-alert-backend.md`
+- `docs/roadmap/feature-plans/completed/MVP-008-threshold-rule-alert-backend.md`
   with the delivered stored-observation handoff and retention-safe triggering
   context requirement; and
 - this plan, feature-plan index, and roadmap lifecycle/status only when the
