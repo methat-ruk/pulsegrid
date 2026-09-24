@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/methat-ruk/pulsegrid/apps/api/graph/model"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/device/registry"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/rules"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/telemetry/projection"
 )
 
@@ -165,11 +166,182 @@ func (r *queryResolver) DeviceTelemetry(ctx context.Context, deviceID string, fi
 	return &model.TelemetryConnection{Edges: edges, PageInfo: pageInfo}, nil
 }
 
+// CreateThresholdRule creates one tenant-scoped temperature rule.
+func (r *mutationResolver) CreateThresholdRule(ctx context.Context, input model.CreateThresholdRuleInput) (*model.ThresholdRule, error) {
+	organizationID, err := r.authority(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rulesRepository, err := r.rulesRepositoryForMutation()
+	if err != nil {
+		return nil, err
+	}
+	deviceID, err := parseCanonicalUUID(input.DeviceID)
+	if err != nil {
+		return nil, err
+	}
+	created, err := rulesRepository.CreateRule(ctx, organizationID, rules.CreateRuleInput{
+		DeviceID:         deviceID,
+		Comparator:       rules.Comparator(input.Comparator),
+		ThresholdCelsius: input.ThresholdCelsius,
+		Enabled:          input.Enabled,
+	})
+	if err != nil {
+		return nil, presentRuleMutationError(err)
+	}
+	return presentThresholdRule(created), nil
+}
+
+// UpdateThresholdRule replaces mutable fields only when the caller's revision
+// still matches the stored rule.
+func (r *mutationResolver) UpdateThresholdRule(ctx context.Context, input model.UpdateThresholdRuleInput) (*model.ThresholdRule, error) {
+	organizationID, err := r.authority(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rulesRepository, err := r.rulesRepositoryForMutation()
+	if err != nil {
+		return nil, err
+	}
+	ruleID, err := parseCanonicalUUID(input.ID)
+	if err != nil {
+		return nil, err
+	}
+	updated, err := rulesRepository.UpdateRule(ctx, organizationID, rules.UpdateRuleInput{
+		ID:               ruleID,
+		ExpectedRevision: input.ExpectedRevision,
+		Comparator:       rules.Comparator(input.Comparator),
+		ThresholdCelsius: input.ThresholdCelsius,
+		Enabled:          input.Enabled,
+	})
+	if err != nil {
+		return nil, presentRuleMutationError(err)
+	}
+	return presentThresholdRule(updated), nil
+}
+
+// ThresholdRules returns a bounded rule list only for a device in the fixed
+// tenant scope.
+func (r *queryResolver) ThresholdRules(ctx context.Context, deviceID string) ([]*model.ThresholdRule, error) {
+	organizationID, err := r.authority(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rulesRepository, err := r.rulesRepositoryForQuery()
+	if err != nil {
+		return nil, err
+	}
+	parsedDeviceID, err := parseCanonicalUUID(deviceID)
+	if err != nil {
+		return nil, err
+	}
+	ruleList, err := rulesRepository.ListRules(ctx, organizationID, parsedDeviceID)
+	if err != nil {
+		if errors.Is(err, rules.ErrNotFound) {
+			return []*model.ThresholdRule{}, nil
+		}
+		return nil, presentRuleQueryError(err)
+	}
+	result := make([]*model.ThresholdRule, 0, len(ruleList))
+	for _, rule := range ruleList {
+		result = append(result, presentThresholdRule(rule))
+	}
+	return result, nil
+}
+
+// Alert returns an occurrence only inside the fixed tenant scope.
+func (r *queryResolver) Alert(ctx context.Context, id string) (*model.AlertOccurrence, error) {
+	organizationID, err := r.authority(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rulesRepository, err := r.rulesRepositoryForQuery()
+	if err != nil {
+		return nil, err
+	}
+	alertID, err := parseCanonicalUUID(id)
+	if err != nil {
+		return nil, err
+	}
+	alert, err := rulesRepository.GetAlert(ctx, organizationID, alertID)
+	if errors.Is(err, rules.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, presentRuleQueryError(err)
+	}
+	return presentAlert(alert), nil
+}
+
+// Alerts returns tenant-scoped, bounded occurrence history.
+func (r *queryResolver) Alerts(ctx context.Context, first int, after *string, deviceID *string) (*model.AlertConnection, error) {
+	organizationID, err := r.authority(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rulesRepository, err := r.rulesRepositoryForQuery()
+	if err != nil {
+		return nil, err
+	}
+	if first < 1 || first > rules.MaxAlertPageSize {
+		return nil, newPublicError(errorCodeBadUserInput, "first must be between 1 and 100", rules.ErrInvalidInput)
+	}
+	var filter *uuid.UUID
+	if deviceID != nil {
+		parsedDeviceID, parseErr := parseCanonicalUUID(*deviceID)
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		filter = &parsedDeviceID
+	}
+	var cursor *rules.AlertCursor
+	if after != nil {
+		cursor, err = decodeAlertCursor(*after)
+		if err != nil {
+			return nil, err
+		}
+	}
+	page, err := rulesRepository.ListAlerts(ctx, organizationID, first, filter, cursor)
+	if err != nil {
+		return nil, presentRuleQueryError(err)
+	}
+	edges := make([]*model.AlertEdge, 0, len(page.Alerts))
+	for _, alert := range page.Alerts {
+		alertCursor, cursorErr := encodeAlertCursor(rules.AlertCursor{
+			CreatedAt:      alert.CreatedAt,
+			ID:             alert.ID,
+			OrganizationID: organizationID,
+			DeviceFilter:   cloneUUID(filter),
+		})
+		if cursorErr != nil {
+			return nil, cursorErr
+		}
+		edges = append(edges, &model.AlertEdge{Cursor: alertCursor, Node: presentAlert(alert)})
+	}
+	pageInfo := &model.PageInfo{HasNextPage: page.NextCursor != nil}
+	if len(edges) > 0 {
+		endCursor := edges[len(edges)-1].Cursor
+		pageInfo.EndCursor = &endCursor
+	}
+	return &model.AlertConnection{Edges: edges, PageInfo: pageInfo}, nil
+}
+
 func (r *queryResolver) telemetryRepositoryForQuery() (TelemetryRepository, error) {
 	if r.telemetryRepository == nil {
 		return nil, newPublicError(errorCodeInternal, "telemetry repository is unavailable", errors.New("telemetry repository is not configured"))
 	}
 	return r.telemetryRepository, nil
+}
+
+func (r *Resolver) rulesRepositoryForQuery() (ThresholdRuleRepository, error) {
+	if r.rulesRepository == nil {
+		return nil, newPublicError(errorCodeInternal, "threshold rules repository is unavailable", errors.New("threshold rules repository is not configured"))
+	}
+	return r.rulesRepository, nil
+}
+
+func (r *Resolver) rulesRepositoryForMutation() (ThresholdRuleRepository, error) {
+	return r.rulesRepositoryForQuery()
 }
 
 func presentDevice(device registry.Device) *model.Device {
@@ -198,6 +370,62 @@ func presentTelemetryPoint(point projection.TelemetryPoint) *model.TelemetryPoin
 		ReceivedAt:         point.ReceivedAt.UTC(),
 		TemperatureCelsius: point.TemperatureCelsius,
 	}
+}
+
+func presentThresholdRule(rule rules.Rule) *model.ThresholdRule {
+	return &model.ThresholdRule{
+		ID:               rule.ID.String(),
+		DeviceID:         rule.DeviceID.String(),
+		Metric:           model.ThresholdMetricTemperatureCelsius,
+		Comparator:       model.ThresholdComparator(rule.Comparator),
+		ThresholdCelsius: rule.ThresholdCelsius,
+		Enabled:          rule.Enabled,
+		Revision:         rule.Revision,
+		CreatedAt:        rule.CreatedAt.UTC(),
+		UpdatedAt:        rule.UpdatedAt.UTC(),
+	}
+}
+
+func presentAlert(alert rules.Alert) *model.AlertOccurrence {
+	return &model.AlertOccurrence{
+		ID:                 alert.ID.String(),
+		DeviceID:           alert.DeviceID.String(),
+		RuleID:             alert.RuleID.String(),
+		MessageID:          alert.MessageID.String(),
+		ObservedAt:         alert.ObservedAt.UTC(),
+		ReceivedAt:         alert.ReceivedAt.UTC(),
+		TemperatureCelsius: alert.TemperatureCelsius,
+		Metric:             model.ThresholdMetricTemperatureCelsius,
+		Comparator:         model.ThresholdComparator(alert.Comparator),
+		ThresholdCelsius:   alert.ThresholdCelsius,
+		CreatedAt:          alert.CreatedAt.UTC(),
+	}
+}
+
+func presentRuleMutationError(err error) error {
+	switch {
+	case errors.Is(err, rules.ErrInvalidInput), errors.Is(err, rules.ErrNotFound):
+		return newPublicError(errorCodeBadUserInput, "threshold rule input is invalid", err)
+	case errors.Is(err, rules.ErrConflict), errors.Is(err, rules.ErrRuleLimitReached):
+		return newPublicError(errorCodeConflict, "threshold rule conflicts with current state", err)
+	default:
+		return err
+	}
+}
+
+func presentRuleQueryError(err error) error {
+	if errors.Is(err, rules.ErrInvalidInput) {
+		return newPublicError(errorCodeBadUserInput, "threshold rule query input is invalid", err)
+	}
+	return err
+}
+
+func cloneUUID(value *uuid.UUID) *uuid.UUID {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
 
 func parseCanonicalUUID(raw string) (uuid.UUID, error) {

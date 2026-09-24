@@ -6,10 +6,12 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/device/registry"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/config"
@@ -24,6 +26,16 @@ type integrationFixture struct {
 	registry   *registry.Repository
 	orgID      uuid.UUID
 	deviceID   uuid.UUID
+}
+
+type fakeRuleEvaluator struct {
+	callCount atomic.Int32
+	err       error
+}
+
+func (f *fakeRuleEvaluator) Evaluate(context.Context, pgx.Tx, ingestion.AcceptedTelemetry) error {
+	f.callCount.Add(1)
+	return f.err
 }
 
 func newIntegrationFixture(t *testing.T) *integrationFixture {
@@ -65,8 +77,11 @@ func newIntegrationFixture(t *testing.T) *integrationFixture {
 	t.Cleanup(func() {
 		cleanupContext, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cleanupCancel()
+		_, _ = pool.Exec(cleanupContext, "DELETE FROM threshold_alerts WHERE device_id = $1", fixture.deviceID)
+		_, _ = pool.Exec(cleanupContext, "DELETE FROM threshold_rules WHERE device_id = $1", fixture.deviceID)
 		_, _ = pool.Exec(cleanupContext, "DELETE FROM device_current_state WHERE device_id = $1", fixture.deviceID)
 		_, _ = pool.Exec(cleanupContext, "DELETE FROM telemetry_observations WHERE device_id = $1", fixture.deviceID)
+		_, _ = pool.Exec(cleanupContext, "DELETE FROM telemetry_observation_keys WHERE device_id = $1", fixture.deviceID)
 		_, _ = pool.Exec(cleanupContext, "DELETE FROM devices WHERE id = $1", fixture.deviceID)
 		_, _ = pool.Exec(cleanupContext, "DELETE FROM organizations WHERE id = $1", fixture.orgID)
 		pool.Close()
@@ -145,6 +160,57 @@ func TestProjectionPersistsLateReplayAndConflictSemantics(t *testing.T) {
 	}
 	if count != 3 {
 		t.Fatalf("telemetry row count after replay/conflict = %d, want 3", count)
+	}
+}
+
+func TestProjectionRuleFailureRollsBackTelemetryAndState(t *testing.T) {
+	fixture := newIntegrationFixture(t)
+	evaluationFailure := errors.New("rule storage is unavailable")
+	evaluator := &fakeRuleEvaluator{err: evaluationFailure}
+	consumer, err := NewRepositoryWithEvaluator(fixture.pool, evaluator)
+	if err != nil {
+		t.Fatalf("create projection with rule evaluator: %v", err)
+	}
+	messageID := uuid.New()
+	observedAt := time.Date(2026, 9, 24, 7, 0, 0, 0, time.UTC)
+	if err := consumer.Consume(context.Background(), acceptedTelemetry(fixture, messageID, observedAt, observedAt.Add(time.Second), 31)); !errors.Is(err, evaluationFailure) {
+		t.Fatalf("Consume error = %v, want evaluation failure", err)
+	}
+	for _, table := range []string{"telemetry_observation_keys", "telemetry_observations", "device_current_state"} {
+		var count int
+		query := "SELECT count(*) FROM " + table + " WHERE device_id = $1"
+		if err := fixture.pool.QueryRow(context.Background(), query, fixture.deviceID).Scan(&count); err != nil {
+			t.Fatalf("count %s after rollback: %v", table, err)
+		}
+		if count != 0 {
+			t.Fatalf("%s count after rule failure = %d, want 0", table, count)
+		}
+	}
+	if evaluator.callCount.Load() != 1 {
+		t.Fatalf("rule evaluator calls = %d, want 1", evaluator.callCount.Load())
+	}
+}
+
+func TestProjectionExactReplaySkipsRuleEvaluation(t *testing.T) {
+	fixture := newIntegrationFixture(t)
+	evaluator := &fakeRuleEvaluator{}
+	consumer, err := NewRepositoryWithEvaluator(fixture.pool, evaluator)
+	if err != nil {
+		t.Fatalf("create projection with rule evaluator: %v", err)
+	}
+	observedAt := time.Date(2026, 9, 24, 8, 0, 0, 0, time.UTC)
+	accepted := acceptedTelemetry(fixture, uuid.New(), observedAt, observedAt.Add(time.Second), 31)
+	if err := consumer.Consume(context.Background(), accepted); err != nil {
+		t.Fatalf("consume initial observation: %v", err)
+	}
+	replay := accepted
+	replay.IngestionID = uuid.New()
+	replay.ReceivedAt = observedAt.Add(5 * time.Second)
+	if err := consumer.Consume(context.Background(), replay); err != nil {
+		t.Fatalf("consume exact replay: %v", err)
+	}
+	if evaluator.callCount.Load() != 1 {
+		t.Fatalf("rule evaluator calls = %d, want one for initial observation only", evaluator.callCount.Load())
 	}
 }
 

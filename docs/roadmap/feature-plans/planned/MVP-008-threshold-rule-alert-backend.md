@@ -1,6 +1,7 @@
 # MVP-008 — Threshold Rule and Alert Backend
 
-Status: Planned — reviewed on 2026-09-24; implementation has not started
+Status: Ready for review — implementation and author review complete on
+2026-09-24; candidate is locally validated on its feature branch
 
 Branch: `feat/mvp-008-threshold-rule-alert-backend`
 
@@ -28,7 +29,7 @@ device, rules, and alerts remain undiscoverable. A failed evaluation causes a
 processing failure and no partial commit for that input; earlier committed
 telemetry remains inspectable.
 
-## Verified repository baseline (2026-09-24)
+## Verified repository baseline at implementation start (2026-09-24)
 
 - The clean feature branch and `main` both point to `5772b99`; MVP-006 and
   MVP-007 are merged (`8c7a0f5` and `9ce9e7c`). No rules package, alert table,
@@ -239,3 +240,58 @@ manual recovery, growing identity/alert tables, and possible rule edits racing
 with observation acceptance; the evaluation query's visible rule snapshot is
 the stated tie-break. Confidence is based on repository/code inspection, not
 runtime proof. No implementation or runtime validation occurred in this review.
+
+## Implementation and author review closeout (2026-09-24)
+
+The working-tree candidate implements the reviewed scope: additive migration
+`006`, the rules/alerts module, in-transaction evaluation from the telemetry
+projection, tenant-scoped GraphQL operations and cursor, startup schema
+preflight, and real-store/API/MQTT evidence. The candidate adds no external
+dependency, service, environment key, broker consumer, or frontend behavior.
+
+Validation passed on this candidate:
+
+- `corepack pnpm run check:fast` — Go format/generation/modernize/staticcheck,
+  Go vet, web lint/typecheck, OpenAPI/AsyncAPI lint, and unit tests (53 web
+  tests included);
+- `corepack pnpm run build` — Go API and Nuxt production builds; Nuxt emitted
+  a non-blocking Rollup warning for a `@__NO_SIDE_EFFECTS__` annotation in its
+  generated server bundle and completed successfully;
+- `corepack pnpm run api:test:integration` — Goose up/idempotent up/down,
+  pre-005 and pre-006 startup schema rejection, then all Go integration tests
+  with `-race`, including concurrent rule-cap creation, tenant isolation,
+  revision conflict, replay, history pruning, alert snapshots, and atomic
+  rollback;
+- `corepack pnpm run mqtt:test:integration` — real simulator/Mosquitto/API/
+  PostgreSQL path, rule/alert GraphQL reads, duplicate message, injected alert
+  insert failure with no partial rows or acceptance log, explicit same-ID
+  republish after repair, and existing broker recovery/shutdown checks;
+- `corepack pnpm run audit` — Node production dependency audit found no
+  advisories. `govulncheck` found no vulnerable source call paths, with three
+  module-level advisories in existing `golang.org/x/crypto@v0.55.0`
+  (`GO-2026-6355`, `GO-2026-6354`, `GO-2026-5932`); this change adds no
+  dependency;
+- `corepack pnpm run check` — the full repository pre-CI handoff passed,
+  including all 21 existing browser smoke tests. Chromium required running the
+  local check outside the managed sandbox;
+- repository-policy check, GraphQL regeneration idempotence, JavaScript syntax
+  checks, and `git diff --check`.
+
+The existing browser suite passed; no alert-console browser case was added
+because no frontend code changed and MVP-009 owns visible alert behavior. No
+production migration, production identity, deployment, or live external state
+was exercised. The known runtime risk remains pre-commit MQTT loss requiring
+explicit republish;
+durable telemetry identity and alert uniqueness make a same-message retry
+safe. Durable identity and alert tables remain unbounded by policy in this MVP.
+The module-level `x/crypto` advisories have no reachable vulnerable call path
+in this scan; revisit them when dependency maintenance or crypto/SSH usage
+changes.
+
+Plan-to-actual reconciliation and author self-review found no scope or
+architecture deviation. The implementation candidate is based on the
+documentation commit `8b94019` on branch
+`feat/mvp-008-threshold-rule-alert-backend` and is ready for PR review; an
+independent review remains pending. This plan remains under `planned/` with
+status `Ready for review`. M3 remains in progress until the backend candidate
+is accepted and MVP-009 is complete.

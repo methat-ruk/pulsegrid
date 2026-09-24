@@ -104,7 +104,8 @@ MVP-005 provides the completed local/test telemetry ingestion boundary; and
 MVP-006 provides the completed bounded telemetry history/current-state
 projection. MVP-007 adds the operator-visible telemetry console and was merged
 as `9ce9e7c` after its reviewed candidate and required checks passed. M2 is
-complete; M3's rules and alerts remain planned.
+complete; M3 is in progress with the MVP-008 backend candidate ready for
+review and MVP-009 still planned.
 
 ## Milestones
 
@@ -174,7 +175,7 @@ Plans:
 
 ### M3 — Rules and alerts
 
-Status: Planned
+Status: In progress
 
 Dependency: M2
 
@@ -183,7 +184,7 @@ creates an alert, and exposes the triggering context to the operator.
 
 Plans:
 
-- [MVP-008 — Threshold rule and alert backend](feature-plans/planned/MVP-008-threshold-rule-alert-backend.md)
+- [MVP-008 — Threshold rule and alert backend](feature-plans/planned/MVP-008-threshold-rule-alert-backend.md) — implementation candidate validated on its feature branch; ready for review, not merged
 - [MVP-009 — Alert console](feature-plans/planned/MVP-009-alert-console.md)
 
 ### M4 — Remote command loop

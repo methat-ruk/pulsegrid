@@ -5,7 +5,7 @@
 Connect devices · Stream telemetry · Detect conditions · Deliver commands ·
 Operate fleets
 
-![Status](https://img.shields.io/badge/status-mvp--telemetry--console--merged-blue)
+![Status](https://img.shields.io/badge/status-mvp--008--backend--ready--for--review-blue)
 
 > [!IMPORTANT]
 > PulseGrid's documentation foundation, Go API foundation, Nuxt console
@@ -13,8 +13,9 @@ Operate fleets
 > MVP-003 device-registry journey, MVP-004 local MQTT producer fixture,
 > MVP-005 local/test telemetry ingestion, and MVP-006 bounded telemetry
 > persistence/current state and MVP-007 operator-visible telemetry console are
-> implemented and validated. PR #16 merged as `9ce9e7c`; rules and alerts
-> remain planned.
+> implemented and validated. PR #16 merged as `9ce9e7c`. MVP-008's backend
+> implementation candidate passed local validation on its feature branch and
+> is ready for review and not merged. MVP-009 remains planned.
 > Production identity and production readiness remain deferred.
 
 ## What is PulseGrid?
@@ -103,7 +104,7 @@ The decision state and adoption trigger for each technology are maintained in
 
 ## Project status
 
-**Current phase: MVP telemetry console implementation ready for review**
+**Current phase: MVP-008 rules and alerts backend ready for review**
 
 - Product intent and MVP boundary: documented.
 - Architecture and technology adoption rules: documented.
@@ -119,7 +120,9 @@ The decision state and adoption trigger for each technology are maintained in
   are implemented and validated. MVP-007 has a merged section-local console
   consumer with explicit refresh, responsive history cards, collision-aware
   chart labels, and a real simulator-to-browser test journey. PR #16 merged as
-  `9ce9e7c`. Production identity and production readiness remain deferred.
+  `9ce9e7c`. MVP-008's rules/alerts backend candidate is validated on its
+  feature branch but is not merged; MVP-009's console remains planned.
+  Production identity and production readiness remain deferred.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
   required checks include browser evidence for the real local API readiness
   journey.
@@ -136,8 +139,8 @@ validation alone does not imply merge or production readiness.
 | Documentation foundation | Sources of truth, MVP boundary, roadmap, and PR-sized plans | Complete |
 | Executable repository foundation | Runnable Go and Nuxt shells with configuration, tests, local workflow, and CI | Complete |
 | Device registry | Tenant-scoped device provisioning, list, and detail | Complete |
-| Telemetry and current state | Simulator-to-console MQTT telemetry flow | In progress |
-| Rules and alerts | A threshold condition creates an investigable alert | Planned |
+| Telemetry and current state | Simulator-to-console MQTT telemetry flow | Complete |
+| Rules and alerts | A threshold condition creates an investigable alert | In progress |
 | Remote command loop | Command delivery with acknowledgement, result, failure, and timeout | Planned |
 | MVP acceptance | Repeatable end-to-end product loop | Planned |
 | Post-MVP evolution | Security hardening, event scale, specialized data, observability, orchestration, and fleet operations | Deferred |

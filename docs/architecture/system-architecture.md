@@ -19,8 +19,10 @@ history/current-state projection. MVP-003 provides the first device-registry
 operator journey and a fixed same-origin Nuxt GraphQL transport adapter backed
 by the MVP-001 organization/device registry. The merged MVP-007 console now
 exposes the telemetry reads on the existing device-detail route through a
-section-local panel. Production identity, deployment exposure, durable broker
-replay, rules/alerts, and later event contracts remain unimplemented.
+section-local panel. The MVP-008 rules/alerts implementation candidate is
+locally validated on its feature branch but is not merged; `main` still has no
+rule/alert runtime. Production identity, deployment exposure, durable broker
+replay, and later event contracts remain unimplemented.
 
 Architecture diagrams below describe an intended sequence of evolution. They
 must not be read as deployed topology.
@@ -151,19 +153,20 @@ It does not expose ingestion IDs, MQTT duplicate metadata, storage sequence,
 or organization authority. A database failure before commit is a processing
 failure; MQTT transport acknowledgement does not provide automatic replay.
 
-### Planned MVP-008 rules and alert occurrences
+### MVP-008 rules and alert occurrences
 
-MVP-008 plans to evaluate enabled, device-scoped temperature rules inside the
-same transaction that stores each new logical observation. The projection
-writer retains transaction ownership and invokes a narrow rules/alerts
-boundary before commit. A rule or alert storage failure rolls back the new
-telemetry input and returns a processing failure; an exact replay skips rule
-evaluation. Successful matching input commits telemetry and immutable alert
-occurrences together. The alert carries a rule/measurement snapshot and links
-to the durable identity key, so pruning a history row does not erase its
-triggering context. This is a reviewed plan, not implemented behavior; the
+The MVP-008 feature-branch candidate evaluates up to 20 enabled, device-scoped
+temperature rules inside the transaction that stores each new logical
+observation. The projection writer retains transaction ownership and invokes
+the rules evaluator before commit. A rule or alert storage failure rolls back
+that input and returns a processing failure; an exact replay skips evaluation.
+Successful matching input commits telemetry and immutable alert occurrences
+together. Each alert carries a rule/measurement snapshot and references the
+durable observation identity, so pruning history does not erase its context.
+The candidate is locally validated but not merged; `main` remains at the
+pre-MVP-008 runtime. The
 [MVP-008 plan](../roadmap/feature-plans/planned/MVP-008-threshold-rule-alert-backend.md)
-owns the exact limits, GraphQL contract, recovery boundary, and evidence.
+owns the limits, GraphQL contract, recovery boundary, and evidence.
 
 ## Conditional target architecture
 
