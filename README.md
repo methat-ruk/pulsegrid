@@ -5,16 +5,16 @@
 Connect devices · Stream telemetry · Detect conditions · Deliver commands ·
 Operate fleets
 
-![Status](https://img.shields.io/badge/status-mvp--telemetry--console--ready--to--merge-blue)
+![Status](https://img.shields.io/badge/status-mvp--telemetry--console--merged-blue)
 
 > [!IMPORTANT]
 > PulseGrid's documentation foundation, Go API foundation, Nuxt console
 > foundation, MVP-001 persistence, MVP-002 development GraphQL contract,
 > MVP-003 device-registry journey, MVP-004 local MQTT producer fixture,
 > MVP-005 local/test telemetry ingestion, and MVP-006 bounded telemetry
-> persistence/current state are implemented and validated. The MVP-007
-> operator-visible telemetry console and latest review fixes are validated on
-> its feature branch. PR #16 is ready to merge but remains unmerged by request.
+> persistence/current state and MVP-007 operator-visible telemetry console are
+> implemented and validated. PR #16 merged as `9ce9e7c`; rules and alerts
+> remain planned.
 > Production identity and production readiness remain deferred.
 
 ## What is PulseGrid?
@@ -116,11 +116,10 @@ The decision state and adoption trigger for each technology are maintained in
   real browser/DB smoke path for development/test only.
 - The MVP-004 local/test MQTT broker and one-shot simulator, MVP-005 telemetry
   ingestion, and MVP-006 bounded PostgreSQL history/current-state projection
-  are implemented and validated. MVP-007 now has a section-local console
+  are implemented and validated. MVP-007 has a merged section-local console
   consumer with explicit refresh, responsive history cards, collision-aware
-  chart labels, and a real simulator-to-browser test journey. PR #16 is ready
-  to merge but is not merged. Production identity and production readiness
-  remain deferred.
+  chart labels, and a real simulator-to-browser test journey. PR #16 merged as
+  `9ce9e7c`. Production identity and production readiness remain deferred.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
   required checks include browser evidence for the real local API readiness
   journey.

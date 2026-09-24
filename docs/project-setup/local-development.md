@@ -4,8 +4,8 @@ Status: Local repository workflow and merge-gate enforcement implemented;
 FND-004 readiness, the MVP-003 device-registry browser journey, the MVP-005
 local/test MQTT ingestion path, and the merged MVP-006 telemetry
 persistence/current-state path are implemented and validated. The MVP-007
-operator-visible telemetry console and review fixes are validated on its feature
-branch; PR #16 is ready to merge but remains unmerged.
+operator-visible telemetry console and review fixes were merged as `9ce9e7c`
+(PR #16). Rules and alerts remain planned.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local

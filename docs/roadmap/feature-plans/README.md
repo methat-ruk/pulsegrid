@@ -92,7 +92,7 @@ platform foundation” is not an acceptable PR boundary.
 ### MVP — Telemetry and current state
 
 - [MVP-006 — Telemetry and current-state projection](completed/MVP-006-telemetry-current-state-projection.md)
-- [MVP-007 — Telemetry and device-state console](completed/MVP-007-telemetry-device-state-console.md) — accepted for merge; PR #16 remains open and unmerged
+- [MVP-007 — Telemetry and device-state console](completed/MVP-007-telemetry-device-state-console.md) — merged as `9ce9e7c` (PR #16)
 
 ### MVP — Rules and alerts
 

@@ -10,8 +10,8 @@ Milestone: M3 — Rules and alerts
 
 ## Goal
 
-Let an operator see active/recent alerts and trace each alert to its device,
-rule, and triggering telemetry.
+Let an operator see recent alert occurrences and trace each one to its device,
+rule, and stored triggering context.
 
 ## Why
 
@@ -21,15 +21,18 @@ to continue investigation.
 ## Scope
 
 - Add alert list and alert detail/context presentation.
-- Link alerts to device detail and triggering telemetry.
-- Add severity/status presentation using icon, label, and color.
+- Link alerts to device detail and show the stored measurement/rule snapshot
+  even after telemetry history pruning. Direct navigation to one telemetry
+  row is not promised by MVP-008's GraphQL contract.
+- Present occurrence time and triggering comparison in text as well as visual
+  treatment; do not infer active/resolved status or severity.
 - Add loading, empty, error, and refresh behavior.
 - Add component and browser tests.
 
 ## Out of Scope
 
-- Notification delivery, acknowledgement workflow, escalation, bulk actions,
-  or advanced filtering.
+- Notification delivery, acknowledgement workflow, active/resolved lifecycle,
+  severity, escalation, bulk actions, or advanced filtering.
 
 ## Dependencies
 
@@ -37,19 +40,22 @@ to continue investigation.
 
 ## Architecture / Boundaries
 
-The console presents alert authority from the API and does not infer alert
-matches from cached telemetry.
+The console presents immutable alert-occurrence authority from the API and
+does not infer alert matches from cached telemetry. The `messageId` is a
+logical trace reference; a pruned telemetry row must not make the alert detail
+unusable.
 
 ## Implementation Direction
 
-Prioritize traceability over dashboard breadth. Reuse device and telemetry
-navigation rather than adding a separate investigation subsystem.
+Prioritize traceability over dashboard breadth. Reuse device navigation and
+the alert snapshot rather than adding a separate investigation subsystem.
 
 ## Validation
 
-- Browser test shows a simulator-triggered alert and follows its context.
+- Browser test shows a simulator-triggered alert and follows its stored
+  context, including when the source history row is unavailable.
 - Empty/error/stale states are visible.
-- Status never relies on color alone.
+- Triggering condition never relies on color alone.
 - Tenant-scoped navigation cannot expose another tenant's identifiers.
 
 ## Documentation Updates
@@ -59,10 +65,10 @@ navigation rather than adding a separate investigation subsystem.
 
 ## Risks / Open Decisions
 
-- Active versus historical status semantics.
 - Refresh behavior before realtime transport exists.
 
 ## Done Criteria
 
 An operator can identify what happened, which device was affected, and which
-measurement triggered the alert without relying on infrastructure logs.
+measurement/rule snapshot triggered the occurrence without relying on
+infrastructure logs or a retained telemetry history row.

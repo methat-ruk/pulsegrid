@@ -17,12 +17,10 @@ lifecycle, health, development-only GraphQL device endpoints, the local/test
 MVP-005 MQTT telemetry consumer, and the merged MVP-006 local/test telemetry
 history/current-state projection. MVP-003 provides the first device-registry
 operator journey and a fixed same-origin Nuxt GraphQL transport adapter backed
-by the MVP-001 organization/device registry. The MVP-007 implementation
-candidate now exposes the delivered telemetry reads on the existing
-device-detail route through a section-local panel; it is locally validated on
-its feature branch but not yet merged. Production identity, deployment
-exposure, durable broker replay, and later event contracts remain
-unimplemented.
+by the MVP-001 organization/device registry. The merged MVP-007 console now
+exposes the telemetry reads on the existing device-detail route through a
+section-local panel. Production identity, deployment exposure, durable broker
+replay, rules/alerts, and later event contracts remain unimplemented.
 
 Architecture diagrams below describe an intended sequence of evolution. They
 must not be read as deployed topology.
@@ -152,6 +150,20 @@ telemetry-specific keyset cursor ordered by `observedAt DESC, messageId DESC`.
 It does not expose ingestion IDs, MQTT duplicate metadata, storage sequence,
 or organization authority. A database failure before commit is a processing
 failure; MQTT transport acknowledgement does not provide automatic replay.
+
+### Planned MVP-008 rules and alert occurrences
+
+MVP-008 plans to evaluate enabled, device-scoped temperature rules inside the
+same transaction that stores each new logical observation. The projection
+writer retains transaction ownership and invokes a narrow rules/alerts
+boundary before commit. A rule or alert storage failure rolls back the new
+telemetry input and returns a processing failure; an exact replay skips rule
+evaluation. Successful matching input commits telemetry and immutable alert
+occurrences together. The alert carries a rule/measurement snapshot and links
+to the durable identity key, so pruning a history row does not erase its
+triggering context. This is a reviewed plan, not implemented behavior; the
+[MVP-008 plan](../roadmap/feature-plans/planned/MVP-008-threshold-rule-alert-backend.md)
+owns the exact limits, GraphQL contract, recovery boundary, and evidence.
 
 ## Conditional target architecture
 
