@@ -5,7 +5,7 @@
 Connect devices · Stream telemetry · Detect conditions · Deliver commands ·
 Operate fleets
 
-![Status](https://img.shields.io/badge/status-mvp--008--ready--to--merge-blue)
+![Status](https://img.shields.io/badge/status-mvp--009--accepted--for--merge-blue)
 
 > [!IMPORTANT]
 > PulseGrid's documentation foundation, Go API foundation, Nuxt console
@@ -13,10 +13,12 @@ Operate fleets
 > MVP-003 device-registry journey, MVP-004 local MQTT producer fixture,
 > MVP-005 local/test telemetry ingestion, and MVP-006 bounded telemetry
 > persistence/current state and MVP-007 operator-visible telemetry console are
-> implemented and validated. PR #16 merged as `9ce9e7c`. MVP-008's backend
-> implementation and review fixes passed local validation on its feature
-> branch; PR #18 is ready to merge and remains unmerged. MVP-009 remains
-> planned.
+> implemented and validated. PR #16 merged as `9ce9e7c`; MVP-008's backend
+> merged in PR #18 as `fd0a383`. MVP-009's alert-console implementation and
+> local validation are complete on `feat/mvp-009-alert-console`. PR #19's review
+> evidence gaps have been addressed and its exact-candidate checks passed. The
+> project owner accepted it for merge; the PR remains open and unmerged pending
+> the owner's manual merge.
 > Production identity and production readiness remain deferred.
 
 ## What is PulseGrid?
@@ -105,7 +107,7 @@ The decision state and adoption trigger for each technology are maintained in
 
 ## Project status
 
-**Current phase: MVP-008 rules and alerts backend ready to merge**
+**Current phase: MVP-009 alert console accepted for merge (PR #19)**
 
 - Product intent and MVP boundary: documented.
 - Architecture and technology adoption rules: documented.
@@ -121,9 +123,13 @@ The decision state and adoption trigger for each technology are maintained in
   are implemented and validated. MVP-007 has a merged section-local console
   consumer with explicit refresh, responsive history cards, collision-aware
   chart labels, and a real simulator-to-browser test journey. PR #16 merged as
-  `9ce9e7c`. MVP-008's rules/alerts backend and review fixes passed local and
-  CI validation; PR #18 is ready to merge but is not merged. MVP-009's console
-  remains planned.
+  `9ce9e7c`. MVP-008's rules/alerts backend merged as `fd0a383` (PR #18).
+  MVP-009's alert list/detail console is implemented on
+  `feat/mvp-009-alert-console`. PR #19's review evidence gaps now have focused
+  browser coverage for pagination recovery, stale device scopes, failed device
+  name lookup, keyboard focus, and 390 px detail reflow. Its candidate checks
+  passed and the owner accepted it for merge; PR #19 remains open and unmerged
+  pending the owner's manual merge.
   Production identity and production readiness remain deferred.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
   required checks include browser evidence for the real local API readiness

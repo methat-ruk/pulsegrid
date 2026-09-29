@@ -194,6 +194,19 @@ onBeforeUnmount(() => {
           </dd>
         </div>
       </dl>
+      <div class="device-detail-actions">
+        <NuxtLink
+          class="secondary-action"
+          :to="{ path: '/alerts', query: { deviceId: device.id } }"
+        >
+          <UIcon
+            name="i-lucide-bell"
+            class="size-4"
+            aria-hidden="true"
+          />
+          View alerts for {{ device.deviceKey }}
+        </NuxtLink>
+      </div>
       <DeviceTelemetryPanel :device-id="device.id" />
     </template>
   </section>

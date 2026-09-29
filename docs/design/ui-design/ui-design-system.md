@@ -498,6 +498,10 @@ Device health should use consistent semantic colors across:
 - device detail
 - alerts
 
+The MVP alert console presents immutable occurrences and their stored
+comparison in text. It has no active/resolved state or severity classification;
+do not assign a status color or label that implies either one.
+
 ---
 
 ## 15. Charts
@@ -645,6 +649,10 @@ Overview
 ├── Recent Alerts
 ├── Devices
 └── Recent Activity
+
+This is a target dashboard hierarchy, not the current MVP route contract.
+The **Active Alerts** summary requires an alert lifecycle that MVP-008/009 do
+not provide. MVP-009 may show recent occurrences without that summary.
 
 Infrastructure metrics such as Kafka consumer lag should not dominate
 the normal operator dashboard.

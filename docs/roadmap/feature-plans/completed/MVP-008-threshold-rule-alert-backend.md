@@ -1,8 +1,7 @@
 # MVP-008 — Threshold Rule and Alert Backend
 
-Status: Complete — implementation, review follow-up, and required local
-validation completed on 2026-09-24; PR #18 is ready to merge and remains
-unmerged by request
+Status: Complete — implementation and review evidence accepted; PR #18 merged
+into `main` as `fd0a383` on 2026-09-24
 
 Branch: `feat/mvp-008-threshold-rule-alert-backend`
 
@@ -320,3 +319,10 @@ architecture deviation. The implementation is based on documentation commit
 disposition and evidence, this plan is in `completed/`; PR #18 is ready to
 merge but has not been merged. M3 remains in progress until MVP-009 is
 complete.
+
+## Merge update (2026-09-24)
+
+PR #18 subsequently merged into `main` as `fd0a383`. Earlier unmerged
+statements above are dated review history. MVP-009 now consumes this merged
+GraphQL alert contract; M3 remains in progress until the alert console is
+accepted. The merge did not execute a production migration or deployment.

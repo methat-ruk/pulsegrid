@@ -119,6 +119,7 @@ func TestGraphQLThresholdRulesAndAlertsUseRealPostgres(t *testing.T) {
 				Node struct {
 					ID                 string  `json:"id"`
 					DeviceID           string  `json:"deviceId"`
+					RuleID             string  `json:"ruleId"`
 					MessageID          string  `json:"messageId"`
 					ObservedAt         string  `json:"observedAt"`
 					TemperatureCelsius float64 `json:"temperatureCelsius"`
@@ -138,6 +139,28 @@ func TestGraphQLThresholdRulesAndAlertsUseRealPostgres(t *testing.T) {
 	alert := alertData.Alerts.Edges[0].Node
 	if alert.DeviceID != deviceA.ID.String() || alert.MessageID != messageID.String() || alert.TemperatureCelsius != 31 || alert.Metric != rules.MetricTemperatureCelsius || alert.Comparator != string(rules.GreaterThan) || alert.ThresholdCelsius != 25 {
 		t.Fatalf("alert snapshot = %+v", alert)
+	}
+	alertDetailResponse := doGraphQLForOrganization(t, handler, organizationA, `{ "query": "query { alert(id: \"`+alert.ID+`\") { id deviceId ruleId messageId observedAt receivedAt temperatureCelsius metric comparator thresholdCelsius createdAt } }" }`)
+	if len(alertDetailResponse.Errors) != 0 {
+		t.Fatalf("alert detail GraphQL response after history pruning = %+v", alertDetailResponse)
+	}
+	var alertDetailData struct {
+		Alert *struct {
+			ID                 string  `json:"id"`
+			DeviceID           string  `json:"deviceId"`
+			RuleID             string  `json:"ruleId"`
+			MessageID          string  `json:"messageId"`
+			TemperatureCelsius float64 `json:"temperatureCelsius"`
+			Metric             string  `json:"metric"`
+			Comparator         string  `json:"comparator"`
+			ThresholdCelsius   float64 `json:"thresholdCelsius"`
+		} `json:"alert"`
+	}
+	if err := json.Unmarshal(alertDetailResponse.Data, &alertDetailData); err != nil {
+		t.Fatalf("decode alert detail after history pruning: %v", err)
+	}
+	if alertDetailData.Alert == nil || alertDetailData.Alert.ID != alert.ID || alertDetailData.Alert.DeviceID != deviceA.ID.String() || alertDetailData.Alert.RuleID != alert.RuleID || alertDetailData.Alert.MessageID != messageID.String() || alertDetailData.Alert.TemperatureCelsius != 31 || alertDetailData.Alert.Metric != rules.MetricTemperatureCelsius || alertDetailData.Alert.Comparator != string(rules.GreaterThan) || alertDetailData.Alert.ThresholdCelsius != 25 {
+		t.Fatalf("alert detail after history pruning = %+v", alertDetailData.Alert)
 	}
 
 	foreignRule, err := rulesRepository.CreateRule(ctx, organizationB, rules.CreateRuleInput{

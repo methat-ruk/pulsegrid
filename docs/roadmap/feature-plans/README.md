@@ -96,8 +96,8 @@ platform foundation” is not an acceptable PR boundary.
 
 ### MVP — Rules and alerts
 
-- [MVP-008 — Threshold rule and alert backend](completed/MVP-008-threshold-rule-alert-backend.md) — implementation and review fixes validated; PR #18 ready to merge, not merged
-- [MVP-009 — Alert console](planned/MVP-009-alert-console.md)
+- [MVP-008 — Threshold rule and alert backend](completed/MVP-008-threshold-rule-alert-backend.md) — merged as `fd0a383` (PR #18)
+- [MVP-009 — Alert console](completed/MVP-009-alert-console.md) — accepted for merge by the project owner; PR #19 open and unmerged pending manual merge
 
 ### MVP — Remote commands
 

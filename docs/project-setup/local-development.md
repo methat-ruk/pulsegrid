@@ -5,9 +5,13 @@ FND-004 readiness, the MVP-003 device-registry browser journey, the MVP-005
 local/test MQTT ingestion path, and the merged MVP-006 telemetry
 persistence/current-state path are implemented and validated. The MVP-007
 operator-visible telemetry console and review fixes were merged as `9ce9e7c`
-(PR #16). The MVP-008 rules/alerts backend and review fixes passed local and CI
-validation; PR #18 is ready to merge but remains unmerged. The MVP-009 console
-is still planned.
+(PR #16). The MVP-008 rules/alerts backend merged as `fd0a383` (PR #18).
+The MVP-009 alert-console candidate and local validation are complete on
+`feat/mvp-009-alert-console`. PR #19 now includes focused browser evidence for
+next-page append/retry, stale device-scope cancellation, detail rendering when
+device-name lookup fails, keyboard focus, and 390 px detail reflow. The
+published candidate checks passed. The project owner accepted PR #19 for
+merge; it remains open and unmerged pending the owner's manual merge.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
@@ -217,9 +221,9 @@ existing registry/readiness journeys, and port-conflict cleanup behavior.
 Headless assertions complement visible Browser inspection; they do not replace
 it.
 
-### MVP-008 rules and alert backend candidate
+### MVP-008 rules and alert backend
 
-The current MVP-008 feature branch adds rule configuration and alert history to
+MVP-008 adds rule configuration and alert history to
 the development-only GraphQL API. The development example already enables the
 loopback MQTT consumer; after migration and seed, create a rule with the API
 contract, then publish with `corepack pnpm run mqtt:simulator`. A match should
@@ -234,8 +238,41 @@ evidence:
 corepack pnpm run mqtt:test:integration
 ```
 
-PR #18 is ready to merge but not merged; `main` does not yet include the
-MVP-008 API or transaction behavior.
+PR #18 merged into `main` as `fd0a383`; the commands above now exercise the
+MVP-008 API and transaction behavior from the current repository.
+
+### MVP-009 alert console candidate
+
+On `feat/mvp-009-alert-console`, the console adds an **Alerts** route for
+recent occurrences, a detail route for the immutable MVP-008 snapshot, and a
+device-scoped link from device detail. The API contract remains unchanged.
+After the local API and console are running, register a device, configure a
+temperature rule through the development GraphQL API, and publish matching
+telemetry with `corepack pnpm run mqtt:simulator`. Open `/alerts` and select
+**Refresh alerts** to see the occurrence, its stored comparison, and the
+affected device. The detail view shows the rule/message identifiers and
+Observed, Received, and Recorded times, and remains useful when the source
+telemetry history row is unavailable. **Alerts** has no active/resolved,
+severity, acknowledgement, or notification state.
+
+The console uses a bounded first page, opaque cursor continuation, and manual
+refresh. A failed refresh preserves the previously loaded rows; no polling or
+realtime connection is used. The browser journey, including device-scoped
+navigation and narrow viewports, is run with:
+
+```sh
+corepack pnpm run test:browser
+```
+
+The PR #19 review follow-up also exercises a successful page append, failed
+next-page recovery using the same opaque cursor, changing device scope while a
+request is pending, and a failed detail device-name lookup. Its exact-candidate
+browser suite passed 32 tests. A Playwright Chromium check at 1440 × 900 and
+390 × 844 verified the detail identity, heading focus and Tab navigation,
+one-column reflow, no horizontal overflow, and no page or console errors.
+
+The project owner accepted this candidate for merge on its feature branch. PR
+#19 remains open and has not been merged into `main`.
 
 ### Local PostgreSQL, seed, and development GraphQL
 
