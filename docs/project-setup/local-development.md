@@ -6,7 +6,8 @@ local/test MQTT ingestion path, and the merged MVP-006 telemetry
 persistence/current-state path are implemented and validated. The MVP-007
 operator-visible telemetry console and review fixes were merged as `9ce9e7c`
 (PR #16). The MVP-008 rules/alerts backend merged as `fd0a383` (PR #18).
-The MVP-009 console is under reviewed planning and is not implemented.
+The MVP-009 alert-console candidate and local validation are complete on
+`feat/mvp-009-alert-console`; it is ready for review and is not merged.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
@@ -235,6 +236,32 @@ corepack pnpm run mqtt:test:integration
 
 PR #18 merged into `main` as `fd0a383`; the commands above now exercise the
 MVP-008 API and transaction behavior from the current repository.
+
+### MVP-009 alert console candidate
+
+On `feat/mvp-009-alert-console`, the console adds an **Alerts** route for
+recent occurrences, a detail route for the immutable MVP-008 snapshot, and a
+device-scoped link from device detail. The API contract remains unchanged.
+After the local API and console are running, register a device, configure a
+temperature rule through the development GraphQL API, and publish matching
+telemetry with `corepack pnpm run mqtt:simulator`. Open `/alerts` and select
+**Refresh alerts** to see the occurrence, its stored comparison, and the
+affected device. The detail view shows the rule/message identifiers and
+Observed, Received, and Recorded times, and remains useful when the source
+telemetry history row is unavailable. **Alerts** has no active/resolved,
+severity, acknowledgement, or notification state.
+
+The console uses a bounded first page, opaque cursor continuation, and manual
+refresh. A failed refresh preserves the previously loaded rows; no polling or
+realtime connection is used. The browser journey, including device-scoped
+navigation and narrow viewports, is run with:
+
+```sh
+corepack pnpm run test:browser
+```
+
+This candidate is ready for review on its feature branch and has not been
+merged into `main`.
 
 ### Local PostgreSQL, seed, and development GraphQL
 

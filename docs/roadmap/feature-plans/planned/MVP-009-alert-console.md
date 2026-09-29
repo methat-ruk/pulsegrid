@@ -1,7 +1,7 @@
 # MVP-009 — Alert Console
 
-Status: Proposed — reviewed and implementation-ready; awaiting approval to
-implement. No implementation has started.
+Status: Ready for review — implementation and author validation completed on
+2026-09-29 on `feat/mvp-009-alert-console`; not merged.
 
 Branch: `feat/mvp-009-alert-console`
 
@@ -108,8 +108,9 @@ Alert routes -> alert feature client -> feature-neutral GraphQL transport
   device-client behavior and proxy safeguards. Add no GraphQL framework or
   global server-state store.
 - Reuse client-side route loading. The list fetches only displayed fields;
-  detail fetches the full snapshot. Its optional device-name read follows
-  the alert response. Neither route fetches telemetry or current rule state.
+  detail fetches the full snapshot. One best-effort tenant-scoped device-name
+  read follows the alert response. Neither route fetches telemetry or current
+  rule state.
 - `createdAt` controls list order and is labeled **Recorded**. Label
   `observedAt` **Observed** and `receivedAt` **Received**; late telemetry can
   make Observed earlier than Recorded. Format dates with the existing locale
@@ -221,7 +222,7 @@ panel only on device detail was considered but would not provide discovery
 across devices. A server join or realtime transport has no demonstrated MVP
 need. No implementation, runtime validation, or PR action occurred in this
 review. The remaining assumptions fit the development-only slice; approval
-of this reviewed version is the next gate before implementation.
+of this reviewed version was the gate before implementation.
 
 The second pass found no remaining plan blocker. The main assumptions are
 manual freshness, full device IDs in global rows, and reuse of the existing
@@ -237,5 +238,53 @@ leave the new journey ambiguous or fragile. Frontend patterns, UX states, web
 security baseline, and test strategy own their design and evidence. Device
 name projection and realtime updates remain future enhancements with the
 operator-evidence and unattended-update triggers above. This review changes
-only the planned frontend slice and its tests; implementation approval is
-still pending.
+only the planned frontend slice and its tests.
+
+## Plan-to-actual reconciliation and author review (2026-09-29)
+
+The approved scope was implemented on `feat/mvp-009-alert-console`:
+
+- The shared same-origin GraphQL transport now owns POST, abort/timeout,
+  error mapping, no-store, and omitted-credential behavior for both device and
+  alert clients. Existing device API operations keep the same request/error
+  behavior; no package or server contract changed.
+- The alert feature client and `/alerts` / `/alerts/:id` routes consume the
+  existing tenant-scoped operations. The list uses 50-row pages, opaque cursor
+  continuation, manual refresh, preserved rows on refresh/page failure, and
+  route cancellation. It displays device IDs without an N+1 list lookup.
+- Detail presents the stored measurement/comparison, rule and message IDs, and
+  Observed, Received, and Recorded times. A best-effort device lookup adds its
+  display name without making it necessary to render the snapshot. No
+  telemetry or current-rule query was added.
+- Primary navigation and the device-detail link provide global and
+  device-scoped discovery. Invalid, unknown, and foreign device scopes do not
+  disclose a device; unknown/foreign alert IDs share the API's null result.
+- The API integration test now calls `alert(id)` after deleting the source
+  history row and verifies the saved snapshot. The real browser journey uses
+  the simulator and database-backed API; focused browser tests cover refresh
+  failure, pagination cancellation, unknown IDs, filtered navigation, and
+  narrow viewport layout.
+
+Validation passed on this candidate:
+
+- `corepack pnpm run check` — formatting, gqlgen drift, Go modernize,
+  staticcheck/vet, frontend lint/typecheck, OpenAPI/AsyncAPI lint, Go and web
+  tests, Go race tests, builds, audit, MQTT/API/PostgreSQL integration, and
+  all 28 browser tests.
+- Visible Playwright QA on the built routes at 1440×900 and 320×844 confirmed
+  page identity, alert list/detail rendering, heading focus, the list-to-detail
+  interaction, no application console errors/warnings, and no horizontal
+  overflow at 320 px. Screenshots are saved under `/private/tmp` for this
+  review and are not repository artifacts.
+- `govulncheck` found no vulnerable source call paths; it reported three
+  module-level advisories in the existing `golang.org/x/crypto` dependency.
+  This PR adds no dependency. Nuxt build retains the existing non-blocking
+  Rollup annotation warning.
+
+Author self-review found no scope or boundary deviation. The implementation
+uses only the merged MVP-008 contract and preserves server tenant authority;
+MVP-009 changes no persistence, API, environment key, or service. The feature
+plan remains in `planned/` as Ready for review because no PR has been opened
+and independent review/acceptance are pending. M3 remains in progress until
+this UI is accepted. No commit, push, PR, production migration, or deployment
+occurred in this implementation turn.

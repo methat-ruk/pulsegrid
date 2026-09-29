@@ -10,6 +10,7 @@ const mobileMenuPanel = ref<HTMLElement | null>(null)
 const navigationItems = [
   { label: 'Overview', to: '/', icon: 'i-lucide-house' },
   { label: 'Devices', to: '/devices', icon: 'i-lucide-cpu' },
+  { label: 'Alerts', to: '/alerts', icon: 'i-lucide-bell' },
 ] as const
 
 const activeNavigationLabel = computed(() => {

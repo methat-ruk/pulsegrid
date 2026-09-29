@@ -146,4 +146,68 @@ export async function publishSimulatorTelemetry(deviceID: string, temperatureCel
   return { messageID: messageMatch[1] }
 }
 
+export async function seedAlertDevice(page: import('@playwright/test').Page, deviceKey: string) {
+  const response = await page.request.post('/api/graphql', {
+    headers: { accept: 'application/graphql-response+json' },
+    data: {
+      query: `mutation CreateDevice($input: CreateDeviceInput!) {
+        createDevice(input: $input) { id deviceKey displayName }
+      }`,
+      variables: { input: { deviceKey, displayName: 'Alert browser device' } },
+    },
+  })
+  if (response.status() !== 200) throw new Error(`device creation returned ${response.status()}`)
+  const payload = await response.json()
+  if (payload.errors !== undefined) throw new Error('device creation returned GraphQL errors')
+  return payload.data.createDevice as { id: string, deviceKey: string, displayName: string }
+}
+
+export async function createTemperatureRule(page: import('@playwright/test').Page, deviceID: string) {
+  const response = await page.request.post('/api/graphql', {
+    headers: { accept: 'application/graphql-response+json' },
+    data: {
+      query: `mutation CreateRule($input: CreateThresholdRuleInput!) {
+        createThresholdRule(input: $input) { id enabled comparator thresholdCelsius }
+      }`,
+      variables: { input: { deviceId: deviceID, comparator: 'GT', thresholdCelsius: 25 } },
+    },
+  })
+  if (response.status() !== 200) throw new Error(`rule creation returned ${response.status()}`)
+  const payload = await response.json()
+  if (payload.errors !== undefined) throw new Error('rule creation returned GraphQL errors')
+  return payload.data.createThresholdRule as { id: string, enabled: boolean }
+}
+
+export async function readAlerts(page: import('@playwright/test').Page, deviceID?: string) {
+  const response = await page.request.post('/api/graphql', {
+    headers: { accept: 'application/graphql-response+json' },
+    data: {
+      query: `query Alerts($first: Int!, $deviceId: ID) {
+        alerts(first: $first, deviceId: $deviceId) {
+          edges { node { id deviceId ruleId messageId observedAt receivedAt temperatureCelsius metric comparator thresholdCelsius createdAt } }
+          pageInfo { endCursor hasNextPage }
+        }
+      }`,
+      variables: { first: 50, deviceId: deviceID ?? null },
+    },
+  })
+  if (response.status() !== 200) throw new Error(`alert query returned ${response.status()}`)
+  const payload = await response.json()
+  if (payload.errors !== undefined) throw new Error('alert query returned GraphQL errors')
+  return payload.data.alerts as {
+    edges: Array<{ node: {
+      id: string
+      deviceId: string
+      ruleId: string
+      messageId: string
+      observedAt: string
+      receivedAt: string
+      temperatureCelsius: number
+      comparator: string
+      thresholdCelsius: number
+    } }>
+    pageInfo: { endCursor: string | null, hasNextPage: boolean }
+  }
+}
+
 export { expect } from '@playwright/test'

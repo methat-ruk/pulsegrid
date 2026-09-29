@@ -36,7 +36,7 @@ describe('device GraphQL client', () => {
     await expect(executeDeviceGraphQL('mutation Test { __typename }', {})).rejects.toMatchObject<DeviceGraphQLError>({
       code: 'CONFLICT',
       message: 'device key already exists',
-      name: 'DeviceGraphQLError',
+      name: 'GraphQLClientError',
       status: 200,
     })
     expect(fetchMock).toHaveBeenCalledWith('/api/graphql', expect.objectContaining({
@@ -135,7 +135,7 @@ describe('device GraphQL client', () => {
     await expect(executeDeviceGraphQL('query Test { __typename }', {})).rejects.toMatchObject<DeviceGraphQLError>({
       code: 'SERVICE_UNAVAILABLE',
       message: 'device service returned an invalid response',
-      name: 'DeviceGraphQLError',
+      name: 'GraphQLClientError',
       status: 200,
     })
   })

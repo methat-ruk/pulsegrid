@@ -20,7 +20,8 @@ operator journey and a fixed same-origin Nuxt GraphQL transport adapter backed
 by the MVP-001 organization/device registry. The merged MVP-007 console now
 exposes the telemetry reads on the existing device-detail route through a
 section-local panel. MVP-008 rules/alerts merged as `fd0a383` (PR #18), while
-the MVP-009 alert console remains planned. Production identity, deployment
+the MVP-009 alert-console candidate is ready for review on its feature branch.
+Production identity, deployment
 exposure, durable broker replay, and later event contracts remain
 unimplemented.
 
@@ -165,8 +166,12 @@ Successful matching input commits telemetry and immutable alert occurrences
 together. Each alert carries a rule/measurement snapshot and references the
 durable observation identity, so pruning history does not erase its context.
 PR #18 merged this behavior into `main` as `fd0a383`. MVP-009 plans a
-read-only alert list/detail journey over the existing GraphQL snapshot;
-frontend navigation will not own alert evaluation, lifecycle, or tenant scope.
+read-only alert list/detail journey over the existing GraphQL snapshot. Its
+candidate adds the `/alerts` list and detail route, optional device scope, and
+a device-detail entry point. The browser renders the stored comparison and
+event times; it does not own alert evaluation, lifecycle, or tenant scope. The
+candidate passed local API and browser validation and remains unmerged on
+`feat/mvp-009-alert-console`.
 The [MVP-008 plan](../roadmap/feature-plans/completed/MVP-008-threshold-rule-alert-backend.md)
 owns the limits, GraphQL contract, recovery boundary, and evidence.
 
