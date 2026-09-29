@@ -8,7 +8,8 @@ are implemented and validated. The MVP-008 rules/alerts backend merged in PR
 alert reads without changing the API contract; its UI remains unmerged. PR #19
 adds a post-pruning `alert(id)` assertion and browser evidence for the operator
 journey, pagination recovery, route-scope changes, and detail enrichment
-failure. The latest published candidate is ready for review.
+failure. The project owner accepted the published candidate for merge; PR #19
+remains open and unmerged pending the owner's manual merge.
 Production identity, production MQTT, and permanent high-volume storage remain
 deferred.
 

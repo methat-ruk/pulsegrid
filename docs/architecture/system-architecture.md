@@ -23,7 +23,8 @@ section-local panel. MVP-008 rules/alerts merged as `fd0a383` (PR #18), while
 the MVP-009 alert-console candidate on its feature branch now includes the
 requested review evidence for pagination recovery, route-scope changes,
 best-effort device-name lookup, keyboard focus, and narrow detail reflow. PR
-#19 is ready for review and remains unmerged. Production identity, deployment
+#19 is accepted for merge by the project owner and remains open and unmerged
+pending the owner's manual merge. Production identity, deployment
 exposure, durable broker replay, and later event contracts remain
 unimplemented.
 

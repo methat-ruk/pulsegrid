@@ -1,8 +1,7 @@
 # MVP-009 — Alert Console
 
-Status: Ready for review — implementation, author validation, and the PR #19
-review evidence gaps are addressed on `feat/mvp-009-alert-console`; awaiting
-exact-head review and not merged.
+Status: Complete — accepted for merge by the project owner on 2026-09-29;
+PR #19 remains open and unmerged pending the owner's manual merge.
 
 Branch: `feat/mvp-009-alert-console`
 
@@ -284,11 +283,12 @@ Validation passed on this candidate:
 
 Author self-review found no scope or boundary deviation. The implementation
 uses only the merged MVP-008 contract and preserves server tenant authority;
-MVP-009 changes no persistence, API, environment key, or service. The feature
-plan remains in `planned/` as Ready for review because the required exact-head
-re-review is still pending. M3 remains in progress until this UI is accepted.
-The implementation and evidence follow-up were committed and pushed to PR #19;
-no merge, production migration, or deployment occurred.
+MVP-009 changes no persistence, API, environment key, or service. On
+2026-09-29 the project owner accepted the exact published candidate for merge
+and will perform the merge. The prior review requested an exact-head re-review;
+no separate re-review was performed in this task, and this owner acceptance is
+recorded as the disposition. PR #19 remains open and unmerged. M3 remains in
+progress until the PR is merged into `main`.
 
 ## PR review evidence follow-up (2026-09-29)
 
@@ -312,7 +312,7 @@ Actions run 36515919848 passed all 14 PR checks on the same commit. A visible
 Playwright Chromium pass verified the detail title and content at 1440 × 900
 and 390 × 844, heading and Tab focus, one-column reflow, zero horizontal
 overflow, and zero browser console/page errors. Screenshots were captured
-outside the repository. The PR is ready for exact-head review; the review
-comment asks for that re-review before any merge decision. Keep this plan in
-`planned/` until review accepts the published evidence, then move it to
-`completed/` with its inbound links.
+outside the repository. The exact published head and all required checks are
+recorded above. The project owner accepted this candidate for merge and will
+perform that action manually; this plan is moved to `completed/` under that
+acceptance. PR #19 remains open and unmerged at this documentation update.

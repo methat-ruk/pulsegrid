@@ -10,8 +10,8 @@ The MVP-009 alert-console candidate and local validation are complete on
 `feat/mvp-009-alert-console`. PR #19 now includes focused browser evidence for
 next-page append/retry, stale device-scope cancellation, detail rendering when
 device-name lookup fails, keyboard focus, and 390 px detail reflow. The
-published candidate checks passed; PR #19 is ready for review and is not
-merged.
+published candidate checks passed. The project owner accepted PR #19 for
+merge; it remains open and unmerged pending the owner's manual merge.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
@@ -271,8 +271,8 @@ browser suite passed 32 tests. A Playwright Chromium check at 1440 × 900 and
 390 × 844 verified the detail identity, heading focus and Tab navigation,
 one-column reflow, no horizontal overflow, and no page or console errors.
 
-This candidate is ready for review on its feature branch and has not been
-merged into `main`.
+The project owner accepted this candidate for merge on its feature branch. PR
+#19 remains open and has not been merged into `main`.
 
 ### Local PostgreSQL, seed, and development GraphQL
 

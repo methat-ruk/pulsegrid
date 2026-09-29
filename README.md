@@ -5,7 +5,7 @@
 Connect devices · Stream telemetry · Detect conditions · Deliver commands ·
 Operate fleets
 
-![Status](https://img.shields.io/badge/status-mvp--009--ready--for--review-blue)
+![Status](https://img.shields.io/badge/status-mvp--009--accepted--for--merge-blue)
 
 > [!IMPORTANT]
 > PulseGrid's documentation foundation, Go API foundation, Nuxt console
@@ -15,9 +15,10 @@ Operate fleets
 > persistence/current state and MVP-007 operator-visible telemetry console are
 > implemented and validated. PR #16 merged as `9ce9e7c`; MVP-008's backend
 > merged in PR #18 as `fd0a383`. MVP-009's alert-console implementation and
-> local validation are complete on `feat/mvp-009-alert-console`. The PR #19
-> review evidence gaps have been addressed, its exact-candidate checks passed,
-> and it is ready for review; it has not been merged.
+> local validation are complete on `feat/mvp-009-alert-console`. PR #19's review
+> evidence gaps have been addressed and its exact-candidate checks passed. The
+> project owner accepted it for merge; the PR remains open and unmerged pending
+> the owner's manual merge.
 > Production identity and production readiness remain deferred.
 
 ## What is PulseGrid?
@@ -106,7 +107,7 @@ The decision state and adoption trigger for each technology are maintained in
 
 ## Project status
 
-**Current phase: MVP-009 alert console ready for review (PR #19)**
+**Current phase: MVP-009 alert console accepted for merge (PR #19)**
 
 - Product intent and MVP boundary: documented.
 - Architecture and technology adoption rules: documented.
@@ -127,7 +128,8 @@ The decision state and adoption trigger for each technology are maintained in
   `feat/mvp-009-alert-console`. PR #19's review evidence gaps now have focused
   browser coverage for pagination recovery, stale device scopes, failed device
   name lookup, keyboard focus, and 390 px detail reflow. Its candidate checks
-  passed and it is ready for review; it remains unmerged.
+  passed and the owner accepted it for merge; PR #19 remains open and unmerged
+  pending the owner's manual merge.
   Production identity and production readiness remain deferred.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
   required checks include browser evidence for the real local API readiness
