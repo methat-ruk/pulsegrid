@@ -1,7 +1,8 @@
 # MVP-009 — Alert Console
 
-Status: Ready for review — implementation and author validation completed on
-2026-09-29 on `feat/mvp-009-alert-console`; not merged.
+Status: Ready for review — implementation, author validation, and the PR #19
+review evidence gaps are addressed on `feat/mvp-009-alert-console`; awaiting
+exact-head review and not merged.
 
 Branch: `feat/mvp-009-alert-console`
 
@@ -284,7 +285,34 @@ Validation passed on this candidate:
 Author self-review found no scope or boundary deviation. The implementation
 uses only the merged MVP-008 contract and preserves server tenant authority;
 MVP-009 changes no persistence, API, environment key, or service. The feature
-plan remains in `planned/` as Ready for review because no PR has been opened
-and independent review/acceptance are pending. M3 remains in progress until
-this UI is accepted. No commit, push, PR, production migration, or deployment
-occurred in this implementation turn.
+plan remains in `planned/` as Ready for review because the required exact-head
+re-review is still pending. M3 remains in progress until this UI is accepted.
+The implementation and evidence follow-up were committed and pushed to PR #19;
+no merge, production migration, or deployment occurred.
+
+## PR review evidence follow-up (2026-09-29)
+
+The PR #19 review comment identified evidence gaps in visible pagination
+recovery, device-scope changes while a request is in flight, failed device-name
+enrichment, and exact-candidate keyboard-focus/390 px detail layout. Commit
+`06181a90547685f3d7ba6c702c6f1a4ddef44060` adds browser tests for each
+requested behavior:
+
+- A failed next-page request keeps the first page visible; Retry sends the
+  original opaque cursor and appends the next page on success.
+- Changing the device query while the first scoped page is pending clears the
+  old scope and the late result cannot replace the new scope.
+- A failed detail device lookup leaves the stored device, rule, message,
+  measurement, and time snapshot visible with the device-ID link.
+- At 390 × 844, the detail heading receives focus, Tab reaches the device link,
+  the snapshot uses one column, and the page has no horizontal overflow.
+
+`corepack pnpm run test:browser` passed all 32 tests on that candidate. GitHub
+Actions run 36515919848 passed all 14 PR checks on the same commit. A visible
+Playwright Chromium pass verified the detail title and content at 1440 × 900
+and 390 × 844, heading and Tab focus, one-column reflow, zero horizontal
+overflow, and zero browser console/page errors. Screenshots were captured
+outside the repository. The PR is ready for exact-head review; the review
+comment asks for that re-review before any merge decision. Keep this plan in
+`planned/` until review accepts the published evidence, then move it to
+`completed/` with its inbound links.

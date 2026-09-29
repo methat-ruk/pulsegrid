@@ -20,8 +20,10 @@ operator journey and a fixed same-origin Nuxt GraphQL transport adapter backed
 by the MVP-001 organization/device registry. The merged MVP-007 console now
 exposes the telemetry reads on the existing device-detail route through a
 section-local panel. MVP-008 rules/alerts merged as `fd0a383` (PR #18), while
-the MVP-009 alert-console candidate is ready for review on its feature branch.
-Production identity, deployment
+the MVP-009 alert-console candidate on its feature branch now includes the
+requested review evidence for pagination recovery, route-scope changes,
+best-effort device-name lookup, keyboard focus, and narrow detail reflow. PR
+#19 is ready for review and remains unmerged. Production identity, deployment
 exposure, durable broker replay, and later event contracts remain
 unimplemented.
 

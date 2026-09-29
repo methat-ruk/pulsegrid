@@ -5,7 +5,10 @@ integration, MVP-004 local MQTT producer fixture, MVP-005 local/test telemetry
 ingestion, and MVP-006 local/test telemetry persistence/current-state projection
 are implemented and validated. The MVP-008 rules/alerts backend merged in PR
 #18 as `fd0a383`. The MVP-009 alert-console candidate consumes the existing
-alert reads without changing the API contract; its UI remains unmerged.
+alert reads without changing the API contract; its UI remains unmerged. PR #19
+adds a post-pruning `alert(id)` assertion and browser evidence for the operator
+journey, pagination recovery, route-scope changes, and detail enrichment
+failure. The latest published candidate is ready for review.
 Production identity, production MQTT, and permanent high-volume storage remain
 deferred.
 

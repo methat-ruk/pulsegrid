@@ -7,7 +7,11 @@ persistence/current-state path are implemented and validated. The MVP-007
 operator-visible telemetry console and review fixes were merged as `9ce9e7c`
 (PR #16). The MVP-008 rules/alerts backend merged as `fd0a383` (PR #18).
 The MVP-009 alert-console candidate and local validation are complete on
-`feat/mvp-009-alert-console`; it is ready for review and is not merged.
+`feat/mvp-009-alert-console`. PR #19 now includes focused browser evidence for
+next-page append/retry, stale device-scope cancellation, detail rendering when
+device-name lookup fails, keyboard focus, and 390 px detail reflow. The
+published candidate checks passed; PR #19 is ready for review and is not
+merged.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
@@ -259,6 +263,13 @@ navigation and narrow viewports, is run with:
 ```sh
 corepack pnpm run test:browser
 ```
+
+The PR #19 review follow-up also exercises a successful page append, failed
+next-page recovery using the same opaque cursor, changing device scope while a
+request is pending, and a failed detail device-name lookup. Its exact-candidate
+browser suite passed 32 tests. A Playwright Chromium check at 1440 × 900 and
+390 × 844 verified the detail identity, heading focus and Tab navigation,
+one-column reflow, no horizontal overflow, and no page or console errors.
 
 This candidate is ready for review on its feature branch and has not been
 merged into `main`.
