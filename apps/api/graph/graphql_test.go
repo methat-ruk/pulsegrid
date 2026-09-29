@@ -77,9 +77,7 @@ func (f *fakeRepository) ListDevices(_ context.Context, organizationID uuid.UUID
 		start = len(f.devices)
 	}
 	end := start + pageSize
-	if end > len(f.devices) {
-		end = len(f.devices)
-	}
+	end = min(end, len(f.devices))
 	page := registry.DevicePage{Devices: append([]registry.Device(nil), f.devices[start:end]...)}
 	if end < len(f.devices) {
 		next := f.devices[end-1]

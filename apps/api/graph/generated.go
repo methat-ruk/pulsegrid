@@ -8,6 +8,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"strconv"
 	"sync/atomic"
@@ -62,6 +63,30 @@ type ComplexityRoot struct {
 		ThresholdCelsius   func(childComplexity int) int
 	}
 
+	Command struct {
+		AcknowledgedAt func(childComplexity int) int
+		CreatedAt      func(childComplexity int) int
+		DeviceID       func(childComplexity int) int
+		DispatchedAt   func(childComplexity int) int
+		ExpiresAt      func(childComplexity int) int
+		FailureCode    func(childComplexity int) int
+		ID             func(childComplexity int) int
+		Status         func(childComplexity int) int
+		TerminalAt     func(childComplexity int) int
+		Type           func(childComplexity int) int
+		UpdatedAt      func(childComplexity int) int
+	}
+
+	CommandConnection struct {
+		Edges    func(childComplexity int) int
+		PageInfo func(childComplexity int) int
+	}
+
+	CommandEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
 	Device struct {
 		CreatedAt   func(childComplexity int) int
 		DeviceKey   func(childComplexity int) int
@@ -88,6 +113,7 @@ type ComplexityRoot struct {
 	}
 
 	Mutation struct {
+		CreateCommand       func(childComplexity int, input model.CreateCommandInput) int
 		CreateDevice        func(childComplexity int, input model.CreateDeviceInput) int
 		CreateThresholdRule func(childComplexity int, input model.CreateThresholdRuleInput) int
 		UpdateThresholdRule func(childComplexity int, input model.UpdateThresholdRuleInput) int
@@ -101,7 +127,9 @@ type ComplexityRoot struct {
 	Query struct {
 		Alert              func(childComplexity int, id string) int
 		Alerts             func(childComplexity int, first int, after *string, deviceID *string) int
+		Command            func(childComplexity int, id string) int
 		Device             func(childComplexity int, id string) int
+		DeviceCommands     func(childComplexity int, deviceID string, first int, after *string) int
 		DeviceCurrentState func(childComplexity int, deviceID string) int
 		DeviceTelemetry    func(childComplexity int, deviceID string, first int, after *string) int
 		Devices            func(childComplexity int, first int, after *string) int
@@ -146,6 +174,7 @@ type MutationResolver interface {
 	CreateDevice(ctx context.Context, input model.CreateDeviceInput) (*model.Device, error)
 	CreateThresholdRule(ctx context.Context, input model.CreateThresholdRuleInput) (*model.ThresholdRule, error)
 	UpdateThresholdRule(ctx context.Context, input model.UpdateThresholdRuleInput) (*model.ThresholdRule, error)
+	CreateCommand(ctx context.Context, input model.CreateCommandInput) (*model.Command, error)
 }
 type QueryResolver interface {
 	Device(ctx context.Context, id string) (*model.Device, error)
@@ -155,6 +184,8 @@ type QueryResolver interface {
 	ThresholdRules(ctx context.Context, deviceID string) ([]*model.ThresholdRule, error)
 	Alert(ctx context.Context, id string) (*model.AlertOccurrence, error)
 	Alerts(ctx context.Context, first int, after *string, deviceID *string) (*model.AlertConnection, error)
+	Command(ctx context.Context, id string) (*model.Command, error)
+	DeviceCommands(ctx context.Context, deviceID string, first int, after *string) (*model.CommandConnection, error)
 }
 
 // endregion ************************** generated!.gotpl **************************
@@ -268,6 +299,99 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.AlertOccurrence.ThresholdCelsius(childComplexity), true
 
+	case "Command.acknowledgedAt":
+		if e.ComplexityRoot.Command.AcknowledgedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Command.AcknowledgedAt(childComplexity), true
+	case "Command.createdAt":
+		if e.ComplexityRoot.Command.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Command.CreatedAt(childComplexity), true
+	case "Command.deviceId":
+		if e.ComplexityRoot.Command.DeviceID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Command.DeviceID(childComplexity), true
+	case "Command.dispatchedAt":
+		if e.ComplexityRoot.Command.DispatchedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Command.DispatchedAt(childComplexity), true
+	case "Command.expiresAt":
+		if e.ComplexityRoot.Command.ExpiresAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Command.ExpiresAt(childComplexity), true
+	case "Command.failureCode":
+		if e.ComplexityRoot.Command.FailureCode == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Command.FailureCode(childComplexity), true
+	case "Command.id":
+		if e.ComplexityRoot.Command.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Command.ID(childComplexity), true
+	case "Command.status":
+		if e.ComplexityRoot.Command.Status == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Command.Status(childComplexity), true
+	case "Command.terminalAt":
+		if e.ComplexityRoot.Command.TerminalAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Command.TerminalAt(childComplexity), true
+	case "Command.type":
+		if e.ComplexityRoot.Command.Type == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Command.Type(childComplexity), true
+	case "Command.updatedAt":
+		if e.ComplexityRoot.Command.UpdatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Command.UpdatedAt(childComplexity), true
+
+	case "CommandConnection.edges":
+		if e.ComplexityRoot.CommandConnection.Edges == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CommandConnection.Edges(childComplexity), true
+	case "CommandConnection.pageInfo":
+		if e.ComplexityRoot.CommandConnection.PageInfo == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CommandConnection.PageInfo(childComplexity), true
+
+	case "CommandEdge.cursor":
+		if e.ComplexityRoot.CommandEdge.Cursor == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CommandEdge.Cursor(childComplexity), true
+	case "CommandEdge.node":
+		if e.ComplexityRoot.CommandEdge.Node == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CommandEdge.Node(childComplexity), true
+
 	case "Device.createdAt":
 		if e.ComplexityRoot.Device.CreatedAt == nil {
 			break
@@ -350,6 +474,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.DeviceEdge.Node(childComplexity), true
 
+	case "Mutation.createCommand":
+		if e.ComplexityRoot.Mutation.CreateCommand == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createCommand_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.CreateCommand(childComplexity, args["input"].(model.CreateCommandInput)), true
 	case "Mutation.createDevice":
 		if e.ComplexityRoot.Mutation.CreateDevice == nil {
 			break
@@ -419,6 +554,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Alerts(childComplexity, args["first"].(int), args["after"].(*string), args["deviceId"].(*string)), true
+	case "Query.command":
+		if e.ComplexityRoot.Query.Command == nil {
+			break
+		}
+
+		args, err := ec.field_Query_command_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.Command(childComplexity, args["id"].(string)), true
 	case "Query.device":
 		if e.ComplexityRoot.Query.Device == nil {
 			break
@@ -430,6 +576,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Device(childComplexity, args["id"].(string)), true
+	case "Query.deviceCommands":
+		if e.ComplexityRoot.Query.DeviceCommands == nil {
+			break
+		}
+
+		args, err := ec.field_Query_deviceCommands_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.DeviceCommands(childComplexity, args["deviceId"].(string), args["first"].(int), args["after"].(*string)), true
 	case "Query.deviceCurrentState":
 		if e.ComplexityRoot.Query.DeviceCurrentState == nil {
 			break
@@ -590,6 +747,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	opCtx := graphql.GetOperationContext(ctx)
 	ec := newExecutionContext(opCtx, e, make(chan graphql.DeferredResult))
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputCreateCommandInput,
 		ec.unmarshalInputCreateDeviceInput,
 		ec.unmarshalInputCreateThresholdRuleInput,
 		ec.unmarshalInputUpdateThresholdRuleInput,
@@ -667,7 +825,7 @@ func newExecutionContext(
 	}
 }
 
-//go:embed "schema/device.graphqls"
+//go:embed "schema/command.graphqls" "schema/device.graphqls"
 var sourcesFS embed.FS
 
 func sourceData(filename string) string {
@@ -679,6 +837,7 @@ func sourceData(filename string) string {
 }
 
 var sources = []*ast.Source{
+	{Name: "schema/command.graphqls", Input: sourceData("schema/command.graphqls"), BuiltIn: false},
 	{Name: "schema/device.graphqls", Input: sourceData("schema/device.graphqls"), BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
@@ -733,6 +892,54 @@ func (ec *executionContext) childFields_AlertOccurrence(ctx context.Context, fie
 		return ec.fieldContext_AlertOccurrence_createdAt(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type AlertOccurrence", field.Name)
+}
+
+func (ec *executionContext) childFields_Command(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "id":
+		return ec.fieldContext_Command_id(ctx, field)
+	case "deviceId":
+		return ec.fieldContext_Command_deviceId(ctx, field)
+	case "type":
+		return ec.fieldContext_Command_type(ctx, field)
+	case "status":
+		return ec.fieldContext_Command_status(ctx, field)
+	case "createdAt":
+		return ec.fieldContext_Command_createdAt(ctx, field)
+	case "updatedAt":
+		return ec.fieldContext_Command_updatedAt(ctx, field)
+	case "expiresAt":
+		return ec.fieldContext_Command_expiresAt(ctx, field)
+	case "dispatchedAt":
+		return ec.fieldContext_Command_dispatchedAt(ctx, field)
+	case "acknowledgedAt":
+		return ec.fieldContext_Command_acknowledgedAt(ctx, field)
+	case "terminalAt":
+		return ec.fieldContext_Command_terminalAt(ctx, field)
+	case "failureCode":
+		return ec.fieldContext_Command_failureCode(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type Command", field.Name)
+}
+
+func (ec *executionContext) childFields_CommandConnection(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "edges":
+		return ec.fieldContext_CommandConnection_edges(ctx, field)
+	case "pageInfo":
+		return ec.fieldContext_CommandConnection_pageInfo(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type CommandConnection", field.Name)
+}
+
+func (ec *executionContext) childFields_CommandEdge(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "cursor":
+		return ec.fieldContext_CommandEdge_cursor(ctx, field)
+	case "node":
+		return ec.fieldContext_CommandEdge_node(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type CommandEdge", field.Name)
 }
 
 func (ec *executionContext) childFields_Device(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -969,6 +1176,20 @@ func (ec *executionContext) childFields___Type(ctx context.Context, field graphq
 
 // region    ***************************** args.gotpl *****************************
 
+func (ec *executionContext) field_Mutation_createCommand_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (model.CreateCommandInput, error) {
+			return ec.unmarshalNCreateCommandInput2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCreateCommandInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createDevice_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -1066,6 +1287,50 @@ func (ec *executionContext) field_Query_alerts_args(ctx context.Context, rawArgs
 		return nil, err
 	}
 	args["deviceId"] = arg2
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_command_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_deviceCommands_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "deviceId",
+		func(ctx context.Context, v any) (string, error) {
+			return ec.unmarshalNID2string(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["deviceId"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "first",
+		func(ctx context.Context, v any) (int, error) {
+			return ec.unmarshalNInt2int(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["first"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "after",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["after"] = arg2
 	return args, nil
 }
 
@@ -1595,6 +1860,378 @@ func (ec *executionContext) fieldContext_AlertOccurrence_createdAt(_ context.Con
 	return graphql.NewScalarFieldContext("AlertOccurrence", field, false, false, errors.New("field of type Time does not have child fields"))
 }
 
+func (ec *executionContext) _Command_id(ctx context.Context, field graphql.CollectedField, obj *model.Command) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Command_id(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Command_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Command", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _Command_deviceId(ctx context.Context, field graphql.CollectedField, obj *model.Command) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Command_deviceId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DeviceID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNID2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Command_deviceId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Command", field, false, false, errors.New("field of type ID does not have child fields"))
+}
+
+func (ec *executionContext) _Command_type(ctx context.Context, field graphql.CollectedField, obj *model.Command) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Command_type(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Type, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model.CommandType) graphql.Marshaler {
+			return ec.marshalNCommandType2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommandType(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Command_type(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Command", field, false, false, errors.New("field of type CommandType does not have child fields"))
+}
+
+func (ec *executionContext) _Command_status(ctx context.Context, field graphql.CollectedField, obj *model.Command) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Command_status(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Status, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v model.CommandStatus) graphql.Marshaler {
+			return ec.marshalNCommandStatus2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommandStatus(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Command_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Command", field, false, false, errors.New("field of type CommandStatus does not have child fields"))
+}
+
+func (ec *executionContext) _Command_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.Command) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Command_createdAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Command_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Command", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
+func (ec *executionContext) _Command_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.Command) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Command_updatedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.UpdatedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Command_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Command", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
+func (ec *executionContext) _Command_expiresAt(ctx context.Context, field graphql.CollectedField, obj *model.Command) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Command_expiresAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ExpiresAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v time.Time) graphql.Marshaler {
+			return ec.marshalNTime2timeᚐTime(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Command_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Command", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
+func (ec *executionContext) _Command_dispatchedAt(ctx context.Context, field graphql.CollectedField, obj *model.Command) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Command_dispatchedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DispatchedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *time.Time) graphql.Marshaler {
+			return ec.marshalOTime2ᚖtimeᚐTime(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Command_dispatchedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Command", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
+func (ec *executionContext) _Command_acknowledgedAt(ctx context.Context, field graphql.CollectedField, obj *model.Command) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Command_acknowledgedAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.AcknowledgedAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *time.Time) graphql.Marshaler {
+			return ec.marshalOTime2ᚖtimeᚐTime(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Command_acknowledgedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Command", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
+func (ec *executionContext) _Command_terminalAt(ctx context.Context, field graphql.CollectedField, obj *model.Command) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Command_terminalAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TerminalAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *time.Time) graphql.Marshaler {
+			return ec.marshalOTime2ᚖtimeᚐTime(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Command_terminalAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Command", field, false, false, errors.New("field of type Time does not have child fields"))
+}
+
+func (ec *executionContext) _Command_failureCode(ctx context.Context, field graphql.CollectedField, obj *model.Command) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Command_failureCode(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.FailureCode, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.CommandFailureCode) graphql.Marshaler {
+			return ec.marshalOCommandFailureCode2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommandFailureCode(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Command_failureCode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Command", field, false, false, errors.New("field of type CommandFailureCode does not have child fields"))
+}
+
+func (ec *executionContext) _CommandConnection_edges(ctx context.Context, field graphql.CollectedField, obj *model.CommandConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CommandConnection_edges(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Edges, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*model.CommandEdge) graphql.Marshaler {
+			return ec.marshalNCommandEdge2ᚕᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommandEdgeᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CommandConnection_edges(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommandConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CommandEdge(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CommandConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *model.CommandConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CommandConnection_pageInfo(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PageInfo, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.PageInfo) graphql.Marshaler {
+			return ec.marshalNPageInfo2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐPageInfo(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CommandConnection_pageInfo(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommandConnection",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_PageInfo(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CommandEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *model.CommandEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CommandEdge_cursor(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Cursor, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CommandEdge_cursor(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CommandEdge", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CommandEdge_node(ctx context.Context, field graphql.CollectedField, obj *model.CommandEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CommandEdge_node(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Node, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Command) graphql.Marshaler {
+			return ec.marshalNCommand2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommand(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CommandEdge_node(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CommandEdge",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Command(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Device_id(ctx context.Context, field graphql.CollectedField, obj *model.Device) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2053,6 +2690,50 @@ func (ec *executionContext) fieldContext_Mutation_updateThresholdRule(ctx contex
 	return fc, nil
 }
 
+func (ec *executionContext) _Mutation_createCommand(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Mutation_createCommand(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().CreateCommand(ctx, fc.Args["input"].(model.CreateCommandInput))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Command) graphql.Marshaler {
+			return ec.marshalNCommand2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommand(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Mutation_createCommand(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Command(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createCommand_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _PageInfo_endCursor(ctx context.Context, field graphql.CollectedField, obj *model.PageInfo) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -2401,6 +3082,94 @@ func (ec *executionContext) fieldContext_Query_alerts(ctx context.Context, field
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_alerts_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_command(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_command(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().Command(ctx, fc.Args["id"].(string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.Command) graphql.Marshaler {
+			return ec.marshalOCommand2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommand(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Query_command(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Command(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_command_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_deviceCommands(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_deviceCommands(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().DeviceCommands(ctx, fc.Args["deviceId"].(string), fc.Args["first"].(int), fc.Args["after"].(*string))
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *model.CommandConnection) graphql.Marshaler {
+			return ec.marshalNCommandConnection2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommandConnection(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Query_deviceCommands(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CommandConnection(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_deviceCommands_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -3960,6 +4729,48 @@ func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputCreateCommandInput(ctx context.Context, obj any) (model.CreateCommandInput, error) {
+	var it model.CreateCommandInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	maps.Copy(asMap, obj.(map[string]any))
+
+	fieldsInOrder := [...]string{"deviceId", "type", "idempotencyKey"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "deviceId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("deviceId"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.DeviceID = data
+		case "type":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("type"))
+			data, err := ec.unmarshalNCommandType2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommandType(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Type = data
+		case "idempotencyKey":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("idempotencyKey"))
+			data, err := ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IdempotencyKey = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCreateDeviceInput(ctx context.Context, obj any) (model.CreateDeviceInput, error) {
 	var it model.CreateDeviceInput
 	if obj == nil {
@@ -3967,9 +4778,7 @@ func (ec *executionContext) unmarshalInputCreateDeviceInput(ctx context.Context,
 	}
 
 	asMap := map[string]any{}
-	for k, v := range obj.(map[string]any) {
-		asMap[k] = v
-	}
+	maps.Copy(asMap, obj.(map[string]any))
 
 	fieldsInOrder := [...]string{"deviceKey", "displayName"}
 	for _, k := range fieldsInOrder {
@@ -4004,9 +4813,7 @@ func (ec *executionContext) unmarshalInputCreateThresholdRuleInput(ctx context.C
 	}
 
 	asMap := map[string]any{}
-	for k, v := range obj.(map[string]any) {
-		asMap[k] = v
-	}
+	maps.Copy(asMap, obj.(map[string]any))
 
 	if _, present := asMap["enabled"]; !present {
 		asMap["enabled"] = true
@@ -4059,9 +4866,7 @@ func (ec *executionContext) unmarshalInputUpdateThresholdRuleInput(ctx context.C
 	}
 
 	asMap := map[string]any{}
-	for k, v := range obj.(map[string]any) {
-		asMap[k] = v
-	}
+	maps.Copy(asMap, obj.(map[string]any))
 
 	fieldsInOrder := [...]string{"id", "expectedRevision", "comparator", "thresholdCelsius", "enabled"}
 	for _, k := range fieldsInOrder {
@@ -4268,6 +5073,180 @@ func (ec *executionContext) _AlertOccurrence(ctx context.Context, sel ast.Select
 			}
 		case "createdAt":
 			out.Values[i] = ec._AlertOccurrence_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var commandImplementors = []string{"Command"}
+
+func (ec *executionContext) _Command(ctx context.Context, sel ast.SelectionSet, obj *model.Command) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, commandImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Command")
+		case "id":
+			out.Values[i] = ec._Command_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "deviceId":
+			out.Values[i] = ec._Command_deviceId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "type":
+			out.Values[i] = ec._Command_type(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._Command_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._Command_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "updatedAt":
+			out.Values[i] = ec._Command_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "expiresAt":
+			out.Values[i] = ec._Command_expiresAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "dispatchedAt":
+			out.Values[i] = ec._Command_dispatchedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "acknowledgedAt":
+			out.Values[i] = ec._Command_acknowledgedAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "terminalAt":
+			out.Values[i] = ec._Command_terminalAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "failureCode":
+			out.Values[i] = ec._Command_failureCode(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var commandConnectionImplementors = []string{"CommandConnection"}
+
+func (ec *executionContext) _CommandConnection(ctx context.Context, sel ast.SelectionSet, obj *model.CommandConnection) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, commandConnectionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CommandConnection")
+		case "edges":
+			out.Values[i] = ec._CommandConnection_edges(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pageInfo":
+			out.Values[i] = ec._CommandConnection_pageInfo(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var commandEdgeImplementors = []string{"CommandEdge"}
+
+func (ec *executionContext) _CommandEdge(ctx context.Context, sel ast.SelectionSet, obj *model.CommandEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, commandEdgeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CommandEdge")
+		case "cursor":
+			out.Values[i] = ec._CommandEdge_cursor(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "node":
+			out.Values[i] = ec._CommandEdge_node(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -4530,6 +5509,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "createCommand":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createCommand(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -4756,6 +5742,50 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_alerts(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "command":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_command(ctx, field)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "deviceCommands":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_deviceCommands(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -5474,6 +6504,77 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
+func (ec *executionContext) marshalNCommand2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommand(ctx context.Context, sel ast.SelectionSet, v *model.Command) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._Command(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNCommandConnection2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommandConnection(ctx context.Context, sel ast.SelectionSet, v *model.CommandConnection) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CommandConnection(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNCommandEdge2ᚕᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommandEdgeᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.CommandEdge) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNCommandEdge2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommandEdge(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNCommandEdge2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommandEdge(ctx context.Context, sel ast.SelectionSet, v *model.CommandEdge) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CommandEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNCommandStatus2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommandStatus(ctx context.Context, v any) (model.CommandStatus, error) {
+	var res model.CommandStatus
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNCommandStatus2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommandStatus(ctx context.Context, sel ast.SelectionSet, v model.CommandStatus) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) unmarshalNCommandType2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommandType(ctx context.Context, v any) (model.CommandType, error) {
+	var res model.CommandType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNCommandType2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommandType(ctx context.Context, sel ast.SelectionSet, v model.CommandType) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) unmarshalNCreateCommandInput2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCreateCommandInput(ctx context.Context, v any) (model.CreateCommandInput, error) {
+	res, err := ec.unmarshalInputCreateCommandInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNCreateDeviceInput2githubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCreateDeviceInput(ctx context.Context, v any) (model.CreateDeviceInput, error) {
 	res, err := ec.unmarshalInputCreateDeviceInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -5894,6 +6995,29 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return res
 }
 
+func (ec *executionContext) marshalOCommand2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommand(ctx context.Context, sel ast.SelectionSet, v *model.Command) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Command(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOCommandFailureCode2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommandFailureCode(ctx context.Context, v any) (*model.CommandFailureCode, error) {
+	if v == nil {
+		return nil, nil
+	}
+	var res = new(model.CommandFailureCode)
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOCommandFailureCode2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐCommandFailureCode(ctx context.Context, sel ast.SelectionSet, v *model.CommandFailureCode) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return v
+}
+
 func (ec *executionContext) marshalODevice2ᚖgithubᚗcomᚋmethatᚑrukᚋpulsegridᚋappsᚋapiᚋgraphᚋmodelᚐDevice(ctx context.Context, sel ast.SelectionSet, v *model.Device) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -5941,6 +7065,24 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	_ = sel
 	_ = ctx
 	res := graphql.MarshalString(*v)
+	return res
+}
+
+func (ec *executionContext) unmarshalOTime2ᚖtimeᚐTime(ctx context.Context, v any) (*time.Time, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := graphql.UnmarshalTime(v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOTime2ᚖtimeᚐTime(ctx context.Context, sel ast.SelectionSet, v *time.Time) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalTime(*v)
 	return res
 }
 

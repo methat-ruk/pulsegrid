@@ -5,7 +5,7 @@
 Connect devices · Stream telemetry · Detect conditions · Deliver commands ·
 Operate fleets
 
-![Status](https://img.shields.io/badge/status-mvp--009--accepted--for--merge-blue)
+![Status](https://img.shields.io/badge/status-mvp--010--ready--for--review-blue)
 
 > [!IMPORTANT]
 > PulseGrid's documentation foundation, Go API foundation, Nuxt console
@@ -14,11 +14,11 @@ Operate fleets
 > MVP-005 local/test telemetry ingestion, and MVP-006 bounded telemetry
 > persistence/current state and MVP-007 operator-visible telemetry console are
 > implemented and validated. PR #16 merged as `9ce9e7c`; MVP-008's backend
-> merged in PR #18 as `fd0a383`. MVP-009's alert-console implementation and
-> local validation are complete on `feat/mvp-009-alert-console`. PR #19's review
-> evidence gaps have been addressed and its exact-candidate checks passed. The
-> project owner accepted it for merge; the PR remains open and unmerged pending
-> the owner's manual merge.
+> merged in PR #18 as `fd0a383`; MVP-009's alert console merged as `7e3c336`
+> in PR #19. MVP-010's command model and development GraphQL create/read API
+> are implemented and ready for review on
+> `feat/mvp-010-command-model-graphql-api`. It persists `PING` intent but does
+> not yet deliver commands over MQTT; MVP-011 owns delivery and acknowledgement.
 > Production identity and production readiness remain deferred.
 
 ## What is PulseGrid?
@@ -107,7 +107,7 @@ The decision state and adoption trigger for each technology are maintained in
 
 ## Project status
 
-**Current phase: MVP-009 alert console accepted for merge (PR #19)**
+**Current phase: MVP-010 command model and GraphQL API ready for review**
 
 - Product intent and MVP boundary: documented.
 - Architecture and technology adoption rules: documented.
@@ -125,12 +125,12 @@ The decision state and adoption trigger for each technology are maintained in
   chart labels, and a real simulator-to-browser test journey. PR #16 merged as
   `9ce9e7c`. MVP-008's rules/alerts backend merged as `fd0a383` (PR #18).
   MVP-009's alert list/detail console is implemented on
-  `feat/mvp-009-alert-console`. PR #19's review evidence gaps now have focused
-  browser coverage for pagination recovery, stale device scopes, failed device
-  name lookup, keyboard focus, and 390 px detail reflow. Its candidate checks
-  passed and the owner accepted it for merge; PR #19 remains open and unmerged
-  pending the owner's manual merge.
-  Production identity and production readiness remain deferred.
+  `feat/mvp-009-alert-console` and merged as `7e3c336` (PR #19). MVP-010 adds
+  persisted `PING` command intent and tenant-scoped GraphQL create/detail/history
+  operations on `feat/mvp-010-command-model-graphql-api`; its implementation and
+  author validation are ready for review. MQTT delivery, response ingestion,
+  and automatic timeout processing belong to MVP-011. Production identity and
+  production readiness remain deferred.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
   required checks include browser evidence for the real local API readiness
   journey.
@@ -148,8 +148,8 @@ validation alone does not imply merge or production readiness.
 | Executable repository foundation | Runnable Go and Nuxt shells with configuration, tests, local workflow, and CI | Complete |
 | Device registry | Tenant-scoped device provisioning, list, and detail | Complete |
 | Telemetry and current state | Simulator-to-console MQTT telemetry flow | Complete |
-| Rules and alerts | A threshold condition creates an investigable alert | In progress |
-| Remote command loop | Command delivery with acknowledgement, result, failure, and timeout | Planned |
+| Rules and alerts | A threshold condition creates an investigable alert | Complete |
+| Remote command loop | Command delivery with acknowledgement, result, failure, and timeout | In progress |
 | MVP acceptance | Repeatable end-to-end product loop | Planned |
 | Post-MVP evolution | Security hardening, event scale, specialized data, observability, orchestration, and fleet operations | Deferred |
 

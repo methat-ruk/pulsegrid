@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/commands"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/device/registry"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/rules"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/telemetry/projection"
@@ -14,6 +15,7 @@ import (
 const cursorVersion = "v1"
 const telemetryCursorVersion = "telemetry-v1"
 const alertCursorVersion = "alerts-v1"
+const commandCursorVersion = "commands-v1"
 
 func encodeCursor(cursor registry.Cursor) (string, error) {
 	if cursor.ID == uuid.Nil || cursor.CreatedAt.IsZero() {
@@ -156,4 +158,53 @@ func decodeAlertCursor(raw string) (*rules.AlertCursor, error) {
 		OrganizationID: organizationID,
 		DeviceFilter:   deviceFilter,
 	}, nil
+}
+
+func encodeCommandCursor(cursor commands.Cursor, organizationID, deviceID uuid.UUID) (string, error) {
+	if cursor.ID == uuid.Nil || cursor.CreatedAt.IsZero() || organizationID == uuid.Nil || deviceID == uuid.Nil {
+		return "", newPublicError(errorCodeInternal, "command cursor is unavailable", commands.ErrInvalidInput)
+	}
+	payload := strings.Join([]string{
+		commandCursorVersion,
+		cursor.CreatedAt.UTC().Format(time.RFC3339Nano),
+		cursor.ID.String(),
+		organizationID.String(),
+		deviceID.String(),
+	}, "|")
+	encoded := base64.RawURLEncoding.EncodeToString([]byte(payload))
+	if len(encoded) > maxCursorSize {
+		return "", newPublicError(errorCodeInternal, "command cursor is unavailable", commands.ErrInvalidInput)
+	}
+	return encoded, nil
+}
+
+func decodeCommandCursor(raw string, organizationID, deviceID uuid.UUID) (*commands.Cursor, error) {
+	if raw == "" || len(raw) > maxCursorSize {
+		return nil, protocolError("after must be a valid command cursor")
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(raw)
+	if err != nil || len(decoded) > maxCursorSize {
+		return nil, protocolError("after must be a valid command cursor")
+	}
+	parts := strings.Split(string(decoded), "|")
+	if len(parts) != 5 || parts[0] != commandCursorVersion {
+		return nil, protocolError("after must be a valid command cursor")
+	}
+	createdAt, err := time.Parse(time.RFC3339Nano, parts[1])
+	if err != nil || createdAt.UTC().Format(time.RFC3339Nano) != parts[1] {
+		return nil, protocolError("after must be a valid command cursor")
+	}
+	commandID, err := uuid.Parse(parts[2])
+	if err != nil || commandID == uuid.Nil || commandID.String() != parts[2] {
+		return nil, protocolError("after must be a valid command cursor")
+	}
+	cursorOrganizationID, err := uuid.Parse(parts[3])
+	if err != nil || cursorOrganizationID == uuid.Nil || cursorOrganizationID.String() != parts[3] || cursorOrganizationID != organizationID {
+		return nil, protocolError("after must be a valid command cursor")
+	}
+	cursorDeviceID, err := uuid.Parse(parts[4])
+	if err != nil || cursorDeviceID == uuid.Nil || cursorDeviceID.String() != parts[4] || cursorDeviceID != deviceID {
+		return nil, protocolError("after must be a valid command cursor")
+	}
+	return &commands.Cursor{CreatedAt: createdAt.UTC(), ID: commandID}, nil
 }

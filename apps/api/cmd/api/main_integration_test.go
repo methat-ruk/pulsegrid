@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/commands"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/device/registry"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/database"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/databaseconfig"
@@ -116,5 +117,39 @@ func TestOpenDevelopmentGraphQLRejectsMissingThresholdRulesSchema(t *testing.T) 
 	code, message := startupFailureDetails(err)
 	if code != startupDatabaseSchemaUnavailable || message != "development database schema is unavailable; run migrations" {
 		t.Fatalf("pre-006 startup failure = (%q, %q), want schema-unavailable", code, message)
+	}
+}
+
+func TestOpenDevelopmentGraphQLRejectsMissingCommandSchema(t *testing.T) {
+	databaseConfiguration, err := databaseconfig.Load()
+	if err != nil {
+		t.Fatalf("load integration database configuration: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	pool, err := database.Open(ctx, databaseConfiguration.URL)
+	if err != nil {
+		t.Fatalf("open integration database: %v", err)
+	}
+	repository, err := commands.NewRepository(pool)
+	if err != nil {
+		pool.Close()
+		t.Fatalf("create command repository: %v", err)
+	}
+	if err := repository.ValidateSchema(ctx); err == nil {
+		pool.Close()
+		t.Skip("integration database has migration 007; run this test after rolling back only that migration")
+	} else if !errors.Is(err, commands.ErrSchemaUnavailable) {
+		pool.Close()
+		t.Fatalf("validate command schema: %v", err)
+	}
+	pool.Close()
+	_, _, _, err = openDevelopmentGraphQL(ctx)
+	if err == nil {
+		t.Fatal("openDevelopmentGraphQL succeeded without the command schema")
+	}
+	code, message := startupFailureDetails(err)
+	if code != startupDatabaseSchemaUnavailable || message != "development database schema is unavailable; run migrations" {
+		t.Fatalf("pre-007 startup failure = (%q, %q), want schema-unavailable", code, message)
 	}
 }

@@ -41,10 +41,10 @@ or immediately required dependency.
 | Light theme | Selected — Foundation | Only approved PulseGrid light tokens exist; dark-theme work remains deferred |
 | Native browser `fetch` with a feature-scoped typed GraphQL client | Selected — MVP | MVP-003 needs one bounded device journey; avoid a cache/SSR/client-runtime dependency until shared cache, polling, or schema-scale evidence justifies it |
 | Apache ECharts | Selected — MVP | Direct `6.1.0` production dependency for the MVP-007 telemetry chart; modular client-only SVG imports keep SSR and bundle scope bounded |
-| GraphQL and gqlgen | Selected — MVP | Concrete device and operator API boundary; MVP-002 pins gqlgen `v0.17.95` and keeps the SDL as source of truth |
+| GraphQL and gqlgen | Selected — MVP | Concrete device/operator API boundary; MVP-010 adds intent create/read alongside the MVP-002 device contract; gqlgen `v0.17.95` keeps the SDL as source of truth |
 | PostgreSQL 18.6 | Selected — MVP | Transactional authority for the MVP-001 organization/device registry and MVP-006 bounded telemetry/current-state projection; local and CI targets are pinned and isolated |
-| pgx v5 | Selected — MVP | Direct parameterized Go PostgreSQL driver and bounded pool for registry and telemetry projection boundaries |
-| Goose v3 SQL migrations | Selected — MVP | Explicit versioned SQL migrations with session locking; migration execution remains outside API startup |
+| pgx v5 | Selected — MVP | Direct parameterized Go PostgreSQL driver and bounded pool for registry, telemetry, rules/alerts, and command persistence boundaries |
+| Goose v3 SQL migrations | Selected — MVP | Explicit versioned SQL migrations with session locking; migration execution remains outside API startup; MVP-010 adds migration `007` |
 | MQTT 3.1.1 | Selected — MVP | MVP-004 and MVP-005 use QoS 1, non-retained telemetry over loopback TCP; durable duplicate handling remains with MVP-006 |
 | Eclipse Mosquitto 2.1.2 | Selected — MVP | Reviewed for the MVP-004 local/test broker and pinned by multi-platform image digest; production broker product/topology remains open |
 | Eclipse Paho MQTT Go client v1.5.1 | Selected — MVP | Reused by the separate simulator and the MVP-005 API consumer; the adapter keeps Paho types out of ingestion and does not introduce a generic messaging abstraction |
@@ -240,6 +240,28 @@ merged as `fd0a383`. No production migration or production-readiness claim
 follows from that merge. Revisit the transaction
 boundary if telemetry must remain committed through rule failure, and revisit
 the rule cap/retention when measured workload or operator needs change.
+
+## MVP-010 command intent decision
+
+MVP-010 keeps command intent and lifecycle in the existing Go process and
+PostgreSQL authority. It adds additive migration `007`, one `PING` type with
+no payload, a tenant-scoped GraphQL create/detail/history contract, and
+durable idempotency keyed by `(organization_id, idempotency_key)`. The
+command UUID becomes the downstream MQTT correlation identity. The existing
+pgx pool, Goose migrations, and gqlgen toolchain suffice; no dependency,
+service, queue, or environment key is added.
+
+The API fixes one two-minute end-to-end deadline. MVP-010 provides guarded
+transition and bounded due-expiration operations but runs no scheduler. MVP-011
+owns dispatch, retry, response ingestion, and the scanner. A device response
+can prove receipt and atomically record missing dispatch/ACK milestones if it
+races the saved post-publish transition. Until the MVP-011 scanner exists,
+an expired command may remain visible as stored `PENDING` state; reads do not
+infer a timeout from wall time.
+
+This boundary keeps accepted intent separate from uncertain device delivery.
+Revisit it if a concrete actuator command, automatic recovery, longer
+deduplication retention, or production identity/permissions become required.
 
 ## Foundation selection evidence
 

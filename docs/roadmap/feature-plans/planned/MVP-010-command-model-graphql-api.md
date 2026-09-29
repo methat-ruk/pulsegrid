@@ -1,6 +1,6 @@
 # MVP-010 — Command Model and GraphQL API
 
-Status: Planned — design reviewed; implementation has not started
+Status: Ready for review
 
 Branch: `feat/mvp-010-command-model-graphql-api`
 
@@ -26,13 +26,11 @@ Remote commands need stable identity and recoverable state through duplicate
 requests, delayed delivery, acknowledgement, failure, and timeout. A
 synchronous GraphQL response cannot stand for a device result.
 
-## Verified baseline (2026-09-29)
+## Verified planning baseline before implementation (2026-09-29)
 
-- `main` and the plan branch start at `7e3c336` (MVP-009 merged as PR #19).
-  Only this plan is edited in the current working tree. Some roadmap and
-  architecture text still describes PR #19 as unmerged; the commit determines
-  this baseline. MVP-001/002 device registry and GraphQL, MVP-004 simulator,
-  MVP-006 projection, and MVP-008 rules/alerts are present.
+- The feature branch was based on `main` at `7e3c336` (MVP-009 merged as
+  PR #19). MVP-001/002 device registry and GraphQL, MVP-004 simulator,
+  MVP-006 projection, and MVP-008 rules/alerts were present.
 - No command table, package, GraphQL field, or MQTT command consumer exists.
   Migration `006` is the latest. The simulator publishes telemetry once and
   exits. MVP-011 must add a receiving runtime before device effects are claimed.
@@ -50,8 +48,10 @@ synchronous GraphQL response cannot stand for a device result.
 1. Add command domain, migration `007`, and tenant/device-scoped repository
    operations for create, get, bounded list, and lifecycle transitions.
 2. Add additive GraphQL create, detail, and per-device history operations.
-3. Support only `PING` with no arguments. ACK and terminal success/failure are
-   future MVP-011 inputs; no arbitrary JSON payload or catalog is accepted.
+3. Support only `PING` with no arguments. ACK and terminal success/failure
+   arrive through internal transition methods for MVP-011 to wire; this plan
+   adds no response-ingestion runtime. No arbitrary JSON payload or catalog is
+   accepted.
 4. Make duplicate create and transition behavior durable and deterministic
    with an injected clock.
 5. Add state-machine, real-PostgreSQL, migration, GraphQL contract, tenant
@@ -136,25 +136,31 @@ diagnostic metadata, never device or tenant authority.
 ### Lifecycle decision and MVP-011 handoff
 
 ```text
-PENDING -> DISPATCHED -> ACKNOWLEDGED -> COMPLETED | FAILED
-    |            |              |
-    +------------+--------------+--------------> TIMED_OUT
-                 +-------------------------------> FAILED (non-retryable delivery)
+PENDING -- broker accepted --> DISPATCHED -- device ACK --> ACKNOWLEDGED
+   |                              |                         |       |
+   +-- device response proves ---+-------------------------+       +--> COMPLETED / FAILED
+   |   receipt and implies ACK
+   +-- non-retryable delivery rejection --> FAILED
+   +-- deadline --> TIMED_OUT
+                                  +-- deadline --> TIMED_OUT
+                                                            +-- deadline --> TIMED_OUT
 ```
 
 - `PENDING` is stored intent. `DISPATCHED` requires a broker-accepted publish,
   not an attempted publish. `ACKNOWLEDGED` requires device ACK or a terminal
   response that itself proves receipt. `COMPLETED` requires device success.
   `FAILED` requires explicit device failure or a classified non-retryable
-  delivery failure. A transient broker error cannot
-  falsely mark `DISPATCHED` or `FAILED`; MVP-011 owns bounded retry policy.
+  delivery failure before device acknowledgement. A transient broker error
+  cannot falsely mark `DISPATCHED` or `FAILED`; MVP-011 owns bounded retry
+  policy.
   `TIMED_OUT` requires a stored deadline transition, not GraphQL inference.
 - The module exposes narrow transition methods for MVP-011. A terminal result
-  received in `DISPATCHED` can atomically record an implicit ACK followed by
-  the result, so delayed/lost separate ACK does not discard a valid result.
-  The timestamps may coincide. ACK after terminal result is a no-op. Equal
-  duplicates are no-ops; contradictory terminal results are rejected and
-  diagnosed without changing state.
+  received in `PENDING` or `DISPATCHED` proves receipt and can atomically
+  record any missing dispatch/ACK milestones followed by the result. This
+  handles a response racing the post-publish state write and a delayed/lost
+  separate ACK; implied timestamps may coincide. ACK after terminal result
+  is a no-op. Equal duplicates are no-ops; contradictory terminal results
+  are rejected and diagnosed without changing state.
 - Terminal states never regress. Late result after timeout stays `TIMED_OUT`.
   Unknown/foreign responses cannot change another tenant's row. Use a
   conditional update or row lock for one winner in concurrent timeout/result
@@ -227,8 +233,9 @@ the additive table; do not run destructive `down` on valued data.
 ## Validation
 
 - Pure state table: every allowed/rejected transition, terminal immutability,
-  duplicate ACK/result, result before ACK, contradictory result, and before/
-  at/after deadline behavior with injected clock.
+  duplicate ACK/result, response before dispatch is persisted, result before
+  ACK, contradictory result, and before/at/after deadline behavior with
+  injected clock.
 - Real PostgreSQL: migration up/idempotent up/down/up on disposable data;
   constraints and tenant/device FK; concurrent same-key create and conflicting
   reuse; uncertain-commit retry; concurrent result vs timeout; restart
@@ -299,3 +306,42 @@ first simulator command loop. Remaining risks are the temporary expired-
 pending window and row growth. Confidence comes from repository/document
 inspection only; no implementation or runtime validation occurred in this
 review. Implementation remains a separate step.
+
+## Implementation review and handoff (2026-09-29)
+
+The branch implements the reviewed scope: migration `007`, the command model
+and PostgreSQL repository, development GraphQL create/detail/history, tenant
+and cursor scoping, command schema startup validation, and the documented
+MVP-011 transition boundary. No MQTT delivery, response-ingestion runtime,
+timeout scheduler, UI, new Go module dependency, environment key, or production
+exposure was added. The API has no GraphQL lifecycle mutation.
+
+Author review confirmed that tenant/device ownership is checked before
+idempotency replay and enforced by a composite foreign key; conflicting key
+reuse is rejected; guarded row-locked transitions preserve terminal states
+and arbitrate response/timeout races; due expiration is bounded and uses
+`SKIP LOCKED`; and GraphQL reads/mutations do not accept tenant authority from
+the caller. These guarantees have unit, real-PostgreSQL, and GraphQL contract
+coverage. Migration rollback was exercised only against disposable test data.
+
+Validation completed:
+
+- `corepack pnpm run check:fast` passed, including Go checks and 56 web unit
+  tests.
+- `node scripts/test-api-integration.mjs` passed, including migration
+  up/down/up, missing-schema startup checks, and the Go race-enabled
+  PostgreSQL integration suite.
+- `corepack pnpm run build` passed. Nuxt emitted a non-blocking Rollup
+  annotation warning.
+- `node scripts/test-browser.mjs` passed all 32 Chromium tests; its isolated
+  database, broker, volume, and network were cleaned up.
+- `node scripts/check-repository-policy.mjs`,
+  `node scripts/check-graphql-generated.mjs`, and `git diff --check` passed.
+- `go test ./...`, `go test -race ./graph`, and the integration-tag compile
+  check passed.
+
+Remaining product behavior is deliberately deferred: until MVP-011 starts the
+expiry scanner, an expired command may remain `PENDING`; no device has received
+or acknowledged a command in this plan. The browser suite is the existing
+regression suite and contains no command-console journey; MVP-012 owns that
+coverage. Independent PR review remains pending for the draft PR.

@@ -1,0 +1,56 @@
+enum CommandType {
+  PING
+}
+
+enum CommandStatus {
+  PENDING
+  DISPATCHED
+  ACKNOWLEDGED
+  COMPLETED
+  FAILED
+  TIMED_OUT
+}
+
+enum CommandFailureCode {
+  DEVICE_REPORTED_FAILURE
+  DELIVERY_FAILED
+}
+
+type Command {
+  id: ID!
+  deviceId: ID!
+  type: CommandType!
+  status: CommandStatus!
+  createdAt: Time!
+  updatedAt: Time!
+  expiresAt: Time!
+  dispatchedAt: Time
+  acknowledgedAt: Time
+  terminalAt: Time
+  failureCode: CommandFailureCode
+}
+
+type CommandEdge {
+  cursor: String!
+  node: Command!
+}
+
+type CommandConnection {
+  edges: [CommandEdge!]!
+  pageInfo: PageInfo!
+}
+
+input CreateCommandInput {
+  deviceId: ID!
+  type: CommandType!
+  idempotencyKey: ID!
+}
+
+extend type Query {
+  command(id: ID!): Command
+  deviceCommands(deviceId: ID!, first: Int! = 20, after: String): CommandConnection!
+}
+
+extend type Mutation {
+  createCommand(input: CreateCommandInput!): Command!
+}
