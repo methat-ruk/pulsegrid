@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/methat-ruk/pulsegrid/apps/api/graph"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/commands"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/device/registry"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/config"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/database"
@@ -68,11 +69,12 @@ func main() {
 	var repository *registry.Repository
 	var telemetryRepository *projection.Repository
 	var rulesRepository *rules.Repository
+	var commandRepository *commands.Repository
 	var organizationID uuid.UUID
 	if needsRegistry {
 		startupContext, cancelStartup := context.WithTimeout(ctx, 10*time.Second)
 		var startupErr error
-		pool, repository, telemetryRepository, rulesRepository, startupErr = openDevelopmentDependencies(startupContext)
+		pool, repository, telemetryRepository, rulesRepository, commandRepository, startupErr = openDevelopmentDependencies(startupContext)
 		if startupErr == nil && cfg.IdentityMode == config.IdentityDevelopment {
 			organizationID, startupErr = resolveDevelopmentOrganization(startupContext, repository)
 		}
@@ -87,7 +89,7 @@ func main() {
 	}
 
 	if cfg.IdentityMode == config.IdentityDevelopment {
-		graphqlHandler, handlerErr := graph.NewHandlerWithRules(repository, telemetryRepository, rulesRepository, organizationID, logger)
+		graphqlHandler, handlerErr := graph.NewHandlerWithCommands(repository, telemetryRepository, rulesRepository, commandRepository, organizationID, logger)
 		if handlerErr != nil {
 			pool.Close()
 			logger.Error("graphql startup failed", "reason_code", "handler_initialization_failed")
@@ -177,7 +179,7 @@ func main() {
 }
 
 func openDevelopmentGraphQL(ctx context.Context) (*pgxpool.Pool, *registry.Repository, uuid.UUID, error) {
-	pool, repository, _, _, err := openDevelopmentDependencies(ctx)
+	pool, repository, _, _, _, err := openDevelopmentDependencies(ctx)
 	if err != nil {
 		return nil, nil, uuid.Nil, err
 	}
@@ -189,39 +191,61 @@ func openDevelopmentGraphQL(ctx context.Context) (*pgxpool.Pool, *registry.Repos
 	return pool, repository, organizationID, nil
 }
 
-func openDevelopmentDependencies(ctx context.Context) (*pgxpool.Pool, *registry.Repository, *projection.Repository, *rules.Repository, error) {
+func openDevelopmentDependencies(ctx context.Context) (*pgxpool.Pool, *registry.Repository, *projection.Repository, *rules.Repository, *commands.Repository, error) {
 	databaseConfiguration, err := databaseconfig.Load()
 	if err != nil {
-		return nil, nil, nil, nil, newStartupFailure(startupConfigurationInvalid, "development database configuration is invalid", err)
+		return nil, nil, nil, nil, nil, newStartupFailure(startupConfigurationInvalid, "development database configuration is invalid", err)
 	}
 	pool, err := database.Open(ctx, databaseConfiguration.URL)
 	if err != nil {
-		return nil, nil, nil, nil, newStartupFailure(startupDatabaseUnavailable, "development database is unavailable", err)
+		return nil, nil, nil, nil, nil, newStartupFailure(startupDatabaseUnavailable, "development database is unavailable", err)
 	}
 	repository, err := registry.NewRepository(pool)
 	if err != nil {
 		pool.Close()
-		return nil, nil, nil, nil, newStartupFailure(startupRepositoryUnavailable, "development registry is unavailable", err)
+		return nil, nil, nil, nil, nil, newStartupFailure(startupRepositoryUnavailable, "development registry is unavailable", err)
 	}
 	rulesRepository, err := rules.NewRepository(pool)
 	if err != nil {
 		pool.Close()
-		return nil, nil, nil, nil, newStartupFailure(startupRepositoryUnavailable, "development threshold rules are unavailable", err)
+		return nil, nil, nil, nil, nil, newStartupFailure(startupRepositoryUnavailable, "development threshold rules are unavailable", err)
+	}
+	commandRepository, err := commands.NewRepository(pool)
+	if err != nil {
+		pool.Close()
+		return nil, nil, nil, nil, nil, newStartupFailure(startupRepositoryUnavailable, "development commands are unavailable", err)
 	}
 	telemetryRepository, err := projection.NewRepositoryWithEvaluator(pool, rulesRepository)
 	if err != nil {
 		pool.Close()
-		return nil, nil, nil, nil, newStartupFailure(startupRepositoryUnavailable, "development telemetry projection is unavailable", err)
+		return nil, nil, nil, nil, nil, newStartupFailure(startupRepositoryUnavailable, "development telemetry projection is unavailable", err)
 	}
 	if err := telemetryRepository.ValidateSchema(ctx); err != nil {
 		pool.Close()
-		return nil, nil, nil, nil, classifyTelemetrySchemaFailure(err)
+		return nil, nil, nil, nil, nil, classifyTelemetrySchemaFailure(err)
 	}
 	if err := rulesRepository.ValidateSchema(ctx); err != nil {
 		pool.Close()
-		return nil, nil, nil, nil, classifyRulesSchemaFailure(err)
+		return nil, nil, nil, nil, nil, classifyRulesSchemaFailure(err)
 	}
-	return pool, repository, telemetryRepository, rulesRepository, nil
+	if err := commandRepository.ValidateSchema(ctx); err != nil {
+		pool.Close()
+		return nil, nil, nil, nil, nil, classifyCommandSchemaFailure(err)
+	}
+	return pool, repository, telemetryRepository, rulesRepository, commandRepository, nil
+}
+
+func classifyCommandSchemaFailure(err error) error {
+	if errors.Is(err, commands.ErrSchemaUnavailable) {
+		return newStartupFailure(startupDatabaseSchemaUnavailable, "development database schema is unavailable; run migrations", err)
+	}
+	if pgError, ok := errors.AsType[*pgconn.PgError](err); ok {
+		switch pgError.Code {
+		case "3F000", "42P01", "42703":
+			return newStartupFailure(startupDatabaseSchemaUnavailable, "development database schema is unavailable; run migrations", err)
+		}
+	}
+	return newStartupFailure(startupDatabaseUnavailable, "development database is unavailable", err)
 }
 
 func classifyRulesSchemaFailure(err error) error {

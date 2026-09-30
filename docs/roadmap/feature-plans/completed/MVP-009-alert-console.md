@@ -1,7 +1,6 @@
 # MVP-009 — Alert Console
 
-Status: Complete — accepted for merge by the project owner on 2026-09-29;
-PR #19 remains open and unmerged pending the owner's manual merge.
+Status: Complete — merged as `7e3c336` on 2026-09-29 (PR #19).
 
 Branch: `feat/mvp-009-alert-console`
 

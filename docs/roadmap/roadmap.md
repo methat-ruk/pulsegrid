@@ -177,7 +177,7 @@ Plans:
 
 ### M3 — Rules and alerts
 
-Status: In progress
+Status: Complete
 
 Dependency: M2
 
@@ -187,11 +187,11 @@ creates an alert, and exposes the triggering context to the operator.
 Plans:
 
 - [MVP-008 — Threshold rule and alert backend](feature-plans/completed/MVP-008-threshold-rule-alert-backend.md) — merged as `fd0a383` (PR #18)
-- [MVP-009 — Alert console](feature-plans/completed/MVP-009-alert-console.md) — accepted for merge on `feat/mvp-009-alert-console`; PR #19 remains open and unmerged pending manual merge
+- [MVP-009 — Alert console](feature-plans/completed/MVP-009-alert-console.md) — merged as `7e3c336` (PR #19)
 
 ### M4 — Remote command loop
 
-Status: Planned
+Status: In progress
 
 Dependency: M1 and M2
 
@@ -200,7 +200,7 @@ acknowledgement, completion, explicit failure, or timeout.
 
 Plans:
 
-- [MVP-010 — Command model and GraphQL API](feature-plans/planned/MVP-010-command-model-graphql-api.md)
+- [MVP-010 — Command model and GraphQL API](feature-plans/completed/MVP-010-command-model-graphql-api.md) — implementation/evidence complete; PR #20 is open and ready for review, not merged
 - [MVP-011 — MQTT command delivery and acknowledgement](feature-plans/planned/MVP-011-mqtt-command-delivery-acknowledgement.md)
 - [MVP-012 — Command console](feature-plans/planned/MVP-012-command-console.md)
 

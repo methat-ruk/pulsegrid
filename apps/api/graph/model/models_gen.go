@@ -34,6 +34,36 @@ type AlertOccurrence struct {
 	CreatedAt          time.Time           `json:"createdAt"`
 }
 
+type Command struct {
+	ID             string              `json:"id"`
+	DeviceID       string              `json:"deviceId"`
+	Type           CommandType         `json:"type"`
+	Status         CommandStatus       `json:"status"`
+	CreatedAt      time.Time           `json:"createdAt"`
+	UpdatedAt      time.Time           `json:"updatedAt"`
+	ExpiresAt      time.Time           `json:"expiresAt"`
+	DispatchedAt   *time.Time          `json:"dispatchedAt,omitempty"`
+	AcknowledgedAt *time.Time          `json:"acknowledgedAt,omitempty"`
+	TerminalAt     *time.Time          `json:"terminalAt,omitempty"`
+	FailureCode    *CommandFailureCode `json:"failureCode,omitempty"`
+}
+
+type CommandConnection struct {
+	Edges    []*CommandEdge `json:"edges"`
+	PageInfo *PageInfo      `json:"pageInfo"`
+}
+
+type CommandEdge struct {
+	Cursor string   `json:"cursor"`
+	Node   *Command `json:"node"`
+}
+
+type CreateCommandInput struct {
+	DeviceID       string      `json:"deviceId"`
+	Type           CommandType `json:"type"`
+	IdempotencyKey string      `json:"idempotencyKey"`
+}
+
 type CreateDeviceInput struct {
 	DeviceKey   string `json:"deviceKey"`
 	DisplayName string `json:"displayName"`
@@ -117,6 +147,177 @@ type UpdateThresholdRuleInput struct {
 	Comparator       ThresholdComparator `json:"comparator"`
 	ThresholdCelsius float64             `json:"thresholdCelsius"`
 	Enabled          bool                `json:"enabled"`
+}
+
+type CommandFailureCode string
+
+const (
+	CommandFailureCodeDeviceReportedFailure CommandFailureCode = "DEVICE_REPORTED_FAILURE"
+	CommandFailureCodeDeliveryFailed        CommandFailureCode = "DELIVERY_FAILED"
+)
+
+var AllCommandFailureCode = []CommandFailureCode{
+	CommandFailureCodeDeviceReportedFailure,
+	CommandFailureCodeDeliveryFailed,
+}
+
+func (e CommandFailureCode) IsValid() bool {
+	switch e {
+	case CommandFailureCodeDeviceReportedFailure, CommandFailureCodeDeliveryFailed:
+		return true
+	}
+	return false
+}
+
+func (e CommandFailureCode) String() string {
+	return string(e)
+}
+
+func (e *CommandFailureCode) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = CommandFailureCode(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid CommandFailureCode", str)
+	}
+	return nil
+}
+
+func (e CommandFailureCode) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *CommandFailureCode) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e CommandFailureCode) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type CommandStatus string
+
+const (
+	CommandStatusPending      CommandStatus = "PENDING"
+	CommandStatusDispatched   CommandStatus = "DISPATCHED"
+	CommandStatusAcknowledged CommandStatus = "ACKNOWLEDGED"
+	CommandStatusCompleted    CommandStatus = "COMPLETED"
+	CommandStatusFailed       CommandStatus = "FAILED"
+	CommandStatusTimedOut     CommandStatus = "TIMED_OUT"
+)
+
+var AllCommandStatus = []CommandStatus{
+	CommandStatusPending,
+	CommandStatusDispatched,
+	CommandStatusAcknowledged,
+	CommandStatusCompleted,
+	CommandStatusFailed,
+	CommandStatusTimedOut,
+}
+
+func (e CommandStatus) IsValid() bool {
+	switch e {
+	case CommandStatusPending, CommandStatusDispatched, CommandStatusAcknowledged, CommandStatusCompleted, CommandStatusFailed, CommandStatusTimedOut:
+		return true
+	}
+	return false
+}
+
+func (e CommandStatus) String() string {
+	return string(e)
+}
+
+func (e *CommandStatus) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = CommandStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid CommandStatus", str)
+	}
+	return nil
+}
+
+func (e CommandStatus) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *CommandStatus) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e CommandStatus) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
+}
+
+type CommandType string
+
+const (
+	CommandTypePing CommandType = "PING"
+)
+
+var AllCommandType = []CommandType{
+	CommandTypePing,
+}
+
+func (e CommandType) IsValid() bool {
+	switch e {
+	case CommandTypePing:
+		return true
+	}
+	return false
+}
+
+func (e CommandType) String() string {
+	return string(e)
+}
+
+func (e *CommandType) UnmarshalGQL(v any) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = CommandType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid CommandType", str)
+	}
+	return nil
+}
+
+func (e CommandType) MarshalGQL(w io.Writer) {
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+func (e *CommandType) UnmarshalJSON(b []byte) error {
+	s, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	return e.UnmarshalGQL(s)
+}
+
+func (e CommandType) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	e.MarshalGQL(&buf)
+	return buf.Bytes(), nil
 }
 
 type ThresholdComparator string

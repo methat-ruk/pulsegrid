@@ -17,16 +17,16 @@ lifecycle, health, development-only GraphQL device endpoints, the local/test
 MVP-005 MQTT telemetry consumer, and the merged MVP-006 local/test telemetry
 history/current-state projection. MVP-003 provides the first device-registry
 operator journey and a fixed same-origin Nuxt GraphQL transport adapter backed
-by the MVP-001 organization/device registry. The merged MVP-007 console now
-exposes the telemetry reads on the existing device-detail route through a
-section-local panel. MVP-008 rules/alerts merged as `fd0a383` (PR #18), while
-the MVP-009 alert-console candidate on its feature branch now includes the
-requested review evidence for pagination recovery, route-scope changes,
-best-effort device-name lookup, keyboard focus, and narrow detail reflow. PR
-#19 is accepted for merge by the project owner and remains open and unmerged
-pending the owner's manual merge. Production identity, deployment
-exposure, durable broker replay, and later event contracts remain
-unimplemented.
+by the MVP-001 organization/device registry. The merged MVP-007 console exposes
+telemetry reads on device detail. MVP-008 rules/alerts merged as `fd0a383`
+(PR #18), and MVP-009 alert console merged as `7e3c336` (PR #19). MVP-010 adds
+persisted `PING` command intent and development GraphQL create/read operations
+using migration `007`. PR #20 is open and ready
+for review on `feat/mvp-010-command-model-graphql-api`, with implementation
+evidence complete; it has not been merged. It does not include MQTT delivery or
+automatic timeout scanning.
+Production identity, deployment exposure, durable broker replay, and later
+event contracts remain unimplemented.
 
 Architecture diagrams below describe an intended sequence of evolution. They
 must not be read as deployed topology.
@@ -416,9 +416,14 @@ feature plan that introduces the flow.
 stateDiagram-v2
     [*] --> Pending
     Pending --> Dispatched: publish accepted
+    Pending --> Acknowledged: device ACK proves receipt before dispatch state is saved
+    Pending --> Completed: result proves receipt; record implied ACK atomically
+    Pending --> Failed: explicit device failure proves receipt
     Dispatched --> Acknowledged: device ACK
+    Dispatched --> Completed: result proves receipt; record implied ACK atomically
     Acknowledged --> Completed: successful result
     Acknowledged --> Failed: explicit failure
+    Pending --> Failed: non-retryable delivery rejection
     Dispatched --> Failed: delivery failure
     Pending --> TimedOut: dispatch deadline
     Dispatched --> TimedOut: acknowledgement deadline
@@ -430,6 +435,11 @@ stateDiagram-v2
 
 Transport retries may repeat delivery but must not create a second logical
 command or bypass valid state transitions.
+
+A device ACK or terminal result can race the durable write that records an
+accepted broker publish. Because the response itself proves receipt, the
+command owner records any missing dispatch/acknowledgement milestones and the
+result atomically. A late response after timeout cannot reopen the command.
 
 ## Observability
 
