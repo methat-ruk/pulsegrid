@@ -16,9 +16,10 @@ Operate fleets
 > implemented and validated. PR #16 merged as `9ce9e7c`; MVP-008's backend
 > merged in PR #18 as `fd0a383`; MVP-009's alert console merged as `7e3c336`
 > in PR #19. MVP-010's command model and development GraphQL create/read API
-> are implemented and ready for review on
-> `feat/mvp-010-command-model-graphql-api`. It persists `PING` intent but does
-> not yet deliver commands over MQTT; MVP-011 owns delivery and acknowledgement.
+> are implemented with review evidence complete. PR #20 is open and ready for
+> review on `feat/mvp-010-command-model-graphql-api`; it has not been merged.
+> It persists `PING` intent but does not yet deliver commands over MQTT;
+> MVP-011 owns delivery and acknowledgement.
 > Production identity and production readiness remain deferred.
 
 ## What is PulseGrid?
@@ -127,8 +128,9 @@ The decision state and adoption trigger for each technology are maintained in
   MVP-009's alert list/detail console is implemented on
   `feat/mvp-009-alert-console` and merged as `7e3c336` (PR #19). MVP-010 adds
   persisted `PING` command intent and tenant-scoped GraphQL create/detail/history
-  operations on `feat/mvp-010-command-model-graphql-api`; its implementation and
-  author validation are ready for review. MQTT delivery, response ingestion,
+  operations on `feat/mvp-010-command-model-graphql-api`; implementation and
+  review evidence are complete, and PR #20 is ready for review but remains
+  unmerged. MQTT delivery, response ingestion,
   and automatic timeout processing belong to MVP-011. Production identity and
   production readiness remain deferred.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the

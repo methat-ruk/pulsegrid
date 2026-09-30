@@ -1,6 +1,7 @@
 # MVP-010 — Command Model and GraphQL API
 
-Status: Ready for review
+Status: Complete — implementation and evidence accepted for plan closeout
+2026-09-30; PR #20 remains open for review and merge (not merged).
 
 Branch: `feat/mvp-010-command-model-graphql-api`
 
@@ -350,4 +351,30 @@ Remaining product behavior is deliberately deferred: until MVP-011 starts the
 expiry scanner, an expired command may remain `PENDING`; no device has received
 or acknowledged a command in this plan. The browser suite is the existing
 regression suite and contains no command-console journey; MVP-012 owns that
-coverage. Independent PR review remains pending for the draft PR.
+coverage. See the dated review follow-up below for current PR and review status.
+
+## Review follow-up and completion record (2026-09-30)
+
+The follow-up review identified two evidence blockers and one local/CI
+modernization drift. The implementation and latest evidence close all three:
+
+- Deadline/race coverage now checks ACK and Complete before, at, and after the
+  deadline, asserts both race outcomes, and proves the transition waits on a
+  PostgreSQL row lock while the injected clock reaches `expiresAt`.
+- The GraphQL replay integration case discards the create result, verifies the
+  commit, rebuilds the pool/repository/handler, retries the same key, and checks
+  the same identity, state, timestamps, and one stored row.
+- CI `api-static` now enables the same `mapsloop` and `minmax` analyzers as the
+  local modernization command.
+
+The [review response](https://github.com/methat-ruk/pulsegrid/pull/20#issuecomment-5902756922)
+records the evidence and its limits. Response loss is simulated by discarding
+the handler result in the test harness; the test does not simulate a TCP
+disconnect. The review found evidence gaps and CI drift, with no confirmed
+runtime defect in the inspected scope.
+
+The [GitHub Actions run](https://github.com/methat-ruk/pulsegrid/actions/runs/36658828368)
+passed all 14 checks on commit `83f648e495d85d81f1b8b428f294765444e8567f`.
+The plan is recorded Complete for implementation and evidence. PR #20 remains
+open and unmerged; independent PR review/approval has not been recorded, and
+the plan status is not a merge approval.

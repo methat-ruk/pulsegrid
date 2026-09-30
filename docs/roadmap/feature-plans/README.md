@@ -99,9 +99,12 @@ platform foundation” is not an acceptable PR boundary.
 - [MVP-008 — Threshold rule and alert backend](completed/MVP-008-threshold-rule-alert-backend.md) — merged as `fd0a383` (PR #18)
 - [MVP-009 — Alert console](completed/MVP-009-alert-console.md) — merged as `7e3c336` (PR #19)
 
-### MVP — Remote commands
+### MVP — Remote command intent — completed
 
-- [MVP-010 — Command model and GraphQL API](planned/MVP-010-command-model-graphql-api.md) — ready for review on `feat/mvp-010-command-model-graphql-api`
+- [MVP-010 — Command model and GraphQL API](completed/MVP-010-command-model-graphql-api.md) — implementation and required evidence complete; PR #20 is open and ready for review, not merged
+
+### MVP — Remote delivery and console — planned
+
 - [MVP-011 — MQTT command delivery and acknowledgement](planned/MVP-011-mqtt-command-delivery-acknowledgement.md)
 - [MVP-012 — Command console](planned/MVP-012-command-console.md)
 

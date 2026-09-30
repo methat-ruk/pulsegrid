@@ -4,9 +4,10 @@ Status: MVP-002 development GraphQL device contract, MVP-003 console
 integration, MVP-004 local MQTT producer fixture, MVP-005 local/test telemetry
 ingestion, MVP-006 telemetry persistence/current-state projection, MVP-008
 rules/alerts, and MVP-009 alert console are implemented. MVP-009 merged as
-`7e3c336` (PR #19). The MVP-010 command intent and GraphQL candidate is ready
-for review on `feat/mvp-010-command-model-graphql-api`; command transport
-remains planned for MVP-011. Production identity, production MQTT, and
+`7e3c336` (PR #19). MVP-010 command intent and GraphQL implementation evidence
+are complete; PR #20 is open and ready for review on
+`feat/mvp-010-command-model-graphql-api`, not merged. Command transport remains
+planned for MVP-011. Production identity, production MQTT, and
 permanent high-volume storage remain deferred.
 
 ## Purpose and ownership
@@ -50,9 +51,9 @@ and are review artifacts only; they are not published or served at runtime.
 | Process health | REST/HTTP | Implemented in FND-001 | [`operational.yaml`](../../apps/api/api/openapi/operational.yaml) |
 | Console readiness adapter | Same-origin Nuxt server route | Implemented in FND-004; local process-readiness adapter only | [`ready.get.ts`](../../apps/web-console/server/api/operational/ready.get.ts) and the FND-001 operational contract |
 | Console GraphQL adapter | Same-origin Nuxt server route | Implemented in MVP-003; development/test transport adapter only | [`graphql.post.ts`](../../apps/web-console/server/api/graphql.post.ts) and [`graphql-proxy.ts`](../../apps/web-console/server/utils/graphql-proxy.ts) |
-| Operator product API | GraphQL/gqlgen | Development-only MVP-002 and MVP-010 command-intent candidate; MVP-010 is not merged | [`device.graphqls`](../../apps/api/graph/schema/device.graphqls), [`command.graphqls`](../../apps/api/graph/schema/command.graphqls), and committed generated artifacts |
+| Operator product API | GraphQL/gqlgen | Development-only MVP-002; MVP-010 implementation/evidence complete, PR #20 ready for review and not merged | [`device.graphqls`](../../apps/api/graph/schema/device.graphqls), [`command.graphqls`](../../apps/api/graph/schema/command.graphqls), and committed generated artifacts |
 | Device telemetry | MQTT + PostgreSQL | MVP-004 producer fixture, MVP-005 local/test consumer, and MVP-006 bounded persistence/current state implemented; production delivery deferred | [AsyncAPI telemetry contract](../../apps/api/api/asyncapi/telemetry.yaml), [MVP-005 plan](../roadmap/feature-plans/completed/MVP-005-mqtt-telemetry-ingestion.md), and [MVP-006 plan](../roadmap/feature-plans/completed/MVP-006-telemetry-current-state-projection.md) |
-| Command intent and status | GraphQL/gqlgen | MVP-010 working-tree candidate; not merged | [`command.graphqls`](../../apps/api/graph/schema/command.graphqls) and [MVP-010 plan](../roadmap/feature-plans/planned/MVP-010-command-model-graphql-api.md) |
+| Command intent and status | GraphQL/gqlgen | MVP-010 implementation/evidence complete; PR #20 ready for review, not merged | [`command.graphqls`](../../apps/api/graph/schema/command.graphqls) and [MVP-010 plan](../roadmap/feature-plans/completed/MVP-010-command-model-graphql-api.md) |
 | Device command delivery | MQTT | Planned for MVP-011 | A versioned AsyncAPI/message schema when the concrete command flow is implemented |
 | Durable event distribution | Kafka | Post-MVP conditional | A flow-specific AsyncAPI/message contract |
 | Internal synchronous service calls | gRPC/Protobuf | Post-MVP conditional | A flow-specific protobuf contract |

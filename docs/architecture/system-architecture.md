@@ -19,11 +19,12 @@ history/current-state projection. MVP-003 provides the first device-registry
 operator journey and a fixed same-origin Nuxt GraphQL transport adapter backed
 by the MVP-001 organization/device registry. The merged MVP-007 console exposes
 telemetry reads on device detail. MVP-008 rules/alerts merged as `fd0a383`
-(PR #18), and MVP-009 alert console merged as `7e3c336` (PR #19). The
-The ready-for-review `feat/mvp-010-command-model-graphql-api` candidate adds
+(PR #18), and MVP-009 alert console merged as `7e3c336` (PR #19). MVP-010 adds
 persisted `PING` command intent and development GraphQL create/read operations
-using migration `007`; it does not include MQTT delivery or automatic timeout
-scanning.
+using migration `007`. PR #20 is open and ready
+for review on `feat/mvp-010-command-model-graphql-api`, with implementation
+evidence complete; it has not been merged. It does not include MQTT delivery or
+automatic timeout scanning.
 Production identity, deployment exposure, durable broker replay, and later
 event contracts remain unimplemented.
 
