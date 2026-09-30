@@ -27,8 +27,8 @@ func TestCommandTransitions(t *testing.T) {
 		{name: "delivery failure from pending", events: []Event{EventFail}, failureCode: FailureDelivery, wantStatus: StatusFailed, wantChanged: true},
 		{name: "dispatch then ack", events: []Event{EventDispatch, EventAck}, wantStatus: StatusAcknowledged, wantChanged: true},
 		{name: "result before ack", events: []Event{EventDispatch, EventComplete}, wantStatus: StatusCompleted, wantChanged: true},
-		{name: "timeout at deadline wins", events: []Event{EventDispatch, EventComplete}, atDeadline: true, wantStatus: StatusTimedOut, wantErr: ErrTimedOut, wantChanged: true},
-		{name: "timeout just after deadline wins", events: []Event{EventDispatch, EventAck}, afterDeadline: true, wantStatus: StatusTimedOut, wantErr: ErrTimedOut, wantChanged: true},
+		{name: "complete at deadline times out", events: []Event{EventComplete}, atDeadline: true, wantStatus: StatusTimedOut, wantErr: ErrTimedOut, wantChanged: true},
+		{name: "ack after deadline times out", events: []Event{EventAck}, afterDeadline: true, wantStatus: StatusTimedOut, wantErr: ErrTimedOut, wantChanged: true},
 		{name: "expire before deadline rejected", events: []Event{EventExpire}, wantStatus: StatusPending, wantErr: ErrNotDue},
 		{name: "expire at deadline", events: []Event{EventExpire}, atDeadline: true, wantStatus: StatusTimedOut, wantChanged: true},
 		{name: "unknown event rejected", events: []Event{"UNKNOWN"}, wantStatus: StatusPending, wantErr: ErrInvalidTransition},
@@ -63,6 +63,58 @@ func TestCommandTransitions(t *testing.T) {
 			}
 			if command.CreatedAt.Nanosecond()%int(time.Microsecond) != 0 {
 				t.Fatalf("createdAt precision = %s, want microsecond precision", command.CreatedAt)
+			}
+		})
+	}
+}
+
+func TestCommandAckAndCompleteBeforeAtAndAfterDeadline(t *testing.T) {
+	baseTime := time.Date(2026, 9, 29, 4, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name       string
+		event      Event
+		offset     time.Duration
+		wantStatus Status
+		wantErr    error
+	}{
+		{name: "ack before deadline", event: EventAck, offset: -time.Microsecond, wantStatus: StatusAcknowledged},
+		{name: "ack at deadline", event: EventAck, wantStatus: StatusTimedOut, wantErr: ErrTimedOut},
+		{name: "ack after deadline", event: EventAck, offset: time.Microsecond, wantStatus: StatusTimedOut, wantErr: ErrTimedOut},
+		{name: "complete before deadline", event: EventComplete, offset: -time.Microsecond, wantStatus: StatusCompleted},
+		{name: "complete at deadline", event: EventComplete, wantStatus: StatusTimedOut, wantErr: ErrTimedOut},
+		{name: "complete after deadline", event: EventComplete, offset: time.Microsecond, wantStatus: StatusTimedOut, wantErr: ErrTimedOut},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			command := testCommand(baseTime)
+			now := command.ExpiresAt.Add(test.offset)
+			updated, changed, err := command.Apply(test.event, now, "")
+			if !errors.Is(err, test.wantErr) {
+				t.Fatalf("error = %v, want %v", err, test.wantErr)
+			}
+			if !changed || updated.Status != test.wantStatus {
+				t.Fatalf("transition = (%+v, %t), want status %s with a change", updated, changed, test.wantStatus)
+			}
+
+			if test.wantStatus == StatusTimedOut {
+				if updated.TerminalAt == nil || !updated.TerminalAt.Equal(normalizeTime(now)) {
+					t.Fatalf("timeout terminalAt = %v, want %s", updated.TerminalAt, normalizeTime(now))
+				}
+				return
+			}
+			if test.event == EventAck {
+				if updated.DispatchedAt == nil || !updated.DispatchedAt.Equal(normalizeTime(now)) ||
+					updated.AcknowledgedAt == nil || !updated.AcknowledgedAt.Equal(normalizeTime(now)) ||
+					updated.TerminalAt != nil {
+					t.Fatalf("ACK before deadline milestones = %+v", updated)
+				}
+				return
+			}
+			if updated.DispatchedAt == nil || !updated.DispatchedAt.Equal(normalizeTime(now)) ||
+				updated.AcknowledgedAt == nil || !updated.AcknowledgedAt.Equal(normalizeTime(now)) ||
+				updated.TerminalAt == nil || !updated.TerminalAt.Equal(normalizeTime(now)) {
+				t.Fatalf("completion before deadline milestones = %+v", updated)
 			}
 		})
 	}

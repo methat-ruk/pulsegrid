@@ -323,6 +323,12 @@ and arbitrate response/timeout races; due expiration is bounded and uses
 `SKIP LOCKED`; and GraphQL reads/mutations do not accept tenant authority from
 the caller. These guarantees have unit, real-PostgreSQL, and GraphQL contract
 coverage. Migration rollback was exercised only against disposable test data.
+Follow-up review evidence now includes an ACK/Complete before/at/after deadline
+table, a PostgreSQL waiter observed through `pg_blocking_pids` while the
+injected clock crosses the deadline, and a dropped GraphQL response retried
+through a newly created pool, repository, and handler with identity,
+timestamps, state, and single-row assertions. Local and CI modernization
+commands enable the same `mapsloop` and `minmax` analyzers.
 
 Validation completed:
 

@@ -5,6 +5,7 @@ package commands
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -225,7 +226,8 @@ func TestRepositoryConcurrentDuplicateCreateHasOneIdentity(t *testing.T) {
 
 func TestRepositoryExpiryAndResultRaceUsesOneTerminalState(t *testing.T) {
 	fixture := newRepositoryFixture(t)
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	created, err := fixture.repository.Create(ctx, fixture.orgID, CreateInput{
 		DeviceID: fixture.deviceID, Type: TypePing, IdempotencyKey: uuid.New(),
 	})
@@ -233,23 +235,140 @@ func TestRepositoryExpiryAndResultRaceUsesOneTerminalState(t *testing.T) {
 		t.Fatalf("create command: %v", err)
 	}
 	fixture.clock.Set(created.ExpiresAt)
-	var wait sync.WaitGroup
-	wait.Add(2)
+	type completionResult struct {
+		command Command
+		err     error
+	}
+	type expiryResult struct {
+		commands []Command
+		err      error
+	}
+	completed := make(chan completionResult, 1)
+	expired := make(chan expiryResult, 1)
 	go func() {
-		defer wait.Done()
-		_, _ = fixture.repository.Complete(ctx, fixture.orgID, created.ID)
+		command, err := fixture.repository.Complete(ctx, fixture.orgID, created.ID)
+		completed <- completionResult{command: command, err: err}
 	}()
 	go func() {
-		defer wait.Done()
-		_, _ = fixture.repository.ExpireDue(ctx, 10)
+		commands, err := fixture.repository.ExpireDue(ctx, 10)
+		expired <- expiryResult{commands: commands, err: err}
 	}()
-	wait.Wait()
+	completion := <-completed
+	expiration := <-expired
+	if !errors.Is(completion.err, ErrTimedOut) || completion.command.Status != StatusTimedOut || completion.command.TerminalAt == nil {
+		t.Fatalf("completion race result = (%+v, %v), want persisted timeout and ErrTimedOut", completion.command, completion.err)
+	}
+	if expiration.err != nil || len(expiration.commands) > 1 {
+		t.Fatalf("expiry race result = (%+v, %v), want no error and at most one row", expiration.commands, expiration.err)
+	}
+	if len(expiration.commands) == 1 &&
+		(expiration.commands[0].ID != created.ID || expiration.commands[0].Status != StatusTimedOut) {
+		t.Fatalf("expiry race row = %+v, want the command in TIMED_OUT", expiration.commands[0])
+	}
 	current, err := fixture.repository.Get(ctx, fixture.orgID, created.ID)
 	if err != nil {
 		t.Fatalf("read command after race: %v", err)
 	}
-	if current.Status != StatusTimedOut || current.TerminalAt == nil {
+	if current.Status != StatusTimedOut || current.TerminalAt == nil || !current.TerminalAt.Equal(created.ExpiresAt) {
 		t.Fatalf("state after exact-deadline race = %+v, want persisted timeout", current)
+	}
+}
+
+func TestRepositoryTransitionRechecksDeadlineAfterRowLockWait(t *testing.T) {
+	fixture := newRepositoryFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	created, err := fixture.repository.Create(ctx, fixture.orgID, CreateInput{
+		DeviceID: fixture.deviceID, Type: TypePing, IdempotencyKey: uuid.New(),
+	})
+	if err != nil {
+		t.Fatalf("create command: %v", err)
+	}
+	fixture.clock.Set(created.ExpiresAt.Add(-time.Microsecond))
+
+	locker, err := fixture.pool.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("acquire lock connection: %v", err)
+	}
+	defer locker.Release()
+	tx, err := locker.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin lock transaction: %v", err)
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	var blockerPID int32
+	if err := locker.QueryRow(ctx, `SELECT pg_backend_pid()`).Scan(&blockerPID); err != nil {
+		t.Fatalf("read lock connection pid: %v", err)
+	}
+	var lockedID uuid.UUID
+	if err := tx.QueryRow(ctx, `
+		SELECT id FROM commands WHERE organization_id = $1 AND id = $2 FOR UPDATE
+	`, fixture.orgID, created.ID).Scan(&lockedID); err != nil {
+		t.Fatalf("lock command row: %v", err)
+	}
+	if lockedID != created.ID {
+		t.Fatalf("locked command = %s, want %s", lockedID, created.ID)
+	}
+
+	type transitionResult struct {
+		command Command
+		err     error
+	}
+	transitionCtx, transitionCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer transitionCancel()
+	completed := make(chan transitionResult, 1)
+	go func() {
+		command, err := fixture.repository.Complete(transitionCtx, fixture.orgID, created.ID)
+		completed <- transitionResult{command: command, err: err}
+	}()
+	if err := waitForCommandRowLockWait(transitionCtx, fixture.pool, blockerPID); err != nil {
+		t.Fatalf("observe transition blocked by test lock: %v", err)
+	}
+
+	fixture.clock.Set(created.ExpiresAt)
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("release command row lock: %v", err)
+	}
+	transition := <-completed
+	if !errors.Is(transition.err, ErrTimedOut) || transition.command.Status != StatusTimedOut ||
+		transition.command.TerminalAt == nil || !transition.command.TerminalAt.Equal(created.ExpiresAt) {
+		t.Fatalf("transition after lock wait = (%+v, %v), want TIMED_OUT at the post-lock deadline", transition.command, transition.err)
+	}
+
+	current, err := fixture.repository.Get(ctx, fixture.orgID, created.ID)
+	if err != nil {
+		t.Fatalf("read command after lock-wait transition: %v", err)
+	}
+	if current.Status != StatusTimedOut || current.TerminalAt == nil || !current.TerminalAt.Equal(created.ExpiresAt) {
+		t.Fatalf("stored state after lock-wait transition = %+v, want TIMED_OUT at deadline", current)
+	}
+}
+
+func waitForCommandRowLockWait(ctx context.Context, pool *pgxpool.Pool, blockerPID int32) error {
+	ticker := time.NewTicker(5 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		var blocked bool
+		err := pool.QueryRow(ctx, `
+			SELECT EXISTS (
+				SELECT 1 FROM pg_stat_activity AS waiter
+				WHERE waiter.datname = current_database()
+				  AND waiter.pid <> pg_backend_pid()
+				  AND waiter.wait_event_type = 'Lock'
+				  AND $1 = ANY(pg_blocking_pids(waiter.pid))
+			)
+		`, blockerPID).Scan(&blocked)
+		if err != nil {
+			return fmt.Errorf("inspect PostgreSQL lock wait: %w", err)
+		}
+		if blocked {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("transition did not wait on the held command lock: %w", ctx.Err())
+		case <-ticker.C:
+		}
 	}
 }
 
