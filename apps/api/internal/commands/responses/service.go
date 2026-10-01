@@ -98,8 +98,18 @@ func (s *Service) run() {
 		close(s.done)
 	}()
 	for {
+		// A ready queue can win a select alongside cancellation; check after
+		// receiving so we do not start post-deadline work.
+		if s.context.Err() != nil {
+			return
+		}
 		select {
+		case <-s.context.Done():
+			return
 		case delivery := <-queue:
+			if s.context.Err() != nil {
+				return
+			}
 			s.process(delivery)
 		case <-s.stop:
 			for {
@@ -107,6 +117,8 @@ func (s *Service) run() {
 					return
 				}
 				select {
+				case <-s.context.Done():
+					return
 				case delivery := <-queue:
 					if s.context.Err() != nil {
 						return

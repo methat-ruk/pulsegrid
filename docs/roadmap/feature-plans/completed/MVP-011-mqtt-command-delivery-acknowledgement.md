@@ -469,6 +469,13 @@ addresses them as follows:
   before the response worker drains. A deterministic blocked-callback test
   proves that a callback already inside admission is queued before `Stop`
   returns.
+- **Shutdown cancellation follow-up:** required `api-db-integration` on
+  `195dbce` exposed a second worker-selection race: a ready queue entry could
+  win `select` alongside cancellation and start after the drain deadline. The
+  worker now checks cancellation after receiving work before calling the
+  repository. Its forced-deadline regression passed 25 race-enabled runs, the
+  full real-PostgreSQL API integration suite, and the real-broker forced-
+  shutdown scenario.
 - **F2 — optional empty failure code:** the decoder now validates property
   presence as well as value, rejecting any `failureCode` on ACK/COMPLETED and
   requiring it on FAILED. Negative decoder tests cover empty ACK/COMPLETED and
@@ -485,24 +492,32 @@ addresses them as follows:
   before exiting, and leaves the row `DISPATCHED` without ACK/terminal times.
 - **CI duration recommendation:** ACK-only and silent expiry run concurrently
   on different devices (combined wait in the passing all-suites run: 118,956
-  ms). Scenario timestamps and durations are emitted. That run measured
+  ms). Scenario timestamps and durations are emitted. Local runs measured
   command-outcomes 43,776 ms, broker recovery 7,147 ms, broker-outage expiry
-  126,936 ms, and forced response shutdown 2,891 ms. Four independent suites
-  run in CI, with the existing required `mqtt-integration` context retained by
-  a fail-closed aggregate.
+  126,936 ms, and the final forced response shutdown 3,368 ms. Four independent
+  suites run in CI, with the existing required `mqtt-integration` context
+  retained by a fail-closed aggregate.
 
 The first local outage-harness attempt observed expiry but exposed a test-only
 reconnect-log offset race. The harness now records the offset before broker
 restart; the repeated outage suite passed. This did not require a runtime
 behavior change.
 
-Final local evidence on the current implementation includes the four real
-PostgreSQL/Mosquitto suites (`core`, `deadlines`, `outage`, `shutdown`), race
-tests across all API packages, targeted Go tests, real PostgreSQL API
-integration, Go format/vet/build, AsyncAPI lint, repository policy, Node
-syntax, and `git diff --check`. The PR remains open and unmerged; the user
-requested that the plan move with the implementation and review response,
-while branch protection remains the final merge gate.
+The first pushed CI candidate also exposed the cancellation race described
+above in `api-db-integration`; the final local API integration and shutdown
+suite passed after its fix. The replacement CI run on the pushed correction is
+the final remote validation gate.
+
+The full default `mqtt:test:integration` run passed on `195dbce` with all four
+real PostgreSQL/Mosquitto suites (`core`, `deadlines`, `outage`, `shutdown`).
+After the cancellation follow-up, the affected evidence passed again on the
+current source: the response-worker test ran 25 times under the race detector,
+`api:test:integration` passed across all API packages with PostgreSQL, and the
+real-broker `shutdown` suite passed. Go format/vet/build, AsyncAPI lint,
+repository policy, Node syntax, and `git diff --check` also passed. The PR
+remains open and unmerged; the user requested that the plan move with the
+implementation and review response, while branch protection remains the final
+merge gate.
 
 ## Done Criteria
 

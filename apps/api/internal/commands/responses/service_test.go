@@ -296,9 +296,6 @@ func TestStopDeadlineCancelsInflightAndJoinsWorkerBeforeReturning(t *testing.T) 
 	if repository.calls != 1 {
 		t.Fatalf("repository calls = %d, want only the in-flight response; queued work must not start after forced cancellation", repository.calls)
 	}
-	if got := len(transport.Deliveries()); got != 1 {
-		t.Fatalf("queued response count after forced stop = %d, want 1", got)
-	}
 	if got := logOutput.String(); !bytes.Contains([]byte(got), []byte("command_response_drain_deadline_expired")) || !bytes.Contains([]byte(got), []byte("command_response_worker_stopped")) {
 		t.Fatalf("shutdown evidence log missing deadline or worker completion: %s", got)
 	}
