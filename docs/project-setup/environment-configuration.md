@@ -235,6 +235,23 @@ liveness remains process-only. Application acceptance is a diagnostic,
 non-durable handoff until MVP-006 adds persistence and logical `messageId`
 idempotency.
 
+### Proposed MVP-011 command and simulator settings
+
+These settings describe the reviewed MVP-011 plan, which is awaiting
+implementation approval. The current API and simulator do not read or enforce
+them; the examples keep command delivery disabled and simulator behavior on the
+existing telemetry path.
+
+| Key | Development | Test | Production |
+| --- | --- | --- | --- |
+| `PULSEGRID_MQTT_COMMAND_MODE` | `disabled` by default; planned `development` opt-in alongside development identity and loopback broker | `disabled`; an isolated command integration runner may opt in after it owns its broker/database | `disabled` only; command mode is rejected |
+| `PULSEGRID_SIMULATOR_MODE` | `telemetry` by default; planned `commands` mode requires the registered local device | `telemetry` by default; planned commands mode requires the test-owned device | Rejected; simulator is development/test only |
+| `PULSEGRID_SIMULATOR_COMMAND_RESPONSE` | In planned commands mode: `success`, `failure`, `silent`, or `ack-only`; defaults to `success` | Same modes, injected by the isolated runner as needed | Rejected with simulator production mode |
+
+The response setting is only valid when simulator mode is `commands`. These
+planned values do not enable command delivery until its implementation and
+configuration validation are accepted.
+
 ## Delivery sequence
 
 1. This documentation foundation defines the policy and plan.

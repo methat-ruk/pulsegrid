@@ -263,6 +263,24 @@ This boundary keeps accepted intent separate from uncertain device delivery.
 Revisit it if a concrete actuator command, automatic recovery, longer
 deduplication retention, or production identity/permissions become required.
 
+## Proposed MVP-011 command transport decision
+
+The [reviewed MVP-011 plan](../roadmap/feature-plans/planned/MVP-011-mqtt-command-delivery-acknowledgement.md)
+records the proposed 2026-10-01 decision; it awaits implementation approval.
+Existing Paho `v1.5.1`, pgx, Goose, PostgreSQL and Mosquitto suffice. No dependency
+upgrade, extra service, generic bus or external queue is selected.
+
+Command rows remain durable work authority, with additive retry metadata rather
+than an in-memory-only schedule or second outbox. A dedicated command client
+uses supervised fresh epochs so unknown publish cleanup does not interrupt
+telemetry. One more connection and a small additive migration are accepted costs
+for restart-safe bounds and failure isolation. PING is duplicate-safe because
+it has no actuator effect; lost results after ACK may still time out. The plan
+owns alternatives, exact wire/budget policy, recovery and validation. Revisit
+before effectful commands, production identity, multiple dispatchers, required
+durable response replay or measured backlog pressure. These are design choices,
+not a report of implemented runtime behavior.
+
 ## Foundation selection evidence
 
 - [Go release history](https://go.dev/doc/devel/release) identifies Go 1.27 as

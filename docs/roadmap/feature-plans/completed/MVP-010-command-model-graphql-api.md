@@ -1,7 +1,7 @@
 # MVP-010 — Command Model and GraphQL API
 
-Status: Complete — implementation and evidence accepted for plan closeout
-2026-09-30; PR #20 remains open for review and merge (not merged).
+Status: Complete — merged as `9d78301` (PR #20) on 2026-09-30;
+main CI passed on the merge commit.
 
 Branch: `feat/mvp-010-command-model-graphql-api`
 
@@ -375,6 +375,15 @@ runtime defect in the inspected scope.
 
 The [GitHub Actions run](https://github.com/methat-ruk/pulsegrid/actions/runs/36658828368)
 passed all 14 checks on commit `83f648e495d85d81f1b8b428f294765444e8567f`.
-The plan is recorded Complete for implementation and evidence. PR #20 remains
-open and unmerged; independent PR review/approval has not been recorded, and
-the plan status is not a merge approval.
+At that review checkpoint, the plan was recorded Complete for implementation
+and evidence while PR #20 remained open; the plan status itself was not merge
+approval.
+
+## Verified merge follow-up (2026-10-01)
+
+[PR #20](https://github.com/methat-ruk/pulsegrid/pull/20) merged on 2026-09-30
+as `9d7830187b4f6dd6ce6300caeea2cd41fafd7964`, now the verified local and
+GitHub `main` baseline for MVP-011. The [main CI run](https://github.com/methat-ruk/pulsegrid/actions/runs/36660768645)
+passed all 14 jobs on this commit. Earlier review records above describe their
+dated candidate checkpoints; current merge state supersedes their open-PR
+status. MQTT delivery and automatic expiry remain unimplemented.
