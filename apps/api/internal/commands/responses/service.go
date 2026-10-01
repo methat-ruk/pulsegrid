@@ -84,22 +84,33 @@ func (s *Service) Stop(ctx context.Context) error {
 		s.cancel()
 		return nil
 	case <-ctx.Done():
+		s.logger.Warn("command response drain deadline expired", "reason_code", "command_response_drain_deadline_expired", "queued_responses", len(s.transport.Deliveries()))
 		s.cancel()
+		<-s.done
 		return ctx.Err()
 	}
 }
 
 func (s *Service) run() {
-	defer close(s.done)
 	queue := s.transport.Deliveries()
+	defer func() {
+		s.logger.Info("command response worker stopped", "reason_code", "command_response_worker_stopped", "queued_responses", len(queue))
+		close(s.done)
+	}()
 	for {
 		select {
 		case delivery := <-queue:
 			s.process(delivery)
 		case <-s.stop:
 			for {
+				if s.context.Err() != nil {
+					return
+				}
 				select {
 				case delivery := <-queue:
+					if s.context.Err() != nil {
+						return
+					}
 					s.process(delivery)
 				default:
 					return

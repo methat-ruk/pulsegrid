@@ -2,9 +2,10 @@
 
 Status: Local repository workflow and merge-gate enforcement implemented;
 FND-004 readiness and MVP-003 through MVP-010 are merged. MVP-011 command
-delivery is in implementation on
-`feat/mvp-011-mqtt-command-delivery-acknowledgement`; its isolated
-broker/database integration passes, and independent PR review remains pending.
+delivery is implemented in open PR #21 on
+`feat/mvp-011-mqtt-command-delivery-acknowledgement`; review findings are
+covered by local unit and real broker/database integration evidence. The PR
+remains open and unmerged, subject to required CI checks.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
@@ -203,10 +204,23 @@ exercises retained input and readiness recovery across broker stop/start,
 signals the API for drain, and removes only its own disposable resources on
 success or failure. The MVP-011 candidate extends this same run with command
 delivery, duplicate idempotency, explicit device failure, ACK-only and silent
-expiry, plus broker/API/simulator readiness recovery:
+expiry, broker recovery, expiry while the broker is unavailable, and response
+worker shutdown with an in-flight database lock. The isolated runner reports
+timestamps and durations for each long scenario. CI runs four suites
+concurrently while retaining the required `mqtt-integration` aggregate check;
+ACK-only and silent expiry share one suite and wait concurrently:
 
 ```sh
 corepack pnpm run mqtt:test:integration
+```
+
+Run one suite while iterating on a specific boundary:
+
+```sh
+corepack pnpm run mqtt:test:integration:core
+corepack pnpm run mqtt:test:integration:deadlines
+corepack pnpm run mqtt:test:integration:outage
+corepack pnpm run mqtt:test:integration:shutdown
 ```
 
 If `127.0.0.1:1883` or `127.0.0.1:11883` is already occupied, stop the process

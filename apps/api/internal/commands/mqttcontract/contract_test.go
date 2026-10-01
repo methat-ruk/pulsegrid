@@ -91,7 +91,10 @@ func TestResponseContractRequiresOutcomeSpecificFailureCode(t *testing.T) {
 	}
 	for _, raw := range []string{
 		`{"schemaVersion":1,"commandId":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","outcome":"ACK","extra":true}`,
+		`{"schemaVersion":1,"commandId":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","outcome":"ACK","failureCode":""}`,
+		`{"schemaVersion":1,"commandId":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","outcome":"COMPLETED","failureCode":""}`,
 		`{"schemaVersion":1,"commandId":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","outcome":"ACK","failureCode":null}`,
+		`{"schemaVersion":1,"commandId":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","outcome":"FAILED"}`,
 		`{"schemaVersion":1,"commandId":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","outcome":"ACK","outcome":"COMPLETED"}`,
 	} {
 		if _, err := DecodeResponse([]byte(raw)); !errors.Is(err, ErrPayloadInvalid) {

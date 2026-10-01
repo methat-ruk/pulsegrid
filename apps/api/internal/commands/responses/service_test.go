@@ -1,9 +1,12 @@
 package responses
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/eclipse/paho.mqtt.golang"
 	"github.com/google/uuid"
@@ -52,6 +55,50 @@ func (unusedClient) Subscribe(string, byte, func(mqtttransport.Message)) mqtttra
 func (unusedClient) Publish(string, byte, bool, any) mqtttransport.Token { return nil }
 func (unusedClient) Disconnect(uint)                                     {}
 func (unusedClient) IsConnectionOpen() bool                              { return false }
+
+type responseClient struct {
+	handler func(mqtttransport.Message)
+}
+
+func (*responseClient) Connect() mqtttransport.Token { return responseToken{} }
+func (c *responseClient) Subscribe(topic string, _ byte, handler func(mqtttransport.Message)) mqtttransport.SubscribeToken {
+	c.handler = handler
+	return responseSubscribeToken{topic: topic}
+}
+func (*responseClient) Publish(string, byte, bool, any) mqtttransport.Token { return responseToken{} }
+func (*responseClient) Disconnect(uint)                                     {}
+func (*responseClient) IsConnectionOpen() bool                              { return true }
+
+type responseToken struct{}
+
+func (responseToken) WaitTimeout(time.Duration) bool { return true }
+func (responseToken) Error() error                   { return nil }
+
+type responseSubscribeToken struct {
+	responseToken
+	topic string
+}
+
+func (t responseSubscribeToken) Result() map[string]byte { return map[string]byte{t.topic: 1} }
+
+type blockedRepository struct {
+	entered  chan struct{}
+	canceled chan struct{}
+	release  chan struct{}
+	calls    int
+}
+
+func (r *blockedRepository) ApplyDeviceResponse(ctx context.Context, _, _, _ uuid.UUID, _ commands.Event, _ commands.FailureCode) (commands.Command, error) {
+	r.calls++
+	if r.calls == 1 {
+		close(r.entered)
+		<-ctx.Done()
+		close(r.canceled)
+		<-r.release
+		return commands.Command{}, ctx.Err()
+	}
+	return commands.Command{}, ctx.Err()
+}
 
 func newServiceForTest(t *testing.T, resolver DeviceResolver, repository Repository) *Service {
 	t.Helper()
@@ -178,3 +225,92 @@ func TestProcessKeepsTimedOutCommandTerminal(t *testing.T) {
 		t.Fatalf("timeout response call = %+v", repository)
 	}
 }
+
+func TestStopDeadlineCancelsInflightAndJoinsWorkerBeforeReturning(t *testing.T) {
+	client := &responseClient{}
+	transport, err := mqtttransport.New(mqtttransport.DefaultConfig("mqtt://127.0.0.1:11883"), func(*mqtt.ClientOptions) mqtttransport.Client { return client }, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := transport.Start(context.Background()); err != nil {
+		t.Fatalf("transport Start: %v", err)
+	}
+	var logOutput bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logOutput, nil))
+	repository := &blockedRepository{entered: make(chan struct{}), canceled: make(chan struct{}), release: make(chan struct{})}
+	service, err := New(&fakeResolver{organizationID: uuid.New()}, repository, transport, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Start(); err != nil {
+		t.Fatalf("service Start: %v", err)
+	}
+
+	deviceID := uuid.New()
+	responseTopic := "pulsegrid/v1/tenants/pulsegrid-dev/devices/" + deviceID.String() + "/command-responses"
+	for range 2 {
+		payload, err := mqttcontract.EncodeResponse(uuid.New(), mqttcontract.OutcomeAck, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		client.handler(&responseMessage{topic: responseTopic, payload: payload})
+	}
+	select {
+	case <-repository.entered:
+	case <-time.After(time.Second):
+		t.Fatal("first response did not enter repository")
+	}
+	if got := len(transport.Deliveries()); got != 1 {
+		t.Fatalf("queued response count while first is in-flight = %d, want 1", got)
+	}
+
+	transportStopCtx, transportStopCancel := context.WithTimeout(context.Background(), time.Second)
+	if err := transport.Stop(transportStopCtx); err != nil {
+		transportStopCancel()
+		t.Fatalf("transport Stop: %v", err)
+	}
+	transportStopCancel()
+	serviceStopCtx, serviceStopCancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+	defer serviceStopCancel()
+	stopDone := make(chan error, 1)
+	go func() { stopDone <- service.Stop(serviceStopCtx) }()
+	select {
+	case <-repository.canceled:
+	case <-time.After(time.Second):
+		t.Fatal("shutdown deadline did not cancel in-flight repository work")
+	}
+	select {
+	case err := <-stopDone:
+		t.Fatalf("Stop returned before the in-flight worker completed: %v", err)
+	case <-time.After(10 * time.Millisecond):
+	}
+	close(repository.release)
+	select {
+	case err := <-stopDone:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("Stop error = %v, want context deadline exceeded", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Stop did not join the response worker")
+	}
+	if repository.calls != 1 {
+		t.Fatalf("repository calls = %d, want only the in-flight response; queued work must not start after forced cancellation", repository.calls)
+	}
+	if got := len(transport.Deliveries()); got != 1 {
+		t.Fatalf("queued response count after forced stop = %d, want 1", got)
+	}
+	if got := logOutput.String(); !bytes.Contains([]byte(got), []byte("command_response_drain_deadline_expired")) || !bytes.Contains([]byte(got), []byte("command_response_worker_stopped")) {
+		t.Fatalf("shutdown evidence log missing deadline or worker completion: %s", got)
+	}
+}
+
+type responseMessage struct {
+	topic   string
+	payload []byte
+}
+
+func (m *responseMessage) Topic() string   { return m.topic }
+func (m *responseMessage) Payload() []byte { return m.payload }
+func (*responseMessage) QoS() byte         { return 1 }
+func (*responseMessage) Retained() bool    { return false }
+func (*responseMessage) Duplicate() bool   { return false }

@@ -155,10 +155,17 @@ func DecodeResponse(raw []byte) (Response, error) {
 	if err := decodeField(fields, "outcome", &response.Outcome); err != nil {
 		return Response{}, ErrPayloadInvalid
 	}
-	if rawFailure, ok := fields["failureCode"]; ok {
+	rawFailure, failureCodePresent := fields["failureCode"]
+	if failureCodePresent {
 		if bytes.Equal(bytes.TrimSpace(rawFailure), []byte("null")) || decodeField(fields, "failureCode", &response.FailureCode) != nil {
 			return Response{}, ErrPayloadInvalid
 		}
+	}
+	if (response.Outcome == OutcomeAck || response.Outcome == OutcomeCompleted) && failureCodePresent {
+		return Response{}, ErrPayloadInvalid
+	}
+	if response.Outcome == OutcomeFailed && !failureCodePresent {
+		return Response{}, ErrPayloadInvalid
 	}
 	if err := validateResponse(response); err != nil {
 		return Response{}, err

@@ -113,6 +113,7 @@ type Transport struct {
 	retire      chan uint64
 	ctx         context.Context
 	cancel      context.CancelFunc
+	admissionMu sync.RWMutex
 	clientMu    sync.RWMutex
 	client      Client
 	clientEpoch uint64
@@ -189,7 +190,7 @@ func (t *Transport) Start(ctx context.Context) error {
 	t.accepting.Store(true)
 	client, epoch, err := t.connectEpoch(t.ctx)
 	if err != nil {
-		t.accepting.Store(false)
+		t.stopAdmission()
 		t.cancel()
 		if client != nil {
 			client.Disconnect(0)
@@ -208,6 +209,14 @@ func (t *Transport) Ready() bool { return t.ready.Load() }
 func (t *Transport) Generation() uint64 { return t.generation.Load() }
 
 func (t *Transport) Deliveries() <-chan Delivery { return t.queue }
+
+// stopAdmission closes response admission and waits for callbacks that already
+// entered the admission boundary to finish queueing or rejecting their message.
+func (t *Transport) stopAdmission() {
+	t.admissionMu.Lock()
+	t.accepting.Store(false)
+	t.admissionMu.Unlock()
+}
 
 // Publish waits for broker acknowledgement within the caller and configured
 // budgets. An uncertain result retires the client epoch; it is never retried
@@ -265,7 +274,7 @@ func (t *Transport) Stop(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	t.accepting.Store(false)
+	t.stopAdmission()
 	t.ready.Store(false)
 	t.cancel()
 	select {
@@ -405,6 +414,8 @@ func (t *Transport) retireEpoch(epoch uint64) {
 }
 
 func (t *Transport) handleMessage(epoch uint64, message Message) {
+	t.admissionMu.RLock()
+	defer t.admissionMu.RUnlock()
 	if message == nil || !t.accepting.Load() || epoch != t.generation.Load() {
 		return
 	}
@@ -424,9 +435,6 @@ func (t *Transport) handleMessage(epoch uint64, message Message) {
 		delivery.Oversized = true
 	} else {
 		delivery.Payload = append([]byte(nil), payload...)
-	}
-	if !t.accepting.Load() || epoch != t.generation.Load() {
-		return
 	}
 	select {
 	case t.queue <- delivery:

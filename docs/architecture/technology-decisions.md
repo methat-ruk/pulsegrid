@@ -263,12 +263,14 @@ This boundary keeps accepted intent separate from uncertain device delivery.
 Revisit it if a concrete actuator command, automatic recovery, longer
 deduplication retention, or production identity/permissions become required.
 
-## MVP-011 command transport decision (implementation in progress)
+## MVP-011 command transport decision (PR #21 candidate; unmerged)
 
-The [reviewed MVP-011 plan](../roadmap/feature-plans/planned/MVP-011-mqtt-command-delivery-acknowledgement.md)
-records the 2026-10-01 decision, approved for implementation. The feature
-branch's real PostgreSQL/Mosquitto integration now passes; independent PR
-review and merge remain pending.
+The [MVP-011 plan](../roadmap/feature-plans/completed/MVP-011-mqtt-command-delivery-acknowledgement.md)
+records the accepted design and the latest review disposition. PR #21 adds
+real PostgreSQL/Mosquitto evidence for response admission at shutdown, strict
+outcome-specific failure-code presence, expiry while the broker is down, and
+forced response-drain cancellation. The PR remains open and unmerged; required
+CI checks remain the merge gate.
 Existing Paho `v1.5.1`, pgx, Goose, PostgreSQL and Mosquitto suffice. No dependency
 upgrade, extra service, generic bus or external queue is selected.
 

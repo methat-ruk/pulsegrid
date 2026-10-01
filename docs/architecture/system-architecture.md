@@ -26,10 +26,13 @@ passing on the merge commit. It does not include MQTT delivery or
 automatic timeout scanning in the merged MVP-010 baseline. The MVP-011
 implementation on `feat/mvp-011-mqtt-command-delivery-acknowledgement` adds
 migration `008`, a durable bounded dispatcher, a separate command MQTT client,
-response validation, and automatic expiry. Real PostgreSQL/Mosquitto candidate
-integration passes; PR review remains pending, and the branch is not merged.
-Production identity, deployment exposure, durable broker replay, and later
-event contracts remain unimplemented.
+response validation, and automatic expiry. PR #21 review findings now have
+implementation and real PostgreSQL/Mosquitto evidence, including synchronized
+response admission at shutdown, expiry while the broker is down, and a forced
+response-drain deadline with an in-flight database lock. PR #21 remains open
+and unmerged subject to required CI checks. Production identity, deployment
+exposure, durable broker replay, and later event contracts remain
+unimplemented.
 
 Architecture diagrams below describe an intended sequence of evolution. They
 must not be read as deployed topology.
@@ -181,10 +184,11 @@ implementation passed local API and browser validation and merged as `7e3c336`
 The [MVP-008 plan](../roadmap/feature-plans/completed/MVP-008-threshold-rule-alert-backend.md)
 owns the limits, GraphQL contract, recovery boundary, and evidence.
 
-### MVP-011 command transport boundary (implementation in progress)
+### MVP-011 command transport boundary (PR #21 candidate; unmerged)
 
-The [reviewed MVP-011 plan](../roadmap/feature-plans/planned/MVP-011-mqtt-command-delivery-acknowledgement.md)
-is approved and in implementation on its feature branch. It keeps commands in
+The [MVP-011 plan](../roadmap/feature-plans/completed/MVP-011-mqtt-command-delivery-acknowledgement.md)
+records the accepted design and latest review disposition. The PR #21
+candidate keeps commands in
 the existing API process and PostgreSQL authority, adds durable bounded retry
 metadata and independent expiry, and uses a command-specific MQTT client
 alongside the existing telemetry client. The separate client allows uncertain
@@ -197,9 +201,13 @@ binds registry-resolved organization, device and command in one transaction;
 broker acknowledgement is not device success. This remains an anonymous
 loopback PING proof with explicit duplicate/lost-response limits, not production
 device authentication, durable response replay or multi-replica execution.
-The exact contract, retry/deadline policy, migration and recovery are described
-in the plan; final behavior claims remain subject to the candidate's integration
-and review evidence.
+The decoder rejects even an empty `failureCode` property on ACK/COMPLETED,
+matching AsyncAPI's outcome-specific schema. Shutdown closes callback admission
+and joins the response worker after canceling an in-flight database operation;
+real-broker tests cover broker-outage expiry and the forced drain deadline.
+Production identity, durable response replay and multi-replica execution remain
+out of scope. PR #21 remains open and unmerged; required CI checks control
+merge.
 
 ## Conditional target architecture
 

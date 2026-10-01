@@ -9,6 +9,12 @@ const rootDirectory = process.cwd()
 const brokerPort = 11883
 const databasePort = 15432
 const apiPort = 18080
+const suites = ['core', 'deadlines', 'outage', 'shutdown']
+const selectedSuite = process.argv[2] ?? 'all'
+if (selectedSuite !== 'all' && !suites.includes(selectedSuite)) {
+  throw new Error(`unknown MQTT integration suite ${selectedSuite}; expected all or ${suites.join(', ')}`)
+}
+const selectedSuites = selectedSuite === 'all' ? suites : [selectedSuite]
 const projectName = `pulsegrid-mqtt-test-${process.pid}-${Date.now()}`
 const password = `test-${randomBytes(18).toString('base64url')}`
 const databaseUrl = `postgres://pulsegrid:${password}@127.0.0.1:${databasePort}/pulsegrid_test?sslmode=disable`
@@ -31,9 +37,7 @@ let cleanupStarted = false
 let apiChild = null
 let apiExit = null
 let apiOutput = ''
-let simulatorChild = null
-let simulatorExit = null
-let simulatorOutput = ''
+const simulators = new Map()
 
 const simulatorDirectory = mkdtempSync(join(tmpdir(), 'pulsegrid-mqtt-'))
 const apiBinary = join(simulatorDirectory, 'api')
@@ -55,9 +59,39 @@ try {
   const started = built && await run('docker', ['compose', '-p', projectName, '--profile', 'test', 'up', '-d', '--wait', 'postgres-test', 'mqtt-test'], environment, 180_000)
   const migrated = started && await prepareDatabase()
   if (migrated && !stopRequested) {
-    await startApi()
-    await waitForReady()
-    const deviceID = await createDevice()
+    for (const suite of selectedSuites) {
+      if (stopRequested) break
+      console.log(`mqtt-suite-start suite=${suite} timestamp=${new Date().toISOString()}`)
+      if (suite === 'core') await runCoreSuite()
+      if (suite === 'deadlines') await runDeadlineSuite()
+      if (suite === 'outage') await runOutageSuite()
+      if (suite === 'shutdown') await runShutdownSuite()
+      console.log(`mqtt-suite-finish suite=${suite} timestamp=${new Date().toISOString()}`)
+    }
+    exitCode = stopRequested ? stopCode : 0
+    if (exitCode === 0) console.log(`MQTT ${selectedSuite} integration passed`)
+  }
+} catch (error) {
+  console.error(`MQTT ingestion integration failed: ${error.message}`)
+  if (apiOutput) console.error(`API output (last 12 KiB):\n${apiOutput.slice(-12 * 1024)}`)
+  for (const [deviceID, simulator] of simulators) {
+    if (simulator.output) console.error(`command simulator ${deviceID} output (last 8 KiB):\n${simulator.output.slice(-8 * 1024)}`)
+  }
+  exitCode = stopRequested ? stopCode : 1
+} finally {
+  if (simulators.size) await stopCommandSimulator()
+  if (apiChild) await stopApi()
+  const cleanupSucceeded = await cleanup()
+  if (!cleanupSucceeded && !stopRequested) exitCode = 1
+  if (stopRequested) exitCode = stopCode
+}
+process.exit(exitCode)
+
+async function runCoreSuite() {
+  await startApi()
+  await waitForReady()
+  const deviceID = await createDevice()
+  await timed('telemetry-regression', async () => {
     await createThresholdRule(deviceID)
     const simulatorTelemetry = await publishSimulator(deviceID)
     const duplicateMessageID = await publishInvalidCases(deviceID)
@@ -71,27 +105,172 @@ try {
     assertNoRawTelemetryInLogs()
     await testRetainedMessage(deviceID)
     await assertPersistedObservation(deviceID, projectionTelemetry.newerMessageID, 31, 1)
-    await testCommandOutcomes(deviceID)
-    await testBrokerRecovery(deviceID)
-    if (simulatorChild && !await stopCommandSimulator()) throw new Error('command simulator did not stop cleanly')
-    if (!await stopApi()) throw new Error('API did not drain and stop cleanly')
-    if (!apiOutput.includes('reason_code=shutdown_complete')) throw new Error('API shutdown completion was not logged')
-    exitCode = stopRequested ? stopCode : 0
-    if (exitCode === 0) console.log('MQTT telemetry and command integration passed')
-  }
-} catch (error) {
-  console.error(`MQTT ingestion integration failed: ${error.message}`)
-  if (apiOutput) console.error(`API output (last 12 KiB):\n${apiOutput.slice(-12 * 1024)}`)
-  if (simulatorOutput) console.error(`command simulator output (last 8 KiB):\n${simulatorOutput.slice(-8 * 1024)}`)
-  exitCode = stopRequested ? stopCode : 1
-} finally {
-  if (simulatorChild) await stopCommandSimulator()
-  if (apiChild) await stopApi()
-  const cleanupSucceeded = await cleanup()
-  if (!cleanupSucceeded && !stopRequested) exitCode = 1
-  if (stopRequested) exitCode = stopCode
+  })
+  await timed('command-outcomes', () => testCommandOutcomes(deviceID))
+  await timed('broker-recovery', () => testBrokerRecovery(deviceID))
+  if (simulators.size && !await stopCommandSimulator()) throw new Error('command simulator did not stop cleanly')
+  await stopApiAndAssertComplete('core suite')
 }
-process.exit(exitCode)
+
+async function runDeadlineSuite() {
+  await startApi()
+  await waitForReady()
+  const [ackDeviceID, silentDeviceID] = await Promise.all([createDevice(), createDevice()])
+  await Promise.all([
+    startCommandSimulator(ackDeviceID, 'ack-only'),
+    startCommandSimulator(silentDeviceID, 'silent'),
+  ])
+  const ackOnly = await createCommand(ackDeviceID)
+  const silent = await createCommand(silentDeviceID)
+  const acknowledged = await waitForCommandStatus(ackOnly.command.id, 'ACKNOWLEDGED')
+  if (!acknowledged.acknowledgedAt || acknowledged.terminalAt !== null) {
+    throw new Error(`ACK-only command milestones = ${JSON.stringify(acknowledged)}`)
+  }
+  await waitForSimulatorLogFields(silentDeviceID, [`command_id=${silent.command.id}`, 'reason_code=simulator_command_silent'], 20_000, 'silent command receipt')
+  assertNoRawCommandInLogs()
+
+  await restartApi()
+  const acknowledgedAfterRestart = await queryCommand(ackOnly.command.id)
+  if (acknowledgedAfterRestart.status !== 'ACKNOWLEDGED' || acknowledgedAfterRestart.acknowledgedAt !== acknowledged.acknowledgedAt) {
+    throw new Error(`API restart changed acknowledged command state: ${JSON.stringify(acknowledgedAfterRestart)}`)
+  }
+  const silentAfterRestart = await queryCommand(silent.command.id)
+  if (silentAfterRestart.status !== 'DISPATCHED' || silentAfterRestart.acknowledgedAt !== null) {
+    throw new Error(`API restart changed silent command state: ${JSON.stringify(silentAfterRestart)}`)
+  }
+
+  const [ackTimedOut, silentTimedOut] = await Promise.all([
+    timed('ack-only-expiry', () => waitForCommandTimeout(ackOnly.command)),
+    timed('silent-expiry', () => waitForCommandTimeout(silent.command)),
+  ])
+  if (!ackTimedOut.acknowledgedAt || !ackTimedOut.terminalAt) {
+    throw new Error(`ACK-only timeout lost acknowledgement evidence: ${JSON.stringify(ackTimedOut)}`)
+  }
+  if (!silentTimedOut.dispatchedAt || silentTimedOut.acknowledgedAt !== null || !silentTimedOut.terminalAt) {
+    throw new Error(`silent command timeout milestones = ${JSON.stringify(silentTimedOut)}`)
+  }
+  if (!await stopCommandSimulator(ackDeviceID) || !await stopCommandSimulator(silentDeviceID)) {
+    throw new Error('deadline command simulators did not stop cleanly')
+  }
+  assertNoRawCommandInLogs()
+  await stopApiAndAssertComplete('deadline suite')
+}
+
+async function runOutageSuite() {
+  await startApi()
+  await waitForReady()
+  const deviceID = await createDevice()
+  await startCommandSimulator(deviceID, 'success')
+  await timed('broker-outage-expiry', async () => {
+    const stopped = await run('docker', ['compose', '-p', projectName, '--profile', 'test', 'stop', 'mqtt-test'], environment, 60_000)
+    if (!stopped) throw new Error('unable to stop test broker for outage-expiry test')
+    await waitForNotReady()
+    await waitForPortClosed(brokerPort, 10_000)
+    const outageCommand = await createCommand(deviceID)
+    if (outageCommand.command.status !== 'PENDING') {
+      throw new Error(`command created while broker is down had status ${outageCommand.command.status}, want PENDING`)
+    }
+    const timedOut = await waitForCommandTimeout(outageCommand.command)
+    if (timedOut.status !== 'TIMED_OUT' || !timedOut.terminalAt) {
+      throw new Error(`broker-outage command did not expire: ${JSON.stringify(timedOut)}`)
+    }
+    if (await isPortOpen(brokerPort)) throw new Error('broker became available before expiry was observed')
+    const readiness = await fetch(`http://127.0.0.1:${apiPort}/health/ready`)
+    if (readiness.status !== 503) throw new Error(`API unexpectedly became ready while broker remained down: ${readiness.status}`)
+    if (getSimulatorOutput(deviceID).includes(`command_id=${outageCommand.command.id}`)) {
+      throw new Error(`broker outage delivered command ${outageCommand.command.id} to the device`)
+    }
+
+    const simulatorOffset = getSimulatorOutput(deviceID).length
+    const started = await run('docker', ['compose', '-p', projectName, '--profile', 'test', 'up', '-d', '--wait', 'mqtt-test'], environment, 120_000)
+    if (!started) throw new Error('unable to restart test broker after outage expiry')
+    await waitForReady()
+    await waitForSimulatorLogSince(deviceID, simulatorOffset, 'reason_code=simulator_command_ready', 20_000, 'simulator command resubscription after broker recovery')
+    if (getSimulatorOutput(deviceID).slice(simulatorOffset).includes(`command_id=${outageCommand.command.id}`)) {
+      throw new Error(`expired broker-outage command ${outageCommand.command.id} was delivered after recovery`)
+    }
+    const recoveryCommand = await createCommand(deviceID)
+    const recoveredCommand = await waitForCommandStatus(recoveryCommand.command.id, 'COMPLETED', 20_000)
+    assertCommandMilestones(recoveredCommand, ['dispatchedAt', 'acknowledgedAt', 'terminalAt'])
+  })
+  if (!await stopCommandSimulator(deviceID)) throw new Error('outage command simulator did not stop cleanly')
+  await stopApiAndAssertComplete('broker outage suite')
+}
+
+async function runShutdownSuite() {
+  return timed('response-shutdown-drain', runShutdownDrainEvidence)
+}
+
+async function runShutdownDrainEvidence() {
+  await startApi({ ...environment, PULSEGRID_SHUTDOWN_TIMEOUT: '1s' })
+  await waitForReady()
+  const deviceID = await createDevice()
+  await startCommandSimulator(deviceID, 'silent')
+  const command = await createCommand(deviceID)
+  await waitForSimulatorLogFields(deviceID, [`command_id=${command.command.id}`, 'reason_code=simulator_command_silent'], 20_000, 'shutdown test command delivery')
+  const dispatched = await waitForCommandStatus(command.command.id, 'DISPATCHED')
+  if (!dispatched.dispatchedAt) throw new Error(`shutdown test command was not dispatched: ${JSON.stringify(dispatched)}`)
+
+  const lockHolder = await startCommandLockHolder(command.command.id)
+  try {
+    await publishCommandResponse(deviceID, command.command.id, 'ACK')
+    await waitForAPICommandLock(10_000)
+    await publishCommandResponse(deviceID, command.command.id, 'COMPLETED')
+    await delay(300)
+
+    const shutdownOffset = apiOutput.length
+    const child = apiChild
+    const exit = apiExit
+    child.kill('SIGTERM')
+    const result = await Promise.race([exit, delay(10_000).then(() => ({ status: 1, signal: 'timeout' }))])
+    apiChild = null
+    if (result.status !== 1 || result.signal === 'timeout') {
+      child.kill('SIGKILL')
+      throw new Error(`API forced-deadline shutdown exit = ${JSON.stringify(result)}, want status 1 after deadline`)
+    }
+    const shutdownLogs = apiOutput.slice(shutdownOffset)
+    const deadlineIndex = shutdownLogs.indexOf('reason_code=command_response_drain_deadline_expired')
+    const workerStoppedIndex = shutdownLogs.indexOf('reason_code=command_response_worker_stopped')
+    if (deadlineIndex < 0 || !shutdownLogs.slice(deadlineIndex).includes('queued_responses=1')) {
+      throw new Error(`shutdown did not record one queued response at forced deadline: ${shutdownLogs}`)
+    }
+    if (workerStoppedIndex < deadlineIndex) {
+      throw new Error(`response worker completion did not follow forced drain deadline: ${shutdownLogs}`)
+    }
+    if (!shutdownLogs.includes('reason_code=shutdown_incomplete')) {
+      throw new Error(`API did not report its forced shutdown deadline: ${shutdownLogs}`)
+    }
+    if (!await stopCommandSimulator(deviceID)) throw new Error('shutdown test simulator did not stop cleanly')
+  } finally {
+    await lockHolder.release()
+  }
+
+  const row = await runPSQL(`SELECT status || ':' || coalesce(acknowledged_at::text, 'null') || ':' || coalesce(terminal_at::text, 'null') FROM commands WHERE id = '${command.command.id}'::uuid;`)
+  if (row.status !== 0 || row.stdout.trim() !== 'DISPATCHED:null:null') {
+    throw new Error(`forced shutdown applied a response or terminalized the row: ${row.stdout}${row.stderr}`)
+  }
+  if (apiOutput.includes('"outcome"') || apiOutput.includes('"commandId"')) {
+    throw new Error('API logs contain a raw MQTT command response payload')
+  }
+}
+
+async function stopApiAndAssertComplete(label) {
+  if (!await stopApi()) throw new Error(`API did not drain and stop cleanly after ${label}`)
+  if (!apiOutput.includes('reason_code=shutdown_complete')) {
+    throw new Error(`API shutdown completion was not logged after ${label}`)
+  }
+}
+
+async function timed(name, task) {
+  const startedAt = Date.now()
+  console.log(`mqtt-scenario-start scenario=${name} timestamp=${new Date(startedAt).toISOString()}`)
+  try {
+    return await task()
+  } finally {
+    const finishedAt = Date.now()
+    console.log(`mqtt-scenario-finish scenario=${name} timestamp=${new Date(finishedAt).toISOString()} duration_ms=${finishedAt - startedAt}`)
+  }
+}
 
 async function buildBinaries() {
   const apiBuilt = await run('go', ['-C', 'apps/api', 'build', '-o', apiBinary, './cmd/api'], process.env, 180_000)
@@ -323,33 +502,6 @@ async function testCommandOutcomes(deviceID) {
   }
   assertCommandMilestones(failed, ['dispatchedAt', 'acknowledgedAt', 'terminalAt'])
   if (!await stopCommandSimulator()) throw new Error('failure command simulator did not stop cleanly')
-
-  const ackOnly = await createCommand(deviceID)
-  await startCommandSimulator(deviceID, 'ack-only')
-  const acknowledged = await waitForCommandStatus(ackOnly.command.id, 'ACKNOWLEDGED')
-  if (!acknowledged.acknowledgedAt || acknowledged.terminalAt !== null) {
-    throw new Error(`ACK-only command milestones = ${JSON.stringify(acknowledged)}`)
-  }
-  assertNoRawCommandInLogs()
-  await restartApi()
-  const acknowledgedAfterRestart = await queryCommand(ackOnly.command.id)
-  if (acknowledgedAfterRestart.status !== 'ACKNOWLEDGED' || acknowledgedAfterRestart.acknowledgedAt !== acknowledged.acknowledgedAt) {
-    throw new Error(`API restart changed acknowledged command state: ${JSON.stringify(acknowledgedAfterRestart)}`)
-  }
-  const ackTimedOut = await waitForCommandTimeout(ackOnly.command)
-  if (!ackTimedOut.acknowledgedAt || !ackTimedOut.terminalAt) {
-    throw new Error(`ACK-only timeout lost acknowledgement evidence: ${JSON.stringify(ackTimedOut)}`)
-  }
-  if (!await stopCommandSimulator()) throw new Error('ACK-only command simulator did not stop cleanly')
-
-  const silent = await createCommand(deviceID)
-  await startCommandSimulator(deviceID, 'silent')
-  await waitForSimulatorLogFields([`command_id=${silent.command.id}`, 'reason_code=simulator_command_silent'], 20_000, 'silent command receipt')
-  const silentTimedOut = await waitForCommandTimeout(silent.command)
-  if (!silentTimedOut.dispatchedAt || silentTimedOut.acknowledgedAt !== null || !silentTimedOut.terminalAt) {
-    throw new Error(`silent command timeout milestones = ${JSON.stringify(silentTimedOut)}`)
-  }
-  if (!await stopCommandSimulator()) throw new Error('silent command simulator did not stop cleanly')
   assertNoRawCommandInLogs()
 }
 
@@ -375,8 +527,7 @@ function assertNoRawCommandInLogs() {
 }
 
 async function startCommandSimulator(deviceID, responseMode) {
-  if (simulatorChild) throw new Error('command simulator is already running')
-  simulatorOutput = ''
+  if (simulators.has(deviceID)) throw new Error(`command simulator for device ${deviceID} is already running`)
   const simulatorEnvironment = {
     ...environment,
     PULSEGRID_MQTT_DEVICE_ID: deviceID,
@@ -384,16 +535,17 @@ async function startCommandSimulator(deviceID, responseMode) {
     PULSEGRID_SIMULATOR_MODE: 'commands',
     PULSEGRID_SIMULATOR_COMMAND_RESPONSE: responseMode,
   }
-  simulatorChild = spawn(simulatorBinary, [], {
+  const child = spawn(simulatorBinary, [], {
     cwd: rootDirectory,
     env: simulatorEnvironment,
     stdio: ['ignore', 'pipe', 'pipe'],
   })
-  runningChildren.add(simulatorChild)
-  simulatorChild.stdout.on('data', (chunk) => { simulatorOutput += chunk.toString() })
-  simulatorChild.stderr.on('data', (chunk) => { simulatorOutput += chunk.toString() })
-  const child = simulatorChild
-  simulatorExit = new Promise((resolve) => {
+  const simulator = { child, output: '', exit: null }
+  simulators.set(deviceID, simulator)
+  runningChildren.add(child)
+  child.stdout.on('data', (chunk) => { simulator.output += chunk.toString() })
+  child.stderr.on('data', (chunk) => { simulator.output += chunk.toString() })
+  simulator.exit = new Promise((resolve) => {
     child.once('close', (status, signal) => {
       runningChildren.delete(child)
       resolve({ status: status ?? 1, signal })
@@ -403,44 +555,55 @@ async function startCommandSimulator(deviceID, responseMode) {
       resolve({ status: 1, signal: null, error })
     })
   })
-  await waitForSimulatorLog('reason_code=simulator_command_ready', 15_000, `command simulator ${responseMode} subscription`)
+  await waitForSimulatorLog(deviceID, 'reason_code=simulator_command_ready', 15_000, `command simulator ${responseMode} subscription`)
 }
 
-async function stopCommandSimulator() {
-  if (!simulatorChild) return true
-  const child = simulatorChild
-  const exit = simulatorExit
-  simulatorChild = null
-  child.kill('SIGTERM')
-  const result = await Promise.race([exit, delay(15_000).then(() => ({ status: 1, signal: 'timeout' }))])
-  if (result.status !== 0) {
-    child.kill('SIGKILL')
-    console.error(`command simulator did not exit cleanly: ${JSON.stringify(result)}`)
-    return false
+async function stopCommandSimulator(deviceID) {
+  const selected = deviceID === undefined ? [...simulators.keys()] : [deviceID]
+  let success = true
+  for (const id of selected) {
+    const simulator = simulators.get(id)
+    if (!simulator) continue
+    simulators.delete(id)
+    simulator.child.kill('SIGTERM')
+    const result = await Promise.race([simulator.exit, delay(15_000).then(() => ({ status: 1, signal: 'timeout' }))])
+    if (result.status !== 0) {
+      simulator.child.kill('SIGKILL')
+      console.error(`command simulator ${id} did not exit cleanly: ${JSON.stringify(result)}`)
+      success = false
+    }
   }
-  return true
+  return success
 }
 
-async function waitForSimulatorLog(text, timeout, label) {
-  return waitForSimulatorLogSince(0, text, timeout, label)
+function getSimulatorOutput(deviceID) {
+  return simulators.get(deviceID)?.output ?? ''
 }
 
-async function waitForSimulatorLogSince(offset, text, timeout, label) {
+async function waitForSimulatorLog(deviceID, text, timeout, label) {
+  return waitForSimulatorLogSince(deviceID, 0, text, timeout, label)
+}
+
+async function waitForSimulatorLogSince(deviceID, offset, text, timeout, label) {
   const deadline = Date.now() + timeout
+  const simulator = simulators.get(deviceID)
+  if (!simulator) throw new Error(`command simulator for device ${deviceID} is not running`)
   while (Date.now() < deadline && !stopRequested) {
-    if (simulatorOutput.slice(offset).includes(text)) return
+    if (simulator.output.slice(offset).includes(text)) return
     await delay(100)
   }
-  throw new Error(`${label} was not found in command simulator output: ${text}\n${simulatorOutput.slice(offset)}`)
+  throw new Error(`${label} was not found in command simulator output: ${text}\n${simulator.output.slice(offset)}`)
 }
 
-async function waitForSimulatorLogFields(fields, timeout, label) {
+async function waitForSimulatorLogFields(deviceID, fields, timeout, label) {
   const deadline = Date.now() + timeout
+  const simulator = simulators.get(deviceID)
+  if (!simulator) throw new Error(`command simulator for device ${deviceID} is not running`)
   while (Date.now() < deadline && !stopRequested) {
-    if (simulatorOutput.split('\n').some((line) => fields.every((field) => line.includes(field)))) return
+    if (simulator.output.split('\n').some((line) => fields.every((field) => line.includes(field)))) return
     await delay(100)
   }
-  throw new Error(`${label} was not found in command simulator output: ${fields.join(', ')}\n${simulatorOutput}`)
+  throw new Error(`${label} was not found in command simulator output: ${fields.join(', ')}\n${simulator.output}`)
 }
 
 async function publishSimulator(deviceID) {
@@ -599,14 +762,14 @@ async function testRetainedMessage(deviceID) {
 
 async function testBrokerRecovery(deviceID) {
   await startCommandSimulator(deviceID, 'success')
-  const simulatorOutputOffset = simulatorOutput.length
+  const simulatorOutputOffset = getSimulatorOutput(deviceID).length
   const stopped = await run('docker', ['compose', '-p', projectName, '--profile', 'test', 'stop', 'mqtt-test'], environment, 60_000)
   if (!stopped) throw new Error('unable to stop test broker for recovery test')
   await waitForNotReady()
   const started = await run('docker', ['compose', '-p', projectName, '--profile', 'test', 'up', '-d', '--wait', 'mqtt-test'], environment, 120_000)
   if (!started) throw new Error('unable to restart test broker for recovery test')
   await waitForReady()
-  await waitForSimulatorLogSince(simulatorOutputOffset, 'reason_code=simulator_command_ready', 20_000, 'simulator command resubscription after broker recovery')
+  await waitForSimulatorLogSince(deviceID, simulatorOutputOffset, 'reason_code=simulator_command_ready', 20_000, 'simulator command resubscription after broker recovery')
   const recoveryCommand = await createCommand(deviceID)
   const recoveredCommand = await waitForCommandStatus(recoveryCommand.command.id, 'COMPLETED', 20_000)
   assertCommandMilestones(recoveredCommand, ['dispatchedAt', 'acknowledgedAt', 'terminalAt'])
@@ -651,6 +814,75 @@ async function runPSQL(statement) {
     'compose', '-p', projectName, '--profile', 'test', 'exec', '-T', '-e', `PGPASSWORD=${environment.PULSEGRID_POSTGRES_PASSWORD}`,
     'postgres-test', 'psql', '-U', 'pulsegrid', '-d', 'pulsegrid_test', '-v', 'ON_ERROR_STOP=1', '-Atc', statement,
   ], environment, 15_000)
+}
+
+async function startCommandLockHolder(commandID) {
+  const child = spawn('docker', [
+    'compose', '-p', projectName, '--profile', 'test', 'exec', '-T', '-e', `PGPASSWORD=${environment.PULSEGRID_POSTGRES_PASSWORD}`,
+    'postgres-test', 'psql', '-U', 'pulsegrid', '-d', 'pulsegrid_test', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1',
+  ], { cwd: rootDirectory, env: environment, stdio: ['pipe', 'pipe', 'pipe'] })
+  runningChildren.add(child)
+  const lockHolder = { child, output: '' }
+  lockHolder.release = () => releaseCommandLockHolder(lockHolder)
+  child.stdout.on('data', (chunk) => { lockHolder.output += chunk.toString() })
+  child.stderr.on('data', (chunk) => { lockHolder.output += chunk.toString() })
+  lockHolder.exit = new Promise((resolve) => {
+    child.once('close', (status, signal) => {
+      runningChildren.delete(child)
+      resolve({ status: status ?? 1, signal })
+    })
+    child.once('error', (error) => {
+      runningChildren.delete(child)
+      resolve({ status: 1, signal: null, error })
+    })
+  })
+  child.stdin.write(`BEGIN;\nSELECT id FROM commands WHERE id = '${commandID}'::uuid FOR UPDATE;\n\\echo __command_lock_acquired__\n`)
+  const deadline = Date.now() + 10_000
+  while (Date.now() < deadline && !stopRequested) {
+    if (lockHolder.output.includes('__command_lock_acquired__')) return lockHolder
+    const exit = await Promise.race([lockHolder.exit, delay(50).then(() => null)])
+    if (exit) throw new Error(`command row lock holder exited early: ${JSON.stringify(exit)} ${lockHolder.output}`)
+  }
+  await lockHolder.release()
+  throw new Error(`command row lock was not acquired: ${lockHolder.output}`)
+}
+
+async function releaseCommandLockHolder(lockHolder) {
+  if (lockHolder.child.exitCode !== null || lockHolder.child.stdin.destroyed) return
+  lockHolder.child.stdin.end('ROLLBACK;\n\\q\n')
+  const result = await Promise.race([lockHolder.exit, delay(5_000).then(() => ({ status: 1, signal: 'timeout' }))])
+  if (result.status !== 0) {
+    lockHolder.child.kill('SIGTERM')
+    throw new Error(`command row lock holder did not exit cleanly: ${JSON.stringify(result)} ${lockHolder.output}`)
+  }
+}
+
+async function waitForAPICommandLock(timeout) {
+  const deadline = Date.now() + timeout
+  let last = 'unobserved'
+  while (Date.now() < deadline && !stopRequested) {
+    const result = await runPSQL("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND lower(query) LIKE '%commands%' AND lower(query) LIKE '%for update%';")
+    last = result.stdout.trim()
+    if (result.status === 0 && Number(last) > 0) return
+    await delay(150)
+  }
+  throw new Error(`API did not wait on the locked command row; lock-waiting query count=${last}`)
+}
+
+async function publishCommandResponse(deviceID, commandID, outcome) {
+  const topic = `pulsegrid/v1/tenants/pulsegrid-dev/devices/${deviceID}/command-responses`
+  const payload = JSON.stringify({ schemaVersion: 1, commandId: commandID, outcome })
+  const result = await publishRaw(topic, payload, false)
+  if (result.status !== 0) throw new Error(`could not publish ${outcome} command response: ${result.stderr}`)
+}
+
+async function waitForPortClosed(port, timeout) {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline && !stopRequested) {
+    if (!await isPortOpen(port)) return
+    await delay(100)
+  }
+  throw new Error(`127.0.0.1:${port} remained open past ${timeout}ms`)
 }
 
 async function waitForLog(text, timeout, label) {

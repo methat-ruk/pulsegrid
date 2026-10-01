@@ -43,6 +43,18 @@ func (m *fakeMessage) QoS() byte       { return m.qos }
 func (m *fakeMessage) Retained() bool  { return m.retained }
 func (m *fakeMessage) Duplicate() bool { return m.dup }
 
+type blockingTopicMessage struct {
+	fakeMessage
+	entered chan struct{}
+	release <-chan struct{}
+}
+
+func (m *blockingTopicMessage) Topic() string {
+	close(m.entered)
+	<-m.release
+	return m.fakeMessage.topic
+}
+
 type fakeClient struct {
 	mu             sync.Mutex
 	connected      bool
@@ -145,6 +157,64 @@ func TestTransportSubscribesCopiesBoundedDeliveryAndPublishesQoSOneNonRetained(t
 	cancel()
 	if err := transport.Stop(stopCtx); err != nil {
 		t.Fatalf("Stop: %v", err)
+	}
+}
+
+func TestTransportStopWaitsForCallbackInsideAdmissionBoundary(t *testing.T) {
+	client := &fakeClient{}
+	transport, err := New(DefaultConfig("mqtt://127.0.0.1:1883"), func(*mqtt.ClientOptions) Client { return client }, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := transport.Start(context.Background()); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	defer func() {
+		stopCtx, stopCancel := context.WithTimeout(context.Background(), time.Second)
+		defer stopCancel()
+		if err := transport.Stop(stopCtx); err != nil {
+			t.Errorf("Stop: %v", err)
+		}
+	}()
+
+	topic := "pulsegrid/v1/tenants/pulsegrid-dev/devices/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/command-responses"
+	release := make(chan struct{})
+	message := &blockingTopicMessage{
+		fakeMessage: fakeMessage{topic: topic, payload: []byte(`{"schemaVersion":1}`), qos: 1},
+		entered:     make(chan struct{}),
+		release:     release,
+	}
+	callbackDone := make(chan struct{})
+	go func() {
+		defer close(callbackDone)
+		client.handler(message)
+	}()
+	select {
+	case <-message.entered:
+	case <-time.After(time.Second):
+		t.Fatal("callback did not enter message admission")
+	}
+
+	// Release the callback after Stop reaches the admission barrier. Without the
+	// barrier, Stop can return first and this delivery would be lost.
+	time.AfterFunc(25*time.Millisecond, func() { close(release) })
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), time.Second)
+	defer stopCancel()
+	if err := transport.Stop(stopCtx); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+	select {
+	case <-callbackDone:
+	case <-time.After(time.Second):
+		t.Fatal("callback did not finish")
+	}
+	select {
+	case delivery := <-transport.Deliveries():
+		if delivery.Topic != topic || string(delivery.Payload) != `{"schemaVersion":1}` {
+			t.Fatalf("admitted delivery = %+v", delivery)
+		}
+	default:
+		t.Fatal("Stop returned without admitting the callback already inside the boundary")
 	}
 }
 

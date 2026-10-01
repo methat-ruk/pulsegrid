@@ -1,8 +1,8 @@
 # MVP-011 — MQTT Command Delivery and Acknowledgement
 
-Status: In progress — implementation, current-candidate real PostgreSQL/MQTT
-integration, and author self-review are complete. Independent PR review and
-acceptance remain pending.
+Status: Complete for the requested PR handoff — review findings F1/F2 and
+evidence gap G1 are addressed and locally verified. PR #21 remains open and
+unmerged; its required branch-protection checks must pass before merge.
 
 Branch: `feat/mvp-011-mqtt-command-delivery-acknowledgement`
 
@@ -293,7 +293,7 @@ runtime tests still must prove adapter containment.
 
 ## Validation
 
-Required implementation evidence, tied to the final reviewed candidate:
+Required implementation evidence, tied to the final submitted candidate:
 
 | Guarantee/scenario | Boundary and assertion |
 | --- | --- |
@@ -305,7 +305,7 @@ Required implementation evidence, tied to the final reviewed candidate:
 | Durable bound/migration | Real DB: old active/terminal backfill, previous API insert compatibility, new Create metadata, missing-schema startup with command mode disabled/enabled, concurrent reservation one slot, <=4 attempts through restart, no ACK/terminal eligibility, scoped expiry leaves foreign rows unchanged, >100 expiry batches/backlog excludes expired dispatch. |
 | Crash/unknown windows | Hooks plus actual process restart after create commit, reservation before publish, broker accepted before dispatch write, response before DB commit. Verify counters, same ID, duplicate-safe PING and declared replay limits. |
 | Broker/SDK degradation | Real broker restart + controllable SDK tokens: missing/late PUBACK, publish disconnect, retired callbacks/tokens, SUBACK rejection, readiness recovery, no offline publish, one active publish/epoch. Fakes alone do not prove network behavior. |
-| DB/overload/stop | DB unavailable/lock timeout, full 64-response queue: no false completion, bounded waits, diagnosed loss/expiry recovery. Partial startup, HTTP failure, SIGTERM, forced drain close/join before pool; race evidence. |
+| DB/overload/stop | DB unavailable/lock timeout, full 64-response queue: no false completion, bounded waits, diagnosed loss/expiry recovery. Partial startup, HTTP failure, SIGTERM, forced drain cancel/join before pool; race evidence. |
 | Coupled regression | Telemetry/projection/alert transaction, default simulator, command GraphQL scope/idempotency, readiness and health-only behavior with command disabled/alone/alongside telemetry; generated contract unchanged. |
 
 Use fake clocks/ports for policy/token edges and real PostgreSQL/Mosquitto/
@@ -320,9 +320,12 @@ value is not proof of TCP loss.
 - Extend `mqtt:test:integration` retaining telemetry cases. Its unique Compose
   project owns ports 11883/15432/18080, random test credentials, temporary
   binaries and cleanup. Refuse occupied ports; never reset dev resources.
-  Keep existing 10-minute CI job viable: fake clock for most deadline cases,
-  real two-minute ACK-only and silent expiry proofs. Bound startup/assertions/teardown;
-  verify owned processes/containers/ports are gone after success/failure/signal.
+  Keep real two-minute ACK-only and silent expiry proofs, running them
+  concurrently on separate devices. CI runs `core`, `deadlines`, `outage`, and
+  `shutdown` as a matrix; a fail-closed aggregate preserves the required
+  `mqtt-integration` status context. Emit per-scenario timestamps/durations.
+  Bound startup/assertions/teardown; verify owned processes/containers/ports
+  are gone after success/failure/signal.
 - Add `apps/api/api/asyncapi/commands.yaml`; extend existing `asyncapi:lint`
   command to both contracts, consumed by current CI. Lint is not decoder proof:
   contract examples must agree with strict parser, including FAILED-only code.
@@ -343,23 +346,24 @@ value is not proof of TCP loss.
 4. Compose configuration, schema checks, readiness and start/stop in the API;
    extend the isolated real broker/process harness, preserving telemetry cases.
 5. Update contract lint/docs/examples, reconcile actual diff against this plan,
-   self-review/fix, run final candidate validation, and hand off the PR for required
-   independent review. Stop/re-plan if the declared assumption or scope fails.
+   self-review/fix, run final candidate validation, and hand off the PR with
+   review-response evidence. Do not merge without an explicit merge request.
+   Stop/re-plan if the declared assumption or scope fails.
 
 ## Documentation Updates
 
-The env examples and configuration guide now match the implemented validators
-and keep command delivery disabled by default. AsyncAPI, API/architecture
-guides, local simulator walkthrough, integration command, README, and roadmap
-record the current implementation boundary. This feature remains in progress
-until final evidence and applicable review/acceptance; do not move it to
-completed from local implementation alone.
+The env examples and configuration guide match the implemented validators and
+keep command delivery disabled by default. AsyncAPI, API/architecture guides,
+local simulator walkthrough, integration commands, README, and roadmap record
+the implementation and review disposition. F1 admission synchronization,
+F2 failure-code property presence, and G1 outage-expiry/forced-shutdown
+evidence are now part of this completed candidate.
 
 ## Risks / Open Decisions
 
 No architecture/transport choice is open within the approved local/test slice.
-The implementation is authorized; validation and review remain the completion
-gates.
+The implementation is authorized; validation, self-review and review-comment
+resolution are the completion gates for this handoff.
 
 | Assumption / accepted limit | Falsifier, signal and action |
 | --- | --- |
@@ -453,17 +457,60 @@ backend slice; current implementation evidence below supersedes that limit.
   `pnpm run web:build`, and `pnpm run test:browser` passed on the updated
   lockfile. The resolved dependency tree contains only those patched versions.
 
-Final completion remains subject to required independent PR review and
-acceptance. The feature branch is not merged.
+### PR #21 review disposition and final candidate evidence (2026-10-01)
+
+The review of head `4401170ee50b26729bb928c222763a9952d85bea` identified two
+confirmed findings and one missing-evidence blocker. The current candidate
+addresses them as follows:
+
+- **F1 — callback admission race:** the transport holds a read lock from its
+  callback admission guard through bounded queue insertion. `Stop` closes
+  admission under the write lock and waits for already-admitted callbacks
+  before the response worker drains. A deterministic blocked-callback test
+  proves that a callback already inside admission is queued before `Stop`
+  returns.
+- **F2 — optional empty failure code:** the decoder now validates property
+  presence as well as value, rejecting any `failureCode` on ACK/COMPLETED and
+  requiring it on FAILED. Negative decoder tests cover empty ACK/COMPLETED and
+  missing FAILED; the unchanged AsyncAPI outcome schemas remain the contract
+  reference.
+- **G1 — outage expiry:** the real broker/database test creates a command
+  while Mosquitto is down and observes its stored `TIMED_OUT` before restarting
+  the broker. It then proves simulator resubscription, no delivery of the
+  expired command, and successful delivery/completion of a new command.
+- **G1 — forced response shutdown:** a real PostgreSQL transaction holds the
+  command row lock while an ACK is in-flight and a COMPLETED response is
+  queued. With a one-second shutdown deadline, the API records one queued
+  response, cancels the in-flight database operation, logs worker completion
+  before exiting, and leaves the row `DISPATCHED` without ACK/terminal times.
+- **CI duration recommendation:** ACK-only and silent expiry run concurrently
+  on different devices (combined wait in the passing all-suites run: 118,956
+  ms). Scenario timestamps and durations are emitted. That run measured
+  command-outcomes 43,776 ms, broker recovery 7,147 ms, broker-outage expiry
+  126,936 ms, and forced response shutdown 2,891 ms. Four independent suites
+  run in CI, with the existing required `mqtt-integration` context retained by
+  a fail-closed aggregate.
+
+The first local outage-harness attempt observed expiry but exposed a test-only
+reconnect-log offset race. The harness now records the offset before broker
+restart; the repeated outage suite passed. This did not require a runtime
+behavior change.
+
+Final local evidence on the current implementation includes the four real
+PostgreSQL/Mosquitto suites (`core`, `deadlines`, `outage`, `shutdown`), race
+tests across all API packages, targeted Go tests, real PostgreSQL API
+integration, Go format/vet/build, AsyncAPI lint, repository policy, Node
+syntax, and `git diff --check`. The PR remains open and unmerged; the user
+requested that the plan move with the implementation and review response,
+while branch protection remains the final merge gate.
 
 ## Done Criteria
 
-After approval/implementation, every accepted PING keeps one logical identity,
-bounded durable retry and truthful terminal COMPLETED, explicit FAILED or stored
-TIMED_OUT. ACK is intermediate, not completion. Required real-store/transport/
-restart/negative-input/identity/deadline/regression evidence passes on the final
-reviewed candidate; failures/skips/unavailability and limits are recorded.
-Reconcile actual implementation against this plan, self-review/fix, final validate
-and obtain required independent PR review before delivery completion. This handoff
-completes planning only and authorizes no implementation/migration/deployment/
-external write.
+Every accepted PING keeps one logical identity, bounded durable retry and
+truthful terminal COMPLETED, explicit FAILED or stored TIMED_OUT. ACK is
+intermediate, not completion. Required real-store/transport/restart/negative-
+input/identity/deadline/regression evidence and the requested review fixes pass
+on this candidate; CI status remains enforced on PR #21. The author completed
+self-review; no additional context-isolated review was requested. PR #21 is
+open and unmerged. No production migration, deployment or external runtime
+mutation was performed.
