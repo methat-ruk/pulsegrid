@@ -389,7 +389,10 @@ execution; collision never authorizes editing historical SQL.
   replay, retention/admission and measured fleet throughput need their own trigger.
 - Scope effect: the implementation adds additive retry metadata, an independent
   command client, strict response handling and local simulator receive mode. It
-  adds no UI, production path, dependency upgrade or service split.
+  adds no UI, production command path or service split. CI later exposed
+  vulnerable transitive Node resolutions, so this branch also adds three
+  same-major workspace overrides and lockfile updates; direct app dependency
+  declarations and product behavior remain unchanged.
 
 ## Plan review and handoff (2026-10-01)
 
@@ -412,9 +415,9 @@ not an independent implementation/PR review or implemented behavior claim.
 Planning evidence: targeted baseline unit suites, `go mod verify`, repository
 policy, final diff/link/required-section checks passed. Default Go shim cache
 was denied by sandbox; the pinned binary passed with a writable temporary build
-cache and existing module cache. Implementation evidence is recorded below.
-Browser verification and a fresh vulnerability scan were not run in this
-backend-only, dependency-neutral slice; main CI remains dated baseline evidence.
+cache and existing module cache. At that planning handoff, browser verification
+and a fresh vulnerability scan were not run for the then dependency-neutral
+backend slice; current implementation evidence below supersedes that limit.
 
 ## Implementation evidence (2026-10-01, current branch)
 
@@ -433,13 +436,22 @@ backend-only, dependency-neutral slice; main CI remains dated baseline evidence.
   existing device, telemetry and alert journeys. The sandboxed first attempt
   could not launch Chromium; rerunning the same isolated test runner with the
   required launch permission passed. No UI changed.
-- A fresh vulnerability scan was not run because dependencies did not change.
-  Forced process death at every internal instruction boundary is not directly
+- Forced process death at every internal instruction boundary is not directly
   injected; the real restart and publish-before-write failure cases plus
   fake-token tests cover the selected recovery contract.
-- The final candidate also passed `check:fast`, `go test -race ./...`, and
-  rerun real PostgreSQL and Mosquitto integration tests. Local and CI
-  modernization checks include `-any` and `-testingcontext`.
+- Feature implementation commit `46b1ba0` also passed `check:fast`,
+  `go test -race ./...`, and rerun real PostgreSQL and Mosquitto integration
+  tests. Local and CI modernization checks include `-any` and
+  `-testingcontext`. The current Node dependency remediation passed the
+  `check:fast` suite again as recorded below.
+- CI run `36820799246` exposed seven production-audit advisory records through
+  transitive `brace-expansion` and `serialize-javascript` resolutions. The
+  workspace now constrains only their affected major ranges to patched
+  compatible releases (`2.1.7`, `5.0.12`, and `7.1.2`); direct dependency
+  manifests are unchanged. `pnpm install --frozen-lockfile`,
+  `pnpm run node:audit`, `pnpm audit --prod`, `pnpm run check:fast`,
+  `pnpm run web:build`, and `pnpm run test:browser` passed on the updated
+  lockfile. The resolved dependency tree contains only those patched versions.
 
 Final completion remains subject to required independent PR review and
 acceptance. The feature branch is not merged.
