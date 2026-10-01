@@ -25,7 +25,7 @@ type Token interface {
 // Keeping this interface local makes network failure behavior unit-testable.
 type Client interface {
 	Connect() Token
-	Publish(topic string, qos byte, retained bool, payload interface{}) Token
+	Publish(topic string, qos byte, retained bool, payload any) Token
 	Disconnect(quiesce uint)
 }
 
@@ -98,7 +98,7 @@ func (c pahoClient) Connect() Token {
 	return pahoToken{token: c.client.Connect()}
 }
 
-func (c pahoClient) Publish(topic string, qos byte, retained bool, payload interface{}) Token {
+func (c pahoClient) Publish(topic string, qos byte, retained bool, payload any) Token {
 	return pahoToken{token: c.client.Publish(topic, qos, retained, payload)}
 }
 

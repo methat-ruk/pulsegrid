@@ -1,0 +1,205 @@
+asyncapi: 3.1.0
+info:
+  title: PulseGrid command delivery
+  version: 1.0.0
+  description: >-
+    Local/test MQTT contract for delivering diagnostic PING commands and
+    accepting device acknowledgements and outcomes. Broker PUBACK is transport
+    evidence only; a device response is applied only after registry and
+    command/device scope validation.
+servers:
+  development:
+    host: 127.0.0.1:1883
+    protocol: mqtt
+    protocolVersion: 3.1.1
+    description: Loopback-only development Mosquitto listener.
+    bindings:
+      mqtt:
+        cleanSession: true
+        keepAlive: 10
+        bindingVersion: 0.2.0
+  test:
+    host: 127.0.0.1:11883
+    protocol: mqtt
+    protocolVersion: 3.1.1
+    description: Isolated loopback-only test Mosquitto listener.
+    bindings:
+      mqtt:
+        cleanSession: true
+        keepAlive: 10
+        bindingVersion: 0.2.0
+defaultContentType: application/json
+channels:
+  commands:
+    address: pulsegrid/v1/tenants/{tenantSlug}/devices/{deviceId}/commands
+    parameters:
+      tenantSlug:
+        description: Lowercase tenant slug selected by the API.
+        examples:
+          - pulsegrid-dev
+      deviceId:
+        description: Canonical lowercase UUID of the registered device.
+        examples:
+          - 5edacace-70a7-4a8f-846d-3f4d60c56f3a
+    messages:
+      commandV1:
+        $ref: '#/components/messages/commandV1'
+  commandResponses:
+    address: pulsegrid/v1/tenants/{tenantSlug}/devices/{deviceId}/command-responses
+    parameters:
+      tenantSlug:
+        description: Lowercase tenant slug resolved by the API registry.
+        examples:
+          - pulsegrid-dev
+      deviceId:
+        description: Canonical lowercase UUID resolved within tenantSlug.
+        examples:
+          - 5edacace-70a7-4a8f-846d-3f4d60c56f3a
+    messages:
+      commandResponseV1:
+        $ref: '#/components/messages/commandResponseV1'
+operations:
+  deliverCommand:
+    action: send
+    security: []
+    channel:
+      $ref: '#/channels/commands'
+    bindings:
+      mqtt:
+        qos: 1
+        bindingVersion: 0.2.0
+  receiveCommandResponse:
+    action: receive
+    security: []
+    channel:
+      $ref: '#/channels/commandResponses'
+    bindings:
+      mqtt:
+        qos: 1
+        bindingVersion: 0.2.0
+components:
+  messages:
+    commandV1:
+      name: command.v1
+      title: Diagnostic command v1
+      summary: A diagnostic PING with a fixed two-minute deadline.
+      contentType: application/json
+      payload:
+        type: object
+        additionalProperties: false
+        required:
+          - schemaVersion
+          - commandId
+          - type
+          - createdAt
+          - expiresAt
+        properties:
+          schemaVersion:
+            type: integer
+            const: 1
+          commandId:
+            type: string
+            format: uuid
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+          type:
+            type: string
+            const: PING
+          createdAt:
+            type: string
+            format: date-time
+            pattern: 'Z$'
+          expiresAt:
+            type: string
+            format: date-time
+            pattern: 'Z$'
+            description: Exactly createdAt plus two minutes.
+      examples:
+        - name: ping
+          payload:
+            schemaVersion: 1
+            commandId: 5edacace-70a7-4a8f-846d-3f4d60c56f3a
+            type: PING
+            createdAt: '2026-10-01T04:00:00Z'
+            expiresAt: '2026-10-01T04:02:00Z'
+      bindings:
+        mqtt:
+          bindingVersion: 0.2.0
+    commandResponseV1:
+      name: command-response.v1
+      title: Command response v1
+      summary: Device acknowledgement, completion, or explicit failure.
+      contentType: application/json
+      payload:
+        oneOf:
+          - $ref: '#/components/schemas/ackResponse'
+          - $ref: '#/components/schemas/completedResponse'
+          - $ref: '#/components/schemas/failedResponse'
+      examples:
+        - name: acknowledgement
+          payload:
+            schemaVersion: 1
+            commandId: 5edacace-70a7-4a8f-846d-3f4d60c56f3a
+            outcome: ACK
+        - name: completion
+          payload:
+            schemaVersion: 1
+            commandId: 5edacace-70a7-4a8f-846d-3f4d60c56f3a
+            outcome: COMPLETED
+        - name: deviceFailure
+          payload:
+            schemaVersion: 1
+            commandId: 5edacace-70a7-4a8f-846d-3f4d60c56f3a
+            outcome: FAILED
+            failureCode: DEVICE_REPORTED_FAILURE
+      bindings:
+        mqtt:
+          bindingVersion: 0.2.0
+  schemas:
+    ackResponse:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, commandId, outcome]
+      properties:
+        schemaVersion:
+          type: integer
+          const: 1
+        commandId:
+          type: string
+          format: uuid
+          pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        outcome:
+          type: string
+          const: ACK
+    completedResponse:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, commandId, outcome]
+      properties:
+        schemaVersion:
+          type: integer
+          const: 1
+        commandId:
+          type: string
+          format: uuid
+          pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        outcome:
+          type: string
+          const: COMPLETED
+    failedResponse:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, commandId, outcome, failureCode]
+      properties:
+        schemaVersion:
+          type: integer
+          const: 1
+        commandId:
+          type: string
+          format: uuid
+          pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        outcome:
+          type: string
+          const: FAILED
+        failureCode:
+          type: string
+          const: DEVICE_REPORTED_FAILURE

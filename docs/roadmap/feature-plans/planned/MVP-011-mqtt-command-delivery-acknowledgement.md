@@ -1,7 +1,8 @@
 # MVP-011 — MQTT Command Delivery and Acknowledgement
 
-Status: Proposed — revised plan reviewed on 2026-10-01; ready for implementation
-approval. No implementation has started. Review readiness is not approval.
+Status: In progress — implementation, current-candidate real PostgreSQL/MQTT
+integration, and author self-review are complete. Independent PR review and
+acceptance remain pending.
 
 Branch: `feat/mvp-011-mqtt-command-delivery-acknowledgement`
 
@@ -11,8 +12,9 @@ simulator receive mode, contracts, composition, tests, and documentation.
 Milestone: M4 — Remote command loop
 
 Impact: Material Change (Tier 2), full reasoning: durable retry, MQTT contracts,
-untrusted responses, and background lifecycle behavior. This planning episode
-changes documentation only.
+untrusted responses, and background lifecycle behavior. This implementation
+episode changes local Go runtime, additive schema, examples, contracts, and
+integration evidence within the approved plan.
 
 ## Goal
 
@@ -253,9 +255,11 @@ response; after ACK, a lost result or DB/queue failure can end in TIMED_OUT.
   two-minute visibility SLA; disabled mode does not expire work.
 - API key: `PULSEGRID_MQTT_COMMAND_MODE=disabled|development`, default disabled;
   enabled only in development/test with development identity. Telemetry/commands
-  are independent. Existing broker URL required when either enabled, forbidden
-  when both disabled; retain exact environment loopback ports. API never reads
-  simulator device/tenant config.
+  are independent. The shared broker URL is required and must match the exact
+  environment loopback port when either API runtime is enabled. When both API
+  runtimes are disabled, the API does not require the URL; the simulator still
+  validates its own broker setting. API never reads simulator device/tenant
+  config.
 - Simulator keys: `PULSEGRID_SIMULATOR_MODE=telemetry|commands` default telemetry;
   `PULSEGRID_SIMULATOR_COMMAND_RESPONSE=success|failure|silent|ack-only` defaults
   success in command mode; reject explicitly supplied response setting in telemetry
@@ -317,7 +321,7 @@ value is not proof of TCP loss.
   project owns ports 11883/15432/18080, random test credentials, temporary
   binaries and cleanup. Refuse occupied ports; never reset dev resources.
   Keep existing 10-minute CI job viable: fake clock for most deadline cases,
-  one real two-minute silent expiry proof. Bound startup/assertions/teardown;
+  real two-minute ACK-only and silent expiry proofs. Bound startup/assertions/teardown;
   verify owned processes/containers/ports are gone after success/failure/signal.
 - Add `apps/api/api/asyncapi/commands.yaml`; extend existing `asyncapi:lint`
   command to both contracts, consumed by current CI. Lint is not decoder proof:
@@ -327,7 +331,7 @@ value is not proof of TCP loss.
   interactive browser verification/frontend change belongs in this backend slice;
   MVP-012 owns that journey.
 
-### Execution sequence after approval
+### Approved execution sequence
 
 1. Recheck branch/base, accepted dependencies, and available migration number;
    confirm only the approved local/test PING boundary is being implemented.
@@ -344,21 +348,18 @@ value is not proof of TCP loss.
 
 ## Documentation Updates
 
-The development/test/production env examples and environment policy now preview
-the proposed variables with disabled defaults; comments explicitly say current
-code does not consume them. At implementation, reconcile each example with the
-actual validators and enable only supported cases. Update AsyncAPI/API entry
-point, API/root README, architecture/technology decisions, local
-simulator/command walkthrough and validation commands. Describe runtime behavior
-only after it exists. Include two clients, contracts, retry/deadline/loss
-semantics, loopback trust limitation and recovery.
-Roadmap/index keep MVP-011 proposed until approval, then planned/in progress;
-move to completed only after evidence and applicable review/acceptance.
+The env examples and configuration guide now match the implemented validators
+and keep command delivery disabled by default. AsyncAPI, API/architecture
+guides, local simulator walkthrough, integration command, README, and roadmap
+record the current implementation boundary. This feature remains in progress
+until final evidence and applicable review/acceptance; do not move it to
+completed from local implementation alone.
 
 ## Risks / Open Decisions
 
-No architecture/transport choice is open within this proposed local/test slice.
-Approval of the revised scope remains the execution gate.
+No architecture/transport choice is open within the approved local/test slice.
+The implementation is authorized; validation and review remain the completion
+gates.
 
 | Assumption / accepted limit | Falsifier, signal and action |
 | --- | --- |
@@ -386,9 +387,9 @@ execution; collision never authorizes editing historical SQL.
   necessary for truthful async behavior; owners/evidence are mapped above.
 - Future enhancements: effectful-device dedup, credentials, replica ownership,
   replay, retention/admission and measured fleet throughput need their own trigger.
-- Scope effect: transport now explicitly includes additive retry metadata and an
-  independent command client. No UI/production/dependency upgrade/service split
-  or implementation was added in this planning episode.
+- Scope effect: the implementation adds additive retry metadata, an independent
+  command client, strict response handling and local simulator receive mode. It
+  adds no UI, production path, dependency upgrade or service split.
 
 ## Plan review and handoff (2026-10-01)
 
@@ -410,12 +411,38 @@ not an independent implementation/PR review or implemented behavior claim.
 
 Planning evidence: targeted baseline unit suites, `go mod verify`, repository
 policy, final diff/link/required-section checks passed. Default Go shim cache
-was denied by sandbox; same pinned binary passed with writable temporary build
-cache and existing module cache. Local DB/MQTT integration, browser, full build,
-migration/fault-injection and fresh vulnerability scan were not run in planning;
-main CI is dated baseline evidence. All new transport tests await implementation.
-Confidence: high in baseline/boundary selection; timing/recovery guarantees remain
-unverified until candidate evidence passes.
+was denied by sandbox; the pinned binary passed with a writable temporary build
+cache and existing module cache. Implementation evidence is recorded below.
+Browser verification and a fresh vulnerability scan were not run in this
+backend-only, dependency-neutral slice; main CI remains dated baseline evidence.
+
+## Implementation evidence (2026-10-01, current branch)
+
+- `go test -race ./...`, Go format, `go vet ./...`, `api:generate:check`,
+  `api:modernize`, `api:staticcheck`, repository `lint`, API build, repository
+  policy, AsyncAPI lint for both contracts, and `git diff --check` passed.
+- `api:test:integration` passed with real PostgreSQL. It exercised migration
+  008 backfill for active and terminal pre-008 rows, old insert compatibility,
+  missing-schema startup, concurrent durable reservations, device/org binding,
+  scoped expiry, deadline/row-lock races, and all integration-tagged race tests.
+- `mqtt:test:integration` passed with real PostgreSQL/Mosquitto and processes.
+  It covered telemetry regression, command completion/failure, ACK-only/silent
+  expiry, API restart, publish-before-state write failure/retry, broker
+  recovery and shutdown.
+- `test:browser` passed all 32 cases, including API readiness recovery and the
+  existing device, telemetry and alert journeys. The sandboxed first attempt
+  could not launch Chromium; rerunning the same isolated test runner with the
+  required launch permission passed. No UI changed.
+- A fresh vulnerability scan was not run because dependencies did not change.
+  Forced process death at every internal instruction boundary is not directly
+  injected; the real restart and publish-before-write failure cases plus
+  fake-token tests cover the selected recovery contract.
+- The final candidate also passed `check:fast`, `go test -race ./...`, and
+  rerun real PostgreSQL and Mosquitto integration tests. Local and CI
+  modernization checks include `-any` and `-testingcontext`.
+
+Final completion remains subject to required independent PR review and
+acceptance. The feature branch is not merged.
 
 ## Done Criteria
 

@@ -5,9 +5,11 @@ integration, MVP-004 local MQTT producer fixture, MVP-005 local/test telemetry
 ingestion, MVP-006 telemetry persistence/current-state projection, MVP-008
 rules/alerts, and MVP-009 alert console are implemented. MVP-009 merged as
 `7e3c336` (PR #19). MVP-010 command intent and GraphQL merged as `9d78301`
-(PR #20), with main CI passing on that commit. Command transport remains
-planned for MVP-011. Production identity, production MQTT, and
-permanent high-volume storage remain deferred.
+(PR #20), with main CI passing on that commit. MVP-011 command delivery and
+acknowledgement are in implementation on its feature branch with local
+PostgreSQL/Mosquitto integration passing. Independent PR review and merge are
+pending. Production identity, production MQTT, and permanent high-volume
+storage remain deferred.
 
 ## Purpose and ownership
 
@@ -53,7 +55,7 @@ and are review artifacts only; they are not published or served at runtime.
 | Operator product API | GraphQL/gqlgen | Development-only MVP-002; MVP-010 merged as `9d78301` (PR #20) | [`device.graphqls`](../../apps/api/graph/schema/device.graphqls), [`command.graphqls`](../../apps/api/graph/schema/command.graphqls), and committed generated artifacts |
 | Device telemetry | MQTT + PostgreSQL | MVP-004 producer fixture, MVP-005 local/test consumer, and MVP-006 bounded persistence/current state implemented; production delivery deferred | [AsyncAPI telemetry contract](../../apps/api/api/asyncapi/telemetry.yaml), [MVP-005 plan](../roadmap/feature-plans/completed/MVP-005-mqtt-telemetry-ingestion.md), and [MVP-006 plan](../roadmap/feature-plans/completed/MVP-006-telemetry-current-state-projection.md) |
 | Command intent and status | GraphQL/gqlgen | MVP-010 merged as `9d78301` (PR #20) | [`command.graphqls`](../../apps/api/graph/schema/command.graphqls) and [MVP-010 plan](../roadmap/feature-plans/completed/MVP-010-command-model-graphql-api.md) |
-| Device command delivery | MQTT | Planned for MVP-011 | A versioned AsyncAPI/message schema when the concrete command flow is implemented |
+| Device command delivery | MQTT | MVP-011 implementation in progress | [Command delivery contract](../../apps/api/api/asyncapi/commands.yaml) |
 | Durable event distribution | Kafka | Post-MVP conditional | A flow-specific AsyncAPI/message contract |
 | Internal synchronous service calls | gRPC/Protobuf | Post-MVP conditional | A flow-specific protobuf contract |
 
@@ -189,9 +191,29 @@ different device returns `CONFLICT`.
 `deviceCommands(deviceId, first, after)` returns a bounded newest-first page
 with a cursor bound to tenant and device. Lifecycle fields are owned by the
 command module and are not writable through GraphQL. The fixed end-to-end
-deadline is two minutes; until MVP-011 starts its expiry scanner, an expired
-command can still be stored as `PENDING`. MQTT dispatch, ACK/result handling,
-and automatic timeout processing remain in MVP-011.
+deadline is two minutes. MQTT dispatch, ACK/result handling, and automatic
+timeout processing are implemented by MVP-011 on its feature branch; see the
+[command wire contract](../../apps/api/api/asyncapi/commands.yaml) and the
+implementation status below.
+
+## MVP-011 command delivery (implementation in progress)
+
+The opt-in local/test runtime publishes committed PING intent from PostgreSQL
+over its own MQTT 3.1.1 QoS-1 client and listens for device responses on a
+bounded queue. Broker PUBACK records transport acceptance only. A response
+must pass strict contract checks, resolve the configured tenant/device through
+the registry, and match the same command's organization and device before the
+command lifecycle changes. The independent scanner writes `TIMED_OUT` at the
+immutable two-minute deadline, even while the broker is unavailable.
+
+Command delivery retries use four durable reservations with backoff and reuse
+the same command identity/deadline. A crash between MQTT publish and database
+transition may duplicate the harmless PING. ACK-only or lost responses can
+still time out; responses are not durably replayed. The command client is
+separate from telemetry so an uncertain publish can retire its own connection.
+This remains an anonymous loopback development/test path and is not production
+device authentication or multi-replica coordination. Real-broker evidence
+passes on this branch; independent PR review is still pending.
 
 ## Current operational contract
 

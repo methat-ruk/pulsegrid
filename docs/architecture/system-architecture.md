@@ -23,7 +23,11 @@ telemetry reads on device detail. MVP-008 rules/alerts merged as `fd0a383`
 persisted `PING` command intent and development GraphQL create/read operations
 using migration `007`. PR #20 merged as `9d78301` on 2026-09-30, with main CI
 passing on the merge commit. It does not include MQTT delivery or
-automatic timeout scanning.
+automatic timeout scanning in the merged MVP-010 baseline. The MVP-011
+implementation on `feat/mvp-011-mqtt-command-delivery-acknowledgement` adds
+migration `008`, a durable bounded dispatcher, a separate command MQTT client,
+response validation, and automatic expiry. Real PostgreSQL/Mosquitto candidate
+integration passes; PR review remains pending, and the branch is not merged.
 Production identity, deployment exposure, durable broker replay, and later
 event contracts remain unimplemented.
 
@@ -177,24 +181,25 @@ implementation passed local API and browser validation and merged as `7e3c336`
 The [MVP-008 plan](../roadmap/feature-plans/completed/MVP-008-threshold-rule-alert-backend.md)
 owns the limits, GraphQL contract, recovery boundary, and evidence.
 
-### Proposed MVP-011 command transport boundary
+### MVP-011 command transport boundary (implementation in progress)
 
 The [reviewed MVP-011 plan](../roadmap/feature-plans/planned/MVP-011-mqtt-command-delivery-acknowledgement.md)
-is proposed and awaiting implementation approval; none of this transport is
-implemented. It keeps commands in the existing API process and PostgreSQL
-authority, adds durable bounded retry metadata and independent expiry, and
-uses a command-specific MQTT client alongside the existing telemetry client.
-The separate client allows uncertain command publish cleanup without resetting
-telemetry. A neutral wire-contract package may be shared with the standalone
-simulator; the simulator must not import API/domain persistence.
+is approved and in implementation on its feature branch. It keeps commands in
+the existing API process and PostgreSQL authority, adds durable bounded retry
+metadata and independent expiry, and uses a command-specific MQTT client
+alongside the existing telemetry client. The separate client allows uncertain
+command publish cleanup without resetting telemetry. The neutral wire-contract
+package is shared with the standalone simulator; the simulator does not import
+API/domain persistence.
 
-The command module remains the only lifecycle writer. Response acceptance must
-bind registry-resolved organization, device and command in one transaction;
+The command module remains the only lifecycle writer. Response acceptance
+binds registry-resolved organization, device and command in one transaction;
 broker acknowledgement is not device success. This remains an anonymous
 loopback PING proof with explicit duplicate/lost-response limits, not production
 device authentication, durable response replay or multi-replica execution.
-Exact contract, retry/deadline policy, migration, recovery and required evidence
-are owned by the proposed plan until implementation makes them current behavior.
+The exact contract, retry/deadline policy, migration and recovery are described
+in the plan; final behavior claims remain subject to the candidate's integration
+and review evidence.
 
 ## Conditional target architecture
 

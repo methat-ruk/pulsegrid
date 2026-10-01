@@ -17,6 +17,7 @@ const environment = {
   PULSEGRID_ENV: 'test',
   PULSEGRID_IDENTITY_MODE: 'development',
   PULSEGRID_MQTT_INGESTION_MODE: 'development',
+  PULSEGRID_MQTT_COMMAND_MODE: 'development',
   PULSEGRID_MQTT_BROKER_URL: `mqtt://127.0.0.1:${brokerPort}`,
   PULSEGRID_DATABASE_URL: databaseUrl,
   PULSEGRID_HTTP_HOST: '127.0.0.1',
@@ -30,6 +31,9 @@ let cleanupStarted = false
 let apiChild = null
 let apiExit = null
 let apiOutput = ''
+let simulatorChild = null
+let simulatorExit = null
+let simulatorOutput = ''
 
 const simulatorDirectory = mkdtempSync(join(tmpdir(), 'pulsegrid-mqtt-'))
 const apiBinary = join(simulatorDirectory, 'api')
@@ -67,15 +71,21 @@ try {
     assertNoRawTelemetryInLogs()
     await testRetainedMessage(deviceID)
     await assertPersistedObservation(deviceID, projectionTelemetry.newerMessageID, 31, 1)
+    await testCommandOutcomes(deviceID)
     await testBrokerRecovery(deviceID)
+    if (simulatorChild && !await stopCommandSimulator()) throw new Error('command simulator did not stop cleanly')
     if (!await stopApi()) throw new Error('API did not drain and stop cleanly')
     if (!apiOutput.includes('reason_code=shutdown_complete')) throw new Error('API shutdown completion was not logged')
     exitCode = stopRequested ? stopCode : 0
+    if (exitCode === 0) console.log('MQTT telemetry and command integration passed')
   }
 } catch (error) {
   console.error(`MQTT ingestion integration failed: ${error.message}`)
+  if (apiOutput) console.error(`API output (last 12 KiB):\n${apiOutput.slice(-12 * 1024)}`)
+  if (simulatorOutput) console.error(`command simulator output (last 8 KiB):\n${simulatorOutput.slice(-8 * 1024)}`)
   exitCode = stopRequested ? stopCode : 1
 } finally {
+  if (simulatorChild) await stopCommandSimulator()
   if (apiChild) await stopApi()
   const cleanupSucceeded = await cleanup()
   if (!cleanupSucceeded && !stopRequested) exitCode = 1
@@ -97,12 +107,12 @@ async function prepareDatabase() {
     await run('go', ['-C', 'apps/api', 'run', './cmd/db', 'seed'], environment, 120_000)
 }
 
-async function startApi() {
+async function startApi(apiEnvironment = environment) {
   if (apiChild) throw new Error('API is already running')
   apiOutput = ''
   apiChild = spawn(apiBinary, [], {
     cwd: rootDirectory,
-    env: environment,
+    env: apiEnvironment,
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   runningChildren.add(apiChild)
@@ -193,6 +203,244 @@ async function createThresholdRule(deviceID) {
     throw new Error(`threshold rule creation failed: ${JSON.stringify(body)}`)
   }
   return rule.id
+}
+
+async function createCommand(deviceID, idempotencyKey = randomUUID()) {
+  const response = await fetch(`http://127.0.0.1:${apiPort}/graphql`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      query: 'mutation CreateCommand($input: CreateCommandInput!) { createCommand(input: $input) { id deviceId type status createdAt expiresAt dispatchedAt acknowledgedAt terminalAt failureCode } }',
+      variables: { input: { deviceId: deviceID, type: 'PING', idempotencyKey } },
+    }),
+  })
+  const body = await response.json()
+  const command = body?.data?.createCommand
+  if (response.status !== 200 || body.errors || typeof command?.id !== 'string' || typeof command.status !== 'string') {
+    throw new Error(`command creation failed: ${JSON.stringify(body)}`)
+  }
+  return { command, idempotencyKey }
+}
+
+async function queryCommand(commandID) {
+  const response = await fetch(`http://127.0.0.1:${apiPort}/graphql`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      query: 'query Command($id: ID!) { command(id: $id) { id deviceId type status createdAt expiresAt dispatchedAt acknowledgedAt terminalAt failureCode } }',
+      variables: { id: commandID },
+    }),
+  })
+  const body = await response.json()
+  const command = body?.data?.command
+  if (response.status !== 200 || body.errors || !command) {
+    throw new Error(`command query failed: ${JSON.stringify(body)}`)
+  }
+  return command
+}
+
+async function waitForCommandStatus(commandID, expectedStatus, timeout = 20_000) {
+  const deadline = Date.now() + timeout
+  let command
+  while (Date.now() < deadline && !stopRequested) {
+    command = await queryCommand(commandID)
+    if (command.status === expectedStatus) return command
+    if (['COMPLETED', 'FAILED', 'TIMED_OUT'].includes(command.status)) {
+      throw new Error(`command ${commandID} reached ${command.status}, expected ${expectedStatus}`)
+    }
+    await delay(200)
+  }
+  throw new Error(`command ${commandID} did not reach ${expectedStatus}; latest=${JSON.stringify(command)}`)
+}
+
+async function waitForCommandTimeout(command) {
+  const expiry = Date.parse(command.expiresAt)
+  const timeout = Math.max(20_000, expiry - Date.now() + 15_000)
+  return waitForCommandStatus(command.id, 'TIMED_OUT', timeout)
+}
+
+async function testCommandOutcomes(deviceID) {
+  assertNoRawCommandInLogs()
+  await restartApi({ ...environment, PULSEGRID_MQTT_COMMAND_MODE: 'disabled' })
+  const recovered = await createCommand(deviceID)
+  if ((await queryCommand(recovered.command.id)).status !== 'PENDING') {
+    throw new Error('disabled command mode unexpectedly dispatched persisted intent')
+  }
+  await restartApi(environment)
+  await startCommandSimulator(deviceID, 'success')
+  const recoveredCommand = await waitForCommandStatus(recovered.command.id, 'COMPLETED', 25_000)
+  assertCommandMilestones(recoveredCommand, ['dispatchedAt', 'acknowledgedAt', 'terminalAt'])
+  if (!await stopCommandSimulator()) throw new Error('restart recovery simulator did not stop cleanly')
+
+  await restartApi({ ...environment, PULSEGRID_MQTT_COMMAND_MODE: 'disabled' })
+  const postPublish = await createCommand(deviceID)
+  const triggerSQL = `CREATE OR REPLACE FUNCTION test_reject_command_dispatch() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.id = '${postPublish.command.id}'::uuid AND NEW.status = 'DISPATCHED' AND OLD.status IS DISTINCT FROM NEW.status THEN RAISE EXCEPTION 'forced command dispatch write failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER test_reject_command_dispatch BEFORE UPDATE ON commands FOR EACH ROW EXECUTE FUNCTION test_reject_command_dispatch();`
+  const dropTriggerSQL = 'DROP TRIGGER IF EXISTS test_reject_command_dispatch ON commands; DROP FUNCTION IF EXISTS test_reject_command_dispatch();'
+  const trigger = await runPSQL(triggerSQL)
+  if (trigger.status !== 0) throw new Error(`could not install command dispatch failure trigger: ${trigger.stderr}`)
+  try {
+    await restartApi(environment)
+    const failureLogOffset = apiOutput.length
+    await waitForLogSince(failureLogOffset, 'reason_code=command_dispatch_state_write_failed', 15_000, 'post-publish command state-write failure')
+    const stillPending = await queryCommand(postPublish.command.id)
+    if (stillPending.status !== 'PENDING' || stillPending.dispatchedAt !== null) {
+      throw new Error(`failed dispatch state write changed command: ${JSON.stringify(stillPending)}`)
+    }
+    assertNoRawCommandInLogs()
+    await restartApi({ ...environment, PULSEGRID_MQTT_COMMAND_MODE: 'disabled' })
+    const dropped = await runPSQL(dropTriggerSQL)
+    if (dropped.status !== 0) throw new Error(`could not remove command dispatch failure trigger: ${dropped.stderr}`)
+    await restartApi(environment)
+    await startCommandSimulator(deviceID, 'success')
+    const recoveredPostPublish = await waitForCommandStatus(postPublish.command.id, 'COMPLETED', 40_000)
+    assertCommandMilestones(recoveredPostPublish, ['dispatchedAt', 'acknowledgedAt', 'terminalAt'])
+    if (!await stopCommandSimulator()) throw new Error('post-publish recovery simulator did not stop cleanly')
+  } finally {
+    const dropped = await runPSQL(dropTriggerSQL)
+    if (dropped.status !== 0) throw new Error(`could not clean up command dispatch failure trigger: ${dropped.stderr}`)
+  }
+
+  const success = await createCommand(deviceID)
+  await startCommandSimulator(deviceID, 'success')
+  let completed = await waitForCommandStatus(success.command.id, 'COMPLETED')
+  assertCommandMilestones(completed, ['dispatchedAt', 'acknowledgedAt', 'terminalAt'])
+
+  const duplicate = await createCommand(deviceID, success.idempotencyKey)
+  if (duplicate.command.id !== success.command.id) {
+    throw new Error(`idempotent command retry returned a second ID: ${duplicate.command.id}`)
+  }
+  const rowCount = await runPSQL(`SELECT count(*) FROM commands WHERE id = '${success.command.id}'::uuid;`)
+  if (rowCount.status !== 0 || rowCount.stdout.trim() !== '1') {
+    throw new Error(`idempotent retry stored ${rowCount.stdout.trim()} command rows`)
+  }
+  if (!await stopCommandSimulator()) throw new Error('success command simulator did not stop cleanly')
+
+  const failure = await createCommand(deviceID)
+  await startCommandSimulator(deviceID, 'failure')
+  const failed = await waitForCommandStatus(failure.command.id, 'FAILED')
+  if (failed.failureCode !== 'DEVICE_REPORTED_FAILURE') {
+    throw new Error(`device failure code = ${failed.failureCode}`)
+  }
+  assertCommandMilestones(failed, ['dispatchedAt', 'acknowledgedAt', 'terminalAt'])
+  if (!await stopCommandSimulator()) throw new Error('failure command simulator did not stop cleanly')
+
+  const ackOnly = await createCommand(deviceID)
+  await startCommandSimulator(deviceID, 'ack-only')
+  const acknowledged = await waitForCommandStatus(ackOnly.command.id, 'ACKNOWLEDGED')
+  if (!acknowledged.acknowledgedAt || acknowledged.terminalAt !== null) {
+    throw new Error(`ACK-only command milestones = ${JSON.stringify(acknowledged)}`)
+  }
+  assertNoRawCommandInLogs()
+  await restartApi()
+  const acknowledgedAfterRestart = await queryCommand(ackOnly.command.id)
+  if (acknowledgedAfterRestart.status !== 'ACKNOWLEDGED' || acknowledgedAfterRestart.acknowledgedAt !== acknowledged.acknowledgedAt) {
+    throw new Error(`API restart changed acknowledged command state: ${JSON.stringify(acknowledgedAfterRestart)}`)
+  }
+  const ackTimedOut = await waitForCommandTimeout(ackOnly.command)
+  if (!ackTimedOut.acknowledgedAt || !ackTimedOut.terminalAt) {
+    throw new Error(`ACK-only timeout lost acknowledgement evidence: ${JSON.stringify(ackTimedOut)}`)
+  }
+  if (!await stopCommandSimulator()) throw new Error('ACK-only command simulator did not stop cleanly')
+
+  const silent = await createCommand(deviceID)
+  await startCommandSimulator(deviceID, 'silent')
+  await waitForSimulatorLogFields([`command_id=${silent.command.id}`, 'reason_code=simulator_command_silent'], 20_000, 'silent command receipt')
+  const silentTimedOut = await waitForCommandTimeout(silent.command)
+  if (!silentTimedOut.dispatchedAt || silentTimedOut.acknowledgedAt !== null || !silentTimedOut.terminalAt) {
+    throw new Error(`silent command timeout milestones = ${JSON.stringify(silentTimedOut)}`)
+  }
+  if (!await stopCommandSimulator()) throw new Error('silent command simulator did not stop cleanly')
+  assertNoRawCommandInLogs()
+}
+
+async function restartApi(apiEnvironment = environment) {
+  if (!await stopApi()) throw new Error('API did not stop cleanly before restart')
+  if (!apiOutput.includes('reason_code=shutdown_complete')) {
+    throw new Error('API shutdown completion was not logged before restart')
+  }
+  await startApi(apiEnvironment)
+  await waitForReady()
+}
+
+function assertCommandMilestones(command, fields) {
+  for (const field of fields) {
+    if (!command[field]) throw new Error(`command ${command.id} is missing ${field}: ${JSON.stringify(command)}`)
+  }
+}
+
+function assertNoRawCommandInLogs() {
+  if (apiOutput.includes('schemaVersion') || apiOutput.includes('"outcome"') || apiOutput.includes('"commandId"')) {
+    throw new Error('API logs contain a raw MQTT command or response payload')
+  }
+}
+
+async function startCommandSimulator(deviceID, responseMode) {
+  if (simulatorChild) throw new Error('command simulator is already running')
+  simulatorOutput = ''
+  const simulatorEnvironment = {
+    ...environment,
+    PULSEGRID_MQTT_DEVICE_ID: deviceID,
+    PULSEGRID_MQTT_TENANT_SLUG: 'pulsegrid-dev',
+    PULSEGRID_SIMULATOR_MODE: 'commands',
+    PULSEGRID_SIMULATOR_COMMAND_RESPONSE: responseMode,
+  }
+  simulatorChild = spawn(simulatorBinary, [], {
+    cwd: rootDirectory,
+    env: simulatorEnvironment,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  runningChildren.add(simulatorChild)
+  simulatorChild.stdout.on('data', (chunk) => { simulatorOutput += chunk.toString() })
+  simulatorChild.stderr.on('data', (chunk) => { simulatorOutput += chunk.toString() })
+  const child = simulatorChild
+  simulatorExit = new Promise((resolve) => {
+    child.once('close', (status, signal) => {
+      runningChildren.delete(child)
+      resolve({ status: status ?? 1, signal })
+    })
+    child.once('error', (error) => {
+      runningChildren.delete(child)
+      resolve({ status: 1, signal: null, error })
+    })
+  })
+  await waitForSimulatorLog('reason_code=simulator_command_ready', 15_000, `command simulator ${responseMode} subscription`)
+}
+
+async function stopCommandSimulator() {
+  if (!simulatorChild) return true
+  const child = simulatorChild
+  const exit = simulatorExit
+  simulatorChild = null
+  child.kill('SIGTERM')
+  const result = await Promise.race([exit, delay(15_000).then(() => ({ status: 1, signal: 'timeout' }))])
+  if (result.status !== 0) {
+    child.kill('SIGKILL')
+    console.error(`command simulator did not exit cleanly: ${JSON.stringify(result)}`)
+    return false
+  }
+  return true
+}
+
+async function waitForSimulatorLog(text, timeout, label) {
+  return waitForSimulatorLogSince(0, text, timeout, label)
+}
+
+async function waitForSimulatorLogSince(offset, text, timeout, label) {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline && !stopRequested) {
+    if (simulatorOutput.slice(offset).includes(text)) return
+    await delay(100)
+  }
+  throw new Error(`${label} was not found in command simulator output: ${text}\n${simulatorOutput.slice(offset)}`)
+}
+
+async function waitForSimulatorLogFields(fields, timeout, label) {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline && !stopRequested) {
+    if (simulatorOutput.split('\n').some((line) => fields.every((field) => line.includes(field)))) return
+    await delay(100)
+  }
+  throw new Error(`${label} was not found in command simulator output: ${fields.join(', ')}\n${simulatorOutput}`)
 }
 
 async function publishSimulator(deviceID) {
@@ -350,12 +598,18 @@ async function testRetainedMessage(deviceID) {
 }
 
 async function testBrokerRecovery(deviceID) {
+  await startCommandSimulator(deviceID, 'success')
+  const simulatorOutputOffset = simulatorOutput.length
   const stopped = await run('docker', ['compose', '-p', projectName, '--profile', 'test', 'stop', 'mqtt-test'], environment, 60_000)
   if (!stopped) throw new Error('unable to stop test broker for recovery test')
   await waitForNotReady()
   const started = await run('docker', ['compose', '-p', projectName, '--profile', 'test', 'up', '-d', '--wait', 'mqtt-test'], environment, 120_000)
   if (!started) throw new Error('unable to restart test broker for recovery test')
   await waitForReady()
+  await waitForSimulatorLogSince(simulatorOutputOffset, 'reason_code=simulator_command_ready', 20_000, 'simulator command resubscription after broker recovery')
+  const recoveryCommand = await createCommand(deviceID)
+  const recoveredCommand = await waitForCommandStatus(recoveryCommand.command.id, 'COMPLETED', 20_000)
+  assertCommandMilestones(recoveredCommand, ['dispatchedAt', 'acknowledgedAt', 'terminalAt'])
   const messageID = randomUUID()
   await publishRaw(`pulsegrid/v1/tenants/pulsegrid-dev/devices/${deviceID}/telemetry`, JSON.stringify({ schemaVersion: 1, messageId: messageID, observedAt: pastObservedAt(), temperatureCelsius: 26 }), false)
   await waitForLogFields(['reason_code=telemetry_accepted', `message_id=${messageID}`], 10_000, 'post-recovery telemetry acceptance')

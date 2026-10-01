@@ -15,6 +15,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/methat-ruk/pulsegrid/apps/api/graph"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/commands"
+	commanddelivery "github.com/methat-ruk/pulsegrid/apps/api/internal/commands/delivery"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/commands/mqttcontract"
+	commandmqtt "github.com/methat-ruk/pulsegrid/apps/api/internal/commands/mqtttransport"
+	commandresponses "github.com/methat-ruk/pulsegrid/apps/api/internal/commands/responses"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/device/registry"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/config"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/database"
@@ -129,7 +133,52 @@ func main() {
 		}
 	}
 
-	serverOptions.ReadinessCheck = readinessCheck(pool, mqttRuntime)
+	var commandMQTTRuntime *commandmqtt.Transport
+	var commandResponseRuntime *commandresponses.Service
+	var commandDeliveryRuntime *commanddelivery.Runtime
+	if cfg.MQTTCommandEnabled() {
+		responseFilter, filterErr := mqttcontract.ResponseFilter(developmentOrganizationSlug)
+		if filterErr != nil {
+			stopStartedRuntime(mqttRuntime, pool, cfg.ShutdownTimeout)
+			logger.Error("command MQTT startup failed", "reason_code", "command_mqtt_configuration_invalid")
+			fmt.Fprintln(os.Stderr, "command MQTT startup failed: configuration is invalid")
+			os.Exit(1)
+		}
+		transportConfig := commandmqtt.DefaultConfig(cfg.MQTTBrokerURL)
+		transportConfig.ResponseFilter = responseFilter
+		commandMQTTRuntime, err = commandmqtt.New(transportConfig, commandmqtt.PahoClientFactory, logger)
+		if err == nil {
+			commandResponseRuntime, err = commandresponses.New(commandDeviceResolver{repository: repository}, commandRepository, commandMQTTRuntime, logger)
+		}
+		if err == nil {
+			err = commandResponseRuntime.Start()
+		}
+		if err == nil {
+			err = commandMQTTRuntime.Start(ctx)
+		}
+		if err == nil {
+			commandDeliveryRuntime, err = commanddelivery.New(commandRepository, commandMQTTRuntime, organizationID, developmentOrganizationSlug, commanddelivery.DefaultConfig(), nil, logger)
+		}
+		if err == nil {
+			err = commandDeliveryRuntime.Start(ctx)
+		}
+		if err != nil {
+			shutdownContext, cancelShutdown := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+			_ = stopCommandRuntime(shutdownContext, commandDeliveryRuntime, commandMQTTRuntime, commandResponseRuntime)
+			if mqttRuntime != nil {
+				_ = mqttRuntime.Stop(shutdownContext)
+			}
+			cancelShutdown()
+			if pool != nil {
+				pool.Close()
+			}
+			logger.Error("command MQTT startup failed", "reason_code", "command_mqtt_unavailable")
+			fmt.Fprintln(os.Stderr, "command MQTT startup failed: broker or response subscription unavailable")
+			os.Exit(1)
+		}
+	}
+
+	serverOptions.ReadinessCheck = readinessCheck(pool, mqttRuntime, commandMQTTRuntime, commandResponseRuntime, commandDeliveryRuntime)
 
 	var mqttStopDone chan error
 	if mqttRuntime != nil {
@@ -139,6 +188,16 @@ func main() {
 			shutdownContext, cancelShutdown := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 			defer cancelShutdown()
 			mqttStopDone <- mqttRuntime.Stop(shutdownContext)
+		}()
+	}
+	var commandStopDone chan error
+	if commandMQTTRuntime != nil {
+		commandStopDone = make(chan error, 1)
+		go func() {
+			<-ctx.Done()
+			shutdownContext, cancelShutdown := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+			defer cancelShutdown()
+			commandStopDone <- stopCommandRuntime(shutdownContext, commandDeliveryRuntime, commandMQTTRuntime, commandResponseRuntime)
 		}()
 	}
 
@@ -165,17 +224,65 @@ func main() {
 				os.Exit(1)
 			}
 		}
+		if commandStopDone != nil {
+			select {
+			case stopErr := <-commandStopDone:
+				if stopErr != nil {
+					logger.Error("command MQTT shutdown failed", "reason_code", "shutdown_incomplete")
+					os.Exit(1)
+				}
+			case <-waitContext.Done():
+				logger.Error("command MQTT shutdown did not complete", "reason_code", "shutdown_incomplete")
+				os.Exit(1)
+			}
+		}
 	}
 
 	if listenErr != nil && !errors.Is(listenErr, context.Canceled) {
-		if mqttRuntime != nil && ctx.Err() == nil {
+		if mqttRuntime != nil || commandMQTTRuntime != nil {
 			shutdownContext, cancelShutdown := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
-			_ = mqttRuntime.Stop(shutdownContext)
+			if commandMQTTRuntime != nil {
+				_ = stopCommandRuntime(shutdownContext, commandDeliveryRuntime, commandMQTTRuntime, commandResponseRuntime)
+			}
+			if mqttRuntime != nil {
+				_ = mqttRuntime.Stop(shutdownContext)
+			}
 			cancelShutdown()
 		}
 		logger.Error("http server exited", "reason_code", "listen_failed", "error", listenErr.Error())
 		os.Exit(1)
 	}
+}
+
+func stopStartedRuntime(runtime *mqtttransport.Transport, pool *pgxpool.Pool, timeout time.Duration) {
+	if runtime != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		_ = runtime.Stop(ctx)
+		cancel()
+	}
+	if pool != nil {
+		pool.Close()
+	}
+}
+
+func stopCommandRuntime(ctx context.Context, deliveryRuntime *commanddelivery.Runtime, mqttRuntime *commandmqtt.Transport, responseRuntime *commandresponses.Service) error {
+	var stopErrors []error
+	if deliveryRuntime != nil {
+		if err := deliveryRuntime.Stop(ctx); err != nil {
+			stopErrors = append(stopErrors, err)
+		}
+	}
+	if mqttRuntime != nil {
+		if err := mqttRuntime.Stop(ctx); err != nil {
+			stopErrors = append(stopErrors, err)
+		}
+	}
+	if responseRuntime != nil {
+		if err := responseRuntime.Stop(ctx); err != nil {
+			stopErrors = append(stopErrors, err)
+		}
+	}
+	return errors.Join(stopErrors...)
 }
 
 func openDevelopmentGraphQL(ctx context.Context) (*pgxpool.Pool, *registry.Repository, uuid.UUID, error) {
@@ -286,6 +393,18 @@ type repositoryResolver struct {
 	repository *registry.Repository
 }
 
+type commandDeviceResolver struct {
+	repository *registry.Repository
+}
+
+func (r commandDeviceResolver) ResolveDevice(ctx context.Context, tenantSlug string, deviceID uuid.UUID) (uuid.UUID, error) {
+	device, err := r.repository.ResolveDeviceByTenantSlug(ctx, tenantSlug, deviceID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return device.OrganizationID, nil
+}
+
 func (r repositoryResolver) ResolveDevice(ctx context.Context, tenantSlug string, deviceID uuid.UUID) (uuid.UUID, error) {
 	device, err := r.repository.ResolveDeviceByTenantSlug(ctx, tenantSlug, deviceID)
 	if errors.Is(err, registry.ErrNotFound) {
@@ -344,8 +463,27 @@ func telemetryFailureReason(err error) string {
 	}
 }
 
-func readinessCheck(pool *pgxpool.Pool, mqttRuntime *mqtttransport.Transport) func(context.Context) error {
-	if pool == nil && mqttRuntime == nil {
+func readinessCheck(
+	pool *pgxpool.Pool,
+	telemetryRuntime *mqtttransport.Transport,
+	commandMQTTRuntime *commandmqtt.Transport,
+	commandResponseRuntime *commandresponses.Service,
+	commandDeliveryRuntime *commanddelivery.Runtime,
+) func(context.Context) error {
+	readinessChecks := make([]func() bool, 0, 4)
+	if telemetryRuntime != nil {
+		readinessChecks = append(readinessChecks, telemetryRuntime.Ready)
+	}
+	if commandMQTTRuntime != nil {
+		readinessChecks = append(readinessChecks, commandMQTTRuntime.Ready)
+	}
+	if commandResponseRuntime != nil {
+		readinessChecks = append(readinessChecks, commandResponseRuntime.Ready)
+	}
+	if commandDeliveryRuntime != nil {
+		readinessChecks = append(readinessChecks, commandDeliveryRuntime.Ready)
+	}
+	if pool == nil && len(readinessChecks) == 0 {
 		return nil
 	}
 	return func(ctx context.Context) error {
@@ -354,8 +492,10 @@ func readinessCheck(pool *pgxpool.Pool, mqttRuntime *mqtttransport.Transport) fu
 				return err
 			}
 		}
-		if mqttRuntime != nil && !mqttRuntime.Ready() {
-			return errors.New("mqtt ingestion is unavailable")
+		for _, isReady := range readinessChecks {
+			if !isReady() {
+				return errors.New("MQTT runtime is unavailable")
+			}
 		}
 		return nil
 	}

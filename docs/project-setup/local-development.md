@@ -1,17 +1,10 @@
 # PulseGrid local development
 
 Status: Local repository workflow and merge-gate enforcement implemented;
-FND-004 readiness, the MVP-003 device-registry browser journey, the MVP-005
-local/test MQTT ingestion path, and the merged MVP-006 telemetry
-persistence/current-state path are implemented and validated. The MVP-007
-operator-visible telemetry console and review fixes were merged as `9ce9e7c`
-(PR #16). The MVP-008 rules/alerts backend merged as `fd0a383` (PR #18).
-The MVP-009 alert-console candidate and local validation are complete on
-`feat/mvp-009-alert-console`. PR #19 now includes focused browser evidence for
-next-page append/retry, stale device-scope cancellation, detail rendering when
-device-name lookup fails, keyboard focus, and 390 px detail reflow. The
-published candidate checks passed. The project owner accepted PR #19 for
-merge; it remains open and unmerged pending the owner's manual merge.
+FND-004 readiness and MVP-003 through MVP-010 are merged. MVP-011 command
+delivery is in implementation on
+`feat/mvp-011-mqtt-command-delivery-acknowledgement`; its isolated
+broker/database integration passes, and independent PR review remains pending.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
@@ -106,7 +99,7 @@ existing ones. `docker:dev:stop` stops both containers without removing them;
 `docker:dev:down` removes both containers and their Compose network while
 preserving the named PostgreSQL volume.
 
-### Local MQTT broker, API consumer, and simulator
+### Local MQTT broker, API consumers, and simulator
 
 MVP-004 adds an ephemeral, loopback-only Mosquitto broker and a separate
 one-shot device simulator. MVP-005 adds the opt-in API consumer in the same Go
@@ -155,8 +148,9 @@ corepack pnpm run dev:api
 
 Check `GET /health/ready` for `200`/`ready`; the enabled API is ready only when
 PostgreSQL is reachable, the MVP-006 telemetry schema (`005`) and MVP-008
-rules/alerts schema (`006`) are both validated before listening, and its MQTT
-subscription is connected. Missing either required schema fails startup with
+rules/alerts schema (`006`), and command schema (`007`/`008`) are validated
+before listening; each enabled MQTT runtime must also be connected and
+subscribed. Missing a required schema fails startup with
 `database_schema_unavailable` rather than exposing a partially usable API.
 Publish with
 `mqtt:simulator`, query `deviceCurrentState` and `deviceTelemetry`, and inspect
@@ -169,13 +163,47 @@ late observations remain queryable but cannot replace a newer
 `(observedAt,messageId)` state. Stop with `Ctrl-C`; the API stops
 admission, drains its bounded queue, and then closes the database pool.
 
+### MVP-011 local command lifecycle
+
+The command receiver is independently opt-in. In the ignored
+`apps/api/.env.development`, set `PULSEGRID_MQTT_COMMAND_MODE=development`;
+keep `PULSEGRID_IDENTITY_MODE=development` and use the local broker URL. After
+running migrations through `008` and seeding, restart the API. Register a
+device and copy its UUID, then start its long-running simulator in another
+terminal:
+
+```sh
+PULSEGRID_SIMULATOR_MODE=commands \
+PULSEGRID_SIMULATOR_COMMAND_RESPONSE=success \
+PULSEGRID_MQTT_DEVICE_ID=REPLACE_WITH_DEVICE_UUID \
+corepack pnpm run mqtt:simulator
+```
+
+Create a command through GraphQL, replacing both UUID placeholders with
+canonical lowercase UUIDs:
+
+```sh
+curl --fail-with-body http://127.0.0.1:8080/graphql \
+  -H 'content-type: application/json' \
+  --data '{"query":"mutation { createCommand(input: { deviceId: \"DEVICE_UUID\", type: PING, idempotencyKey: \"IDEMPOTENCY_UUID\" }) { id status expiresAt } }"}'
+```
+
+The simulator responds with `ACK` and `COMPLETED`; choose `failure`, `ack-only`,
+or `silent` to exercise explicit failure and timeout behavior. Query the
+returned command ID to inspect stored `dispatchedAt`, `acknowledgedAt`,
+`terminalAt`, and `failureCode`. `ack-only` remains acknowledged until the
+immutable two-minute deadline; `silent` never acknowledges. The broker PUBACK
+alone does not mark a command complete. Press `Ctrl-C` to stop the simulator.
+
 Run the real API/broker/database integration evidence with a unique Compose
 project. It registers a device through GraphQL, publishes with the real
 simulator, verifies committed current state and bounded history through
 GraphQL, checks strict rejection, exact replay, and late-observation semantics,
 exercises retained input and readiness recovery across broker stop/start,
 signals the API for drain, and removes only its own disposable resources on
-success or failure:
+success or failure. The MVP-011 candidate extends this same run with command
+delivery, duplicate idempotency, explicit device failure, ACK-only and silent
+expiry, plus broker/API/simulator readiness recovery:
 
 ```sh
 corepack pnpm run mqtt:test:integration

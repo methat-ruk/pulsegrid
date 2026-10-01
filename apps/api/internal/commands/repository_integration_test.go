@@ -16,6 +16,7 @@ import (
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/config"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/database"
 	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/databaseconfig"
+	"github.com/methat-ruk/pulsegrid/apps/api/internal/platform/migrations"
 )
 
 type repositoryFixture struct {
@@ -128,6 +129,9 @@ func TestRepositoryCreateIdempotencyAndTenantScope(t *testing.T) {
 	if created.CreatedAt.Nanosecond()%int(time.Microsecond) != 0 {
 		t.Fatalf("createdAt precision = %s, want microsecond precision", created.CreatedAt)
 	}
+	if created.DispatchAttempts != 0 || !created.NextDispatchAt.Equal(created.CreatedAt) {
+		t.Fatalf("new command dispatch metadata = (%d, %s), want (0, %s)", created.DispatchAttempts, created.NextDispatchAt, created.CreatedAt)
+	}
 
 	duplicate, err := fixture.repository.Create(ctx, fixture.orgID, input)
 	if err != nil || duplicate.ID != created.ID {
@@ -175,6 +179,245 @@ func TestRepositoryCreateIdempotencyAndTenantScope(t *testing.T) {
 	page, err := fixture.repository.List(ctx, fixture.orgID, fixture.deviceID, 1, nil)
 	if err != nil || len(page.Commands) != 1 || page.Commands[0].ID != created.ID || page.NextCursor != nil {
 		t.Fatalf("list command = (%+v, %v)", page, err)
+	}
+}
+
+func TestRepositoryOldInsertGetsCompatibleDispatchDefaults(t *testing.T) {
+	fixture := newRepositoryFixture(t)
+	ctx := context.Background()
+	now := normalizeTime(fixture.clock.Now())
+	id := uuid.New()
+	_, err := fixture.pool.Exec(ctx, `
+		INSERT INTO commands (
+			id, organization_id, device_id, type, status, idempotency_key,
+			created_request_id, created_at, updated_at, expires_at
+		)
+		VALUES ($1, $2, $3, 'PING', 'PENDING', $4, '', $5, $5, $6)
+	`,
+		id, fixture.orgID, fixture.deviceID, uuid.New(), now, now.Add(CommandLifetime),
+	)
+	if err != nil {
+		t.Fatalf("insert using the pre-008 command shape: %v", err)
+	}
+	var attempts int
+	var nextDispatchAt time.Time
+	if err := fixture.pool.QueryRow(ctx, `SELECT dispatch_attempts, next_dispatch_at FROM commands WHERE id = $1`, id).Scan(&attempts, &nextDispatchAt); err != nil {
+		t.Fatalf("read default dispatch metadata: %v", err)
+	}
+	if attempts != 0 || nextDispatchAt.IsZero() {
+		t.Fatalf("legacy insert dispatch metadata = (%d, %s)", attempts, nextDispatchAt)
+	}
+}
+
+func TestMigration008BackfillsExistingActiveAndTerminalRows(t *testing.T) {
+	databaseConfiguration, err := databaseconfig.Load()
+	if err != nil {
+		t.Fatalf("load integration database configuration: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	pool, err := database.Open(ctx, databaseConfiguration.URL)
+	if err != nil {
+		t.Fatalf("open integration database: %v", err)
+	}
+	t.Cleanup(func() { pool.Close() })
+	var retryColumnsExist bool
+	if err := pool.QueryRow(ctx, `
+		SELECT count(*) = 2 FROM information_schema.columns
+		WHERE table_schema = current_schema() AND table_name = 'commands'
+		  AND column_name IN ('dispatch_attempts', 'next_dispatch_at')
+	`).Scan(&retryColumnsExist); err != nil {
+		t.Fatalf("inspect migration baseline: %v", err)
+	}
+	if retryColumnsExist {
+		t.Skip("migration 008 backfill is exercised only from the migration 007 baseline")
+	}
+
+	registryRepository, err := registry.NewRepository(pool)
+	if err != nil {
+		t.Fatalf("create registry repository: %v", err)
+	}
+	organizationID, err := registryRepository.CreateOrganization(ctx, "commands-migration-"+uuid.NewString(), "Migration Integration")
+	if err != nil {
+		t.Fatalf("create integration organization: %v", err)
+	}
+	device, err := registryRepository.CreateDevice(ctx, organizationID, registry.CreateDeviceInput{DeviceKey: "migration-device", DisplayName: "Migration Device"})
+	if err != nil {
+		t.Fatalf("create integration device: %v", err)
+	}
+	ids := []uuid.UUID{uuid.New(), uuid.New()}
+	createdAt := time.Date(2026, 9, 29, 4, 0, 0, 123456000, time.UTC)
+	t.Cleanup(func() {
+		cleanupContext, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cleanupCancel()
+		_, _ = pool.Exec(cleanupContext, `DELETE FROM commands WHERE id = ANY($1)`, ids)
+		_, _ = pool.Exec(cleanupContext, `DELETE FROM devices WHERE id = $1`, device.ID)
+		_, _ = pool.Exec(cleanupContext, `DELETE FROM organizations WHERE id = $1`, organizationID)
+	})
+	for index, status := range []Status{StatusPending, StatusCompleted} {
+		var dispatchedAt, acknowledgedAt, terminalAt any
+		if status == StatusCompleted {
+			dispatchedAt, acknowledgedAt, terminalAt = createdAt, createdAt, createdAt
+		}
+		_, err := pool.Exec(ctx, `
+			INSERT INTO commands (
+				id, organization_id, device_id, type, status, idempotency_key,
+				created_request_id, created_at, updated_at, expires_at,
+				dispatched_at, acknowledged_at, terminal_at
+			) VALUES ($1, $2, $3, 'PING', $4, $5, '', $6, $6, $7, $8, $9, $10)
+		`, ids[index], organizationID, device.ID, status, uuid.New(), createdAt, createdAt.Add(CommandLifetime), dispatchedAt, acknowledgedAt, terminalAt)
+		if err != nil {
+			t.Fatalf("insert pre-008 %s command: %v", status, err)
+		}
+	}
+	if err := migrations.Run(ctx, databaseConfiguration.URL, "up"); err != nil {
+		t.Fatalf("apply migration 008: %v", err)
+	}
+	for _, id := range ids {
+		var attempts int
+		var nextDispatchAt time.Time
+		if err := pool.QueryRow(ctx, `SELECT dispatch_attempts, next_dispatch_at FROM commands WHERE id = $1`, id).Scan(&attempts, &nextDispatchAt); err != nil {
+			t.Fatalf("read backfilled command %s: %v", id, err)
+		}
+		if attempts != 0 || !nextDispatchAt.Equal(createdAt) {
+			t.Fatalf("backfilled command %s metadata = (%d, %s), want (0, %s)", id, attempts, nextDispatchAt, createdAt)
+		}
+	}
+}
+
+func TestRepositoryClaimDispatchIsDurableBoundedAndConcurrentSafe(t *testing.T) {
+	fixture := newRepositoryFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	created, err := fixture.repository.Create(ctx, fixture.orgID, CreateInput{
+		DeviceID: fixture.deviceID, Type: TypePing, IdempotencyKey: uuid.New(),
+	})
+	if err != nil {
+		t.Fatalf("create command: %v", err)
+	}
+	const requests = 8
+	start := make(chan struct{})
+	claims := make(chan *Command, requests)
+	errorsChannel := make(chan error, requests)
+	for range requests {
+		go func() {
+			<-start
+			claimed, claimErr := fixture.repository.ClaimNextDispatch(ctx, fixture.orgID)
+			claims <- claimed
+			errorsChannel <- claimErr
+		}()
+	}
+	close(start)
+	var reservation *Command
+	claimCount := 0
+	for range requests {
+		claimed, claimErr := <-claims, <-errorsChannel
+		if claimErr != nil {
+			t.Fatalf("concurrent reservation: %v", claimErr)
+		}
+		if claimed != nil {
+			claimCount++
+			reservation = claimed
+		}
+	}
+	if claimCount != 1 || reservation == nil || reservation.ID != created.ID || reservation.DispatchAttempts != 1 {
+		t.Fatalf("concurrent claims = %d, reservation = %+v", claimCount, reservation)
+	}
+	if !reservation.NextDispatchAt.Equal(normalizeTime(fixture.clock.Now().Add(10 * time.Second))) {
+		t.Fatalf("first retry at = %s", reservation.NextDispatchAt)
+	}
+
+	for attempt, backoff := range []time.Duration{20 * time.Second, 40 * time.Second} {
+		fixture.clock.Set(reservation.NextDispatchAt)
+		reservation, err = fixture.repository.ClaimNextDispatch(ctx, fixture.orgID)
+		if err != nil || reservation == nil || reservation.DispatchAttempts != attempt+2 {
+			t.Fatalf("reservation %d = (%+v, %v)", attempt+2, reservation, err)
+		}
+		if !reservation.NextDispatchAt.Equal(fixture.clock.Now().Add(backoff)) {
+			t.Fatalf("reservation %d next at = %s", attempt+2, reservation.NextDispatchAt)
+		}
+	}
+	fixture.clock.Set(reservation.NextDispatchAt)
+	reservation, err = fixture.repository.ClaimNextDispatch(ctx, fixture.orgID)
+	if err != nil || reservation == nil || reservation.DispatchAttempts != MaxDispatchAttempts ||
+		!reservation.NextDispatchAt.Equal(created.ExpiresAt) {
+		t.Fatalf("fourth reservation = (%+v, %v)", reservation, err)
+	}
+	if extra, err := fixture.repository.ClaimNextDispatch(ctx, fixture.orgID); err != nil || extra != nil {
+		t.Fatalf("reservation beyond bound = (%+v, %v)", extra, err)
+	}
+}
+
+func TestRepositoryDoesNotRedispatchAcknowledgedCommand(t *testing.T) {
+	fixture := newRepositoryFixture(t)
+	ctx := context.Background()
+	created, err := fixture.repository.Create(ctx, fixture.orgID, CreateInput{
+		DeviceID: fixture.deviceID, Type: TypePing, IdempotencyKey: uuid.New(),
+	})
+	if err != nil {
+		t.Fatalf("create command: %v", err)
+	}
+	reservation, err := fixture.repository.ClaimNextDispatch(ctx, fixture.orgID)
+	if err != nil || reservation == nil || reservation.ID != created.ID {
+		t.Fatalf("first reservation = (%+v, %v)", reservation, err)
+	}
+	acknowledged, err := fixture.repository.ApplyDeviceResponse(ctx, fixture.orgID, fixture.deviceID, created.ID, EventAck, "")
+	if err != nil || acknowledged.Status != StatusAcknowledged {
+		t.Fatalf("acknowledge command = (%+v, %v)", acknowledged, err)
+	}
+	fixture.clock.Set(reservation.NextDispatchAt)
+	if retry, err := fixture.repository.ClaimNextDispatch(ctx, fixture.orgID); err != nil || retry != nil {
+		t.Fatalf("acknowledged command retry = (%+v, %v), want no reservation", retry, err)
+	}
+}
+
+func TestRepositoryDeviceResponseBindsOrganizationAndDevice(t *testing.T) {
+	fixture := newRepositoryFixture(t)
+	ctx := context.Background()
+	created, err := fixture.repository.Create(ctx, fixture.orgID, CreateInput{
+		DeviceID: fixture.deviceID, Type: TypePing, IdempotencyKey: uuid.New(),
+	})
+	if err != nil {
+		t.Fatalf("create command: %v", err)
+	}
+	if _, err := fixture.repository.ApplyDeviceResponse(ctx, fixture.orgID, fixture.otherID, created.ID, EventComplete, ""); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("same-tenant wrong-device response error = %v, want not found", err)
+	}
+	if _, err := fixture.repository.ApplyDeviceResponse(ctx, fixture.foreignOrg, fixture.deviceID, created.ID, EventComplete, ""); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("foreign-tenant response error = %v, want not found", err)
+	}
+	if _, err := fixture.repository.ApplyDeviceResponse(ctx, fixture.orgID, fixture.deviceID, created.ID, EventFail, FailureDelivery); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("device-selected delivery failure = %v, want invalid input", err)
+	}
+	current, err := fixture.repository.Get(ctx, fixture.orgID, created.ID)
+	if err != nil || current.Status != StatusPending {
+		t.Fatalf("command after denied responses = (%+v, %v)", current, err)
+	}
+	completed, err := fixture.repository.ApplyDeviceResponse(ctx, fixture.orgID, fixture.deviceID, created.ID, EventComplete, "")
+	if err != nil || completed.Status != StatusCompleted || completed.AcknowledgedAt == nil {
+		t.Fatalf("valid device result = (%+v, %v)", completed, err)
+	}
+}
+
+func TestRepositoryExpiryCanBeScopedToOneOrganization(t *testing.T) {
+	fixture := newRepositoryFixture(t)
+	ctx := context.Background()
+	local, err := fixture.repository.Create(ctx, fixture.orgID, CreateInput{DeviceID: fixture.deviceID, Type: TypePing, IdempotencyKey: uuid.New()})
+	if err != nil {
+		t.Fatalf("create local command: %v", err)
+	}
+	foreign, err := fixture.repository.Create(ctx, fixture.foreignOrg, CreateInput{DeviceID: fixture.foreignDev, Type: TypePing, IdempotencyKey: uuid.New()})
+	if err != nil {
+		t.Fatalf("create foreign command: %v", err)
+	}
+	fixture.clock.Set(local.ExpiresAt)
+	expired, err := fixture.repository.ExpireDueForOrganization(ctx, fixture.orgID, MaxExpireBatchSize)
+	if err != nil || len(expired) != 1 || expired[0].ID != local.ID {
+		t.Fatalf("scoped expiry = (%+v, %v)", expired, err)
+	}
+	currentForeign, err := fixture.repository.Get(ctx, fixture.foreignOrg, foreign.ID)
+	if err != nil || currentForeign.Status != StatusPending {
+		t.Fatalf("foreign command after scoped expiry = (%+v, %v)", currentForeign, err)
 	}
 }
 

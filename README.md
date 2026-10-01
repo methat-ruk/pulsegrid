@@ -5,7 +5,7 @@
 Connect devices · Stream telemetry · Detect conditions · Deliver commands ·
 Operate fleets
 
-![Status](https://img.shields.io/badge/status-mvp--010--merged-blue)
+![Status](https://img.shields.io/badge/status-mvp--011--in--progress-yellow)
 
 > [!IMPORTANT]
 > PulseGrid's documentation foundation, Go API foundation, Nuxt console
@@ -17,8 +17,8 @@ Operate fleets
 > merged in PR #18 as `fd0a383`; MVP-009's alert console merged as `7e3c336`
 > in PR #19. MVP-010's command model and development GraphQL create/read API
 > merged in PR #20 as `9d78301`, with main CI passing on that commit.
-> It persists `PING` intent but does not yet deliver commands over MQTT;
-> MVP-011 owns delivery and acknowledgement.
+> MVP-011 command delivery, device acknowledgement/results, and automatic
+> timeout are in implementation on its feature branch and are not yet merged.
 > Production identity and production readiness remain deferred.
 
 ## What is PulseGrid?
@@ -107,7 +107,7 @@ The decision state and adoption trigger for each technology are maintained in
 
 ## Project status
 
-**Current phase: MVP-010 command model and GraphQL API ready for review**
+**Current phase: MVP-011 MQTT command delivery in implementation**
 
 - Product intent and MVP boundary: documented.
 - Architecture and technology adoption rules: documented.
@@ -128,9 +128,10 @@ The decision state and adoption trigger for each technology are maintained in
   `feat/mvp-009-alert-console` and merged as `7e3c336` (PR #19). MVP-010 adds
   persisted `PING` command intent and tenant-scoped GraphQL create/detail/history
   operations merged as `9d78301` (PR #20), with main CI passing.
-  MQTT delivery, response ingestion,
-  and automatic timeout processing belong to MVP-011. Production identity and
-  production readiness remain deferred.
+  MVP-011 now adds MQTT delivery, response ingestion, durable retry, and
+  automatic timeout on its feature branch; final integration evidence and
+  review remain pending. Production identity and production readiness remain
+  deferred.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
   required checks include browser evidence for the real local API readiness
   journey.

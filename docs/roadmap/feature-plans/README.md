@@ -105,7 +105,7 @@ platform foundation” is not an acceptable PR boundary.
 
 ### MVP — Remote delivery and console — planned
 
-- [MVP-011 — MQTT command delivery and acknowledgement](planned/MVP-011-mqtt-command-delivery-acknowledgement.md) — revised plan reviewed; proposed pending implementation approval
+- [MVP-011 — MQTT command delivery and acknowledgement](planned/MVP-011-mqtt-command-delivery-acknowledgement.md) — approved; local implementation and PostgreSQL/Mosquitto evidence pass; PR review pending
 - [MVP-012 — Command console](planned/MVP-012-command-console.md)
 
 ### MVP acceptance

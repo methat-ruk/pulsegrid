@@ -65,11 +65,20 @@ const (
 	MQTTIngestionDevelopment MQTTIngestionMode = "development"
 )
 
+// MQTTCommandMode selects the local/test command delivery runtime.
+type MQTTCommandMode string
+
+const (
+	MQTTCommandDisabled    MQTTCommandMode = "disabled"
+	MQTTCommandDevelopment MQTTCommandMode = "development"
+)
+
 // Config contains only the settings consumed by the API foundation.
 type Config struct {
 	Environment       Environment
 	IdentityMode      IdentityMode
 	MQTTIngestionMode MQTTIngestionMode
+	MQTTCommandMode   MQTTCommandMode
 	MQTTBrokerURL     string
 	HTTPHost          string
 	HTTPPort          int
@@ -81,6 +90,10 @@ type Config struct {
 // broker and include it in readiness.
 func (c Config) MQTTIngestionEnabled() bool {
 	return c.MQTTIngestionMode == MQTTIngestionDevelopment
+}
+
+func (c Config) MQTTCommandEnabled() bool {
+	return c.MQTTCommandMode == MQTTCommandDevelopment
 }
 
 // Address returns the listener address for the configured host and port.
@@ -179,11 +192,22 @@ func parse(values map[string]string, environment Environment) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	mqttCommandMode, err := parseMQTTCommandMode(values, environment, identityMode)
+	if err != nil {
+		return Config{}, err
+	}
+	if mqttCommandMode == MQTTCommandDevelopment && mqttBrokerURL == "" {
+		mqttBrokerURL, err = parseMQTTBrokerURL(values, environment)
+		if err != nil {
+			return Config{}, err
+		}
+	}
 
 	return Config{
 		Environment:       environment,
 		IdentityMode:      identityMode,
 		MQTTIngestionMode: mqttIngestionMode,
+		MQTTCommandMode:   mqttCommandMode,
 		MQTTBrokerURL:     mqttBrokerURL,
 		HTTPHost:          host,
 		HTTPPort:          port,
@@ -212,13 +236,42 @@ func parseMQTTIngestion(values map[string]string, environment Environment) (MQTT
 		return "", "", errors.New("configuration PULSEGRID_MQTT_INGESTION_MODE development is not allowed in production")
 	}
 
+	brokerURL, err := parseMQTTBrokerURL(values, environment)
+	if err != nil {
+		return "", "", err
+	}
+	return mode, brokerURL, nil
+}
+
+func parseMQTTCommandMode(values map[string]string, environment Environment, identityMode IdentityMode) (MQTTCommandMode, error) {
+	rawMode := strings.ToLower(strings.TrimSpace(values["PULSEGRID_MQTT_COMMAND_MODE"]))
+	if rawMode == "" {
+		rawMode = string(MQTTCommandDisabled)
+	}
+	mode := MQTTCommandMode(rawMode)
+	if mode == MQTTCommandDisabled {
+		return mode, nil
+	}
+	if mode != MQTTCommandDevelopment {
+		return "", errors.New("configuration PULSEGRID_MQTT_COMMAND_MODE must be disabled or development")
+	}
+	if environment == Production {
+		return "", errors.New("configuration PULSEGRID_MQTT_COMMAND_MODE development is not allowed in production")
+	}
+	if identityMode != IdentityDevelopment {
+		return "", errors.New("configuration PULSEGRID_MQTT_COMMAND_MODE development requires development identity")
+	}
+	return mode, nil
+}
+
+func parseMQTTBrokerURL(values map[string]string, environment Environment) (string, error) {
 	rawBrokerURL := strings.TrimSpace(values["PULSEGRID_MQTT_BROKER_URL"])
 	if rawBrokerURL == "" {
-		return "", "", errors.New("configuration PULSEGRID_MQTT_BROKER_URL is required when MQTT ingestion is enabled")
+		return "", errors.New("configuration PULSEGRID_MQTT_BROKER_URL is required when MQTT is enabled")
 	}
 	parsed, err := url.Parse(rawBrokerURL)
 	if err != nil || parsed.Scheme != "mqtt" || parsed.Hostname() != "127.0.0.1" || parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.Opaque != "" {
-		return "", "", errors.New("configuration PULSEGRID_MQTT_BROKER_URL must be a loopback mqtt URL")
+		return "", errors.New("configuration PULSEGRID_MQTT_BROKER_URL must be a loopback mqtt URL")
 	}
 
 	expected := developmentMQTTBroker
@@ -226,9 +279,9 @@ func parseMQTTIngestion(values map[string]string, environment Environment) (MQTT
 		expected = testMQTTBroker
 	}
 	if rawBrokerURL != expected {
-		return "", "", errors.New("configuration PULSEGRID_MQTT_BROKER_URL must use the environment-specific loopback broker")
+		return "", errors.New("configuration PULSEGRID_MQTT_BROKER_URL must use the environment-specific loopback broker")
 	}
-	return mode, rawBrokerURL, nil
+	return rawBrokerURL, nil
 }
 
 func isLoopbackHTTPHost(host string) bool {

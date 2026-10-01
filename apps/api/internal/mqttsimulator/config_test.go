@@ -32,10 +32,54 @@ func TestLoadFromAcceptsEnvironmentSpecificLoopbackConfiguration(t *testing.T) {
 			if got.Environment != environment || got.BrokerURL != validEnvironment(environment)[brokerURLKey] {
 				t.Fatalf("configuration = %+v", got)
 			}
+			if got.Mode != ModeTelemetry || got.CommandResponse != ResponseSuccess {
+				t.Fatalf("default simulator modes = (%q, %q)", got.Mode, got.CommandResponse)
+			}
 			if got.TenantSlug != ExpectedTenantSlug || got.DeviceID.String() != testDeviceID || got.TemperatureCelsius != 23.5 {
 				t.Fatalf("configuration values = %+v", got)
 			}
 		})
+	}
+}
+
+func TestLoadFromAcceptsCommandsModeWithoutTemperature(t *testing.T) {
+	for _, response := range []CommandResponseMode{ResponseSuccess, ResponseFailure, ResponseSilent, ResponseAckOnly} {
+		values := validEnvironment(EnvironmentTest)
+		delete(values, temperatureKey)
+		values[simulatorModeKey] = string(ModeCommands)
+		values[commandResponseKey] = string(response)
+		got, err := LoadFrom(values, t.TempDir(), missingDotenv)
+		if err != nil {
+			t.Fatalf("commands mode %q rejected: %v", response, err)
+		}
+		if got.Mode != ModeCommands || got.CommandResponse != response || got.TemperatureCelsius != 0 {
+			t.Fatalf("commands config = %+v", got)
+		}
+	}
+	values := validEnvironment(EnvironmentDevelopment)
+	delete(values, temperatureKey)
+	values[simulatorModeKey] = string(ModeCommands)
+	if _, err := LoadFrom(values, t.TempDir(), missingDotenv); err != nil {
+		t.Fatalf("default commands response rejected: %v", err)
+	}
+}
+
+func TestLoadFromRejectsSimulatorResponseOutsideCommandsMode(t *testing.T) {
+	values := validEnvironment(EnvironmentDevelopment)
+	values[commandResponseKey] = string(ResponseSuccess)
+	if _, err := LoadFrom(values, t.TempDir(), missingDotenv); err == nil || !strings.Contains(err.Error(), "only allowed in commands mode") {
+		t.Fatalf("telemetry mode response configuration error = %v", err)
+	}
+	values[simulatorModeKey] = "invalid"
+	delete(values, commandResponseKey)
+	if _, err := LoadFrom(values, t.TempDir(), missingDotenv); err == nil || !strings.Contains(err.Error(), "must be telemetry or commands") {
+		t.Fatalf("invalid mode error = %v", err)
+	}
+	values = validEnvironment(EnvironmentTest)
+	values[simulatorModeKey] = string(ModeCommands)
+	values[commandResponseKey] = "unknown"
+	if _, err := LoadFrom(values, t.TempDir(), missingDotenv); err == nil || !strings.Contains(err.Error(), "must be success, failure, silent, or ack-only") {
+		t.Fatalf("invalid response error = %v", err)
 	}
 }
 
