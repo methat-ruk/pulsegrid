@@ -21,12 +21,18 @@ by the MVP-001 organization/device registry. The merged MVP-007 console exposes
 telemetry reads on device detail. MVP-008 rules/alerts merged as `fd0a383`
 (PR #18), and MVP-009 alert console merged as `7e3c336` (PR #19). MVP-010 adds
 persisted `PING` command intent and development GraphQL create/read operations
-using migration `007`. PR #20 is open and ready
-for review on `feat/mvp-010-command-model-graphql-api`, with implementation
-evidence complete; it has not been merged. It does not include MQTT delivery or
-automatic timeout scanning.
-Production identity, deployment exposure, durable broker replay, and later
-event contracts remain unimplemented.
+using migration `007`. PR #20 merged as `9d78301` on 2026-09-30, with main CI
+passing on the merge commit. It does not include MQTT delivery or
+automatic timeout scanning in the merged MVP-010 baseline. The MVP-011
+implementation on `feat/mvp-011-mqtt-command-delivery-acknowledgement` adds
+migration `008`, a durable bounded dispatcher, a separate command MQTT client,
+response validation, and automatic expiry. PR #21 review findings now have
+implementation and real PostgreSQL/Mosquitto evidence, including synchronized
+response admission at shutdown, expiry while the broker is down, and a forced
+response-drain deadline with an in-flight database lock. PR #21 remains open
+and unmerged subject to required CI checks. Production identity, deployment
+exposure, durable broker replay, and later event contracts remain
+unimplemented.
 
 Architecture diagrams below describe an intended sequence of evolution. They
 must not be read as deployed topology.
@@ -168,15 +174,40 @@ that input and returns a processing failure; an exact replay skips evaluation.
 Successful matching input commits telemetry and immutable alert occurrences
 together. Each alert carries a rule/measurement snapshot and references the
 durable observation identity, so pruning history does not erase its context.
-PR #18 merged this behavior into `main` as `fd0a383`. MVP-009 plans a
-read-only alert list/detail journey over the existing GraphQL snapshot. Its
-candidate adds the `/alerts` list and detail route, optional device scope, and
+PR #18 merged this behavior into `main` as `fd0a383`. MVP-009 adds a
+read-only alert list/detail journey over the existing GraphQL snapshot with
+the `/alerts` list and detail route, optional device scope, and
 a device-detail entry point. The browser renders the stored comparison and
 event times; it does not own alert evaluation, lifecycle, or tenant scope. The
-candidate passed local API and browser validation and remains unmerged on
-`feat/mvp-009-alert-console`.
+implementation passed local API and browser validation and merged as `7e3c336`
+(PR #19).
 The [MVP-008 plan](../roadmap/feature-plans/completed/MVP-008-threshold-rule-alert-backend.md)
 owns the limits, GraphQL contract, recovery boundary, and evidence.
+
+### MVP-011 command transport boundary (PR #21 candidate; unmerged)
+
+The [MVP-011 plan](../roadmap/feature-plans/completed/MVP-011-mqtt-command-delivery-acknowledgement.md)
+records the accepted design and latest review disposition. The PR #21
+candidate keeps commands in
+the existing API process and PostgreSQL authority, adds durable bounded retry
+metadata and independent expiry, and uses a command-specific MQTT client
+alongside the existing telemetry client. The separate client allows uncertain
+command publish cleanup without resetting telemetry. The neutral wire-contract
+package is shared with the standalone simulator; the simulator does not import
+API/domain persistence.
+
+The command module remains the only lifecycle writer. Response acceptance
+binds registry-resolved organization, device and command in one transaction;
+broker acknowledgement is not device success. This remains an anonymous
+loopback PING proof with explicit duplicate/lost-response limits, not production
+device authentication, durable response replay or multi-replica execution.
+The decoder rejects even an empty `failureCode` property on ACK/COMPLETED,
+matching AsyncAPI's outcome-specific schema. Shutdown closes callback admission
+and joins the response worker after canceling an in-flight database operation;
+real-broker tests cover broker-outage expiry and the forced drain deadline.
+Production identity, durable response replay and multi-replica execution remain
+out of scope. PR #21 remains open and unmerged; required CI checks control
+merge.
 
 ## Conditional target architecture
 

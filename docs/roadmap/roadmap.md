@@ -200,8 +200,8 @@ acknowledgement, completion, explicit failure, or timeout.
 
 Plans:
 
-- [MVP-010 — Command model and GraphQL API](feature-plans/completed/MVP-010-command-model-graphql-api.md) — implementation/evidence complete; PR #20 is open and ready for review, not merged
-- [MVP-011 — MQTT command delivery and acknowledgement](feature-plans/planned/MVP-011-mqtt-command-delivery-acknowledgement.md)
+- [MVP-010 — Command model and GraphQL API](feature-plans/completed/MVP-010-command-model-graphql-api.md) — merged as `9d78301` (PR #20); main CI passed
+- [MVP-011 — MQTT command delivery and acknowledgement](feature-plans/completed/MVP-011-mqtt-command-delivery-acknowledgement.md) — implementation and review findings complete with real PostgreSQL/Mosquitto evidence; PR #21 remains open and unmerged, with required CI gates controlling merge
 - [MVP-012 — Command console](feature-plans/planned/MVP-012-command-console.md)
 
 ### M5 — MVP acceptance

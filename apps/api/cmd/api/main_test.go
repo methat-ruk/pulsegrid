@@ -62,3 +62,9 @@ func TestClassifyTelemetrySchemaFailureUsesSafeSchemaAction(t *testing.T) {
 		t.Fatalf("telemetry schema failure details = (%q, %q)", code, message)
 	}
 }
+
+func TestReadinessCheckIsAbsentWhenAllDependenciesAreDisabled(t *testing.T) {
+	if check := readinessCheck(nil, nil, nil, nil, nil); check != nil {
+		t.Fatal("readiness check should be absent when no dependency is configured")
+	}
+}

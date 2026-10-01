@@ -44,17 +44,17 @@ or immediately required dependency.
 | GraphQL and gqlgen | Selected — MVP | Concrete device/operator API boundary; MVP-010 adds intent create/read alongside the MVP-002 device contract; gqlgen `v0.17.95` keeps the SDL as source of truth |
 | PostgreSQL 18.6 | Selected — MVP | Transactional authority for the MVP-001 organization/device registry and MVP-006 bounded telemetry/current-state projection; local and CI targets are pinned and isolated |
 | pgx v5 | Selected — MVP | Direct parameterized Go PostgreSQL driver and bounded pool for registry, telemetry, rules/alerts, and command persistence boundaries |
-| Goose v3 SQL migrations | Selected — MVP | Explicit versioned SQL migrations with session locking; migration execution remains outside API startup; MVP-010 adds migration `007` |
-| MQTT 3.1.1 | Selected — MVP | MVP-004 and MVP-005 use QoS 1, non-retained telemetry over loopback TCP; durable duplicate handling remains with MVP-006 |
+| Goose v3 SQL migrations | Selected — MVP | Explicit versioned SQL migrations with session locking; migration execution remains outside API startup; MVP-010 adds `007`, and MVP-011 adds `008` |
+| MQTT 3.1.1 | Selected — MVP | Telemetry and the local PING command flow use QoS 1, non-retained messages over loopback TCP; durable telemetry identity remains with MVP-006, and command intent/retry remains in PostgreSQL |
 | Eclipse Mosquitto 2.1.2 | Selected — MVP | Reviewed for the MVP-004 local/test broker and pinned by multi-platform image digest; production broker product/topology remains open |
-| Eclipse Paho MQTT Go client v1.5.1 | Selected — MVP | Reused by the separate simulator and the MVP-005 API consumer; the adapter keeps Paho types out of ingestion and does not introduce a generic messaging abstraction |
+| Eclipse Paho MQTT Go client v1.5.1 | Selected — MVP | Reused by the standalone simulator, MVP-005 telemetry consumer and a separate MVP-011 command client; adapters keep Paho types out of domain modules without a generic messaging abstraction |
 | Docker Compose | Selected — MVP | Local PostgreSQL and the reviewed loopback-only MQTT development/test services are implemented as isolated dependency runtimes |
 | Backend/frontend Dockerfiles | Conditional target | Add when a containerized run, CI, or deployment target will build and exercise the images |
 | MongoDB | Conditional target | Adopt only when heterogeneous profile data and queries justify separate authority |
 | Dedicated time-series storage | Open | Select from measured volume, retention, aggregation, and query patterns |
 | Redis | Conditional target | Adopt for a concrete ephemeral, cache, coordination, or idempotency use case |
 | Apache Kafka | Conditional target | Adopt for a concrete durable fan-out, replay, or independent-consumer flow |
-| AsyncAPI | Selected — MVP | MVP-005 introduces the first concrete MQTT producer/consumer flow and validates its local/test receiver contract with the existing Redocly toolchain; production broker semantics remain open |
+| AsyncAPI | Selected — MVP | MVP-005 defines telemetry and MVP-011 adds the local/test command/response contracts, linted with the existing Redocly toolchain; production broker semantics remain open |
 | Kafka consumer groups | Conditional target | Introduce with a Kafka workload that requires parallel consumption |
 | gRPC and Protocol Buffers | Conditional target | Adopt when independently deployed services need a synchronous typed contract |
 | OpenTelemetry | Conditional target | Adopt when cross-process request/event diagnosis is required |
@@ -251,17 +251,39 @@ command UUID becomes the downstream MQTT correlation identity. The existing
 pgx pool, Goose migrations, and gqlgen toolchain suffice; no dependency,
 service, queue, or environment key is added.
 
-The API fixes one two-minute end-to-end deadline. MVP-010 provides guarded
-transition and bounded due-expiration operations but runs no scheduler. MVP-011
-owns dispatch, retry, response ingestion, and the scanner. A device response
-can prove receipt and atomically record missing dispatch/ACK milestones if it
-races the saved post-publish transition. Until the MVP-011 scanner exists,
-an expired command may remain visible as stored `PENDING` state; reads do not
-infer a timeout from wall time.
+The API fixes one two-minute end-to-end deadline. At the MVP-010 merge, the
+command module provided guarded transitions and bounded due-expiration
+operations but no scheduler. The MVP-011 feature branch now composes durable
+dispatch/retry, response ingestion, and the scanner in the existing process.
+A device response can prove receipt and atomically record missing dispatch/ACK
+milestones if it races the saved post-publish transition. GraphQL reads continue
+to report stored lifecycle state and do not infer timeout from wall time.
 
 This boundary keeps accepted intent separate from uncertain device delivery.
 Revisit it if a concrete actuator command, automatic recovery, longer
 deduplication retention, or production identity/permissions become required.
+
+## MVP-011 command transport decision (PR #21 candidate; unmerged)
+
+The [MVP-011 plan](../roadmap/feature-plans/completed/MVP-011-mqtt-command-delivery-acknowledgement.md)
+records the accepted design and the latest review disposition. PR #21 adds
+real PostgreSQL/Mosquitto evidence for response admission at shutdown, strict
+outcome-specific failure-code presence, expiry while the broker is down, and
+forced response-drain cancellation. The PR remains open and unmerged; required
+CI checks remain the merge gate.
+Existing Paho `v1.5.1`, pgx, Goose, PostgreSQL and Mosquitto suffice. No dependency
+upgrade, extra service, generic bus or external queue is selected.
+
+Command rows remain durable work authority, with additive retry metadata rather
+than an in-memory-only schedule or second outbox. A dedicated command client
+uses supervised fresh epochs so unknown publish cleanup does not interrupt
+telemetry. One more connection and a small additive migration are accepted costs
+for restart-safe bounds and failure isolation. PING is duplicate-safe because
+it has no actuator effect; lost results after ACK may still time out. The
+implementation follows the plan's alternatives, exact wire/budget policy,
+recovery and validation. Revisit
+before effectful commands, production identity, multiple dispatchers, required
+durable response replay or measured backlog pressure.
 
 ## Foundation selection evidence
 

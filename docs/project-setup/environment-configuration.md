@@ -1,12 +1,11 @@
 # Environment and Configuration Strategy
 
-Status: Configuration contract and validation source of truth
+Status: Configuration behavior and validation source of truth
 
 ## Purpose
 
 This document owns how PulseGrid separates development, test, and production
-configuration. It defines the contract before implementation without creating
-unused environment variables or committing secrets.
+configuration, and records which feature-specific keys are implemented.
 
 ## Principles
 
@@ -214,7 +213,7 @@ leave the device UUID blank; a contributor supplies it only in an ignored local
 file or the test process environment. These keys do not make the API depend on
 MQTT, and production identity/TLS/authorization remain a later decision.
 
-### MVP-005 API MQTT ingestion keys
+### MVP-005/MVP-011 API MQTT runtime keys
 
 MVP-005 adds two server-only API keys. The broker URL is intentionally shared
 with the standalone simulator, but the API does not consume the simulator's
@@ -224,7 +223,7 @@ PostgreSQL registry.
 | Key | Development | Test | Production |
 | --- | --- | --- | --- |
 | `PULSEGRID_MQTT_INGESTION_MODE` | `disabled` by default; exact `development` enables the local consumer | `disabled` for ordinary tests; the owned MQTT integration runner injects `development` | `disabled` only; enabled mode is rejected |
-| `PULSEGRID_MQTT_BROKER_URL` | Required only when enabled; exact `mqtt://127.0.0.1:1883` | Required only when enabled; exact `mqtt://127.0.0.1:11883` | No broker URL is accepted while ingestion is disabled |
+| `PULSEGRID_MQTT_BROKER_URL` | Required and exact `mqtt://127.0.0.1:1883` when either runtime is enabled; otherwise optional to the API and still used by the simulator | Required and exact `mqtt://127.0.0.1:11883` when either runtime is enabled; otherwise optional to the API and still used by the simulator | Neither runtime can be enabled; the API rejects this key |
 
 Enabled ingestion requires the existing database configuration because device
 authority is resolved before acceptance. The API rejects credentials, alternate
@@ -234,6 +233,27 @@ crossover. A broker disconnect makes readiness return the generic
 liveness remains process-only. Application acceptance is a diagnostic,
 non-durable handoff until MVP-006 adds persistence and logical `messageId`
 idempotency.
+
+### MVP-011 command and simulator settings
+
+The API command runtime is opt-in for local development and isolated tests. The
+standalone simulator defaults to one-shot telemetry; its long-running command
+receiver requires explicit `commands` mode. The API requires development
+identity and its environment-specific exact loopback broker URL when command
+mode is enabled; it rejects command mode in production. The simulator is
+development/test-only and validates that its configured tenant, device UUID,
+and broker endpoint are local values.
+
+| Key | Development | Test | Production |
+| --- | --- | --- | --- |
+| `PULSEGRID_MQTT_COMMAND_MODE` | `disabled` by default; `development` requires development identity and `mqtt://127.0.0.1:1883` | `disabled` by default; the owned integration runner uses `development` with `mqtt://127.0.0.1:11883` and its isolated database | `disabled` only; `development` is rejected |
+| `PULSEGRID_SIMULATOR_MODE` | `telemetry` by default; `commands` receives commands for the configured local device | `telemetry` by default; the owned integration runner selects `commands` for its test device | Rejected; simulator is development/test only |
+| `PULSEGRID_SIMULATOR_COMMAND_RESPONSE` | In `commands` mode: `success`, `failure`, `silent`, or `ack-only`; defaults to `success` | Same modes, selected by the isolated runner | Rejected with simulator production mode |
+
+The response setting is accepted only when simulator mode is `commands`.
+Command delivery has no production identity, broker authentication, durable
+device-response replay, or multi-replica coordination; its anonymous broker is
+restricted to loopback development/test listeners.
 
 ## Delivery sequence
 
@@ -253,7 +273,9 @@ idempotency.
    origin or credential; MVP-004 adds and validates the local MQTT simulator
    configuration; MVP-005 adds the explicit API ingestion mode and shared
    loopback broker URL.
-7. Production hardening defines the deployment secret provider, rotation,
+7. MVP-011 adds an independently disabled API command mode and an explicit
+   simulator command-receive mode; both require local/test broker validation.
+8. Production hardening defines the deployment secret provider, rotation,
    access controls, and production-mode smoke validation.
 
 ## Validation requirements

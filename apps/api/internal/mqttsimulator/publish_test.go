@@ -29,7 +29,7 @@ type fakeClient struct {
 
 func (c *fakeClient) Connect() Token { return c.connectToken }
 
-func (c *fakeClient) Publish(topic string, qos byte, retained bool, payload interface{}) Token {
+func (c *fakeClient) Publish(topic string, qos byte, retained bool, payload any) Token {
 	c.topic = topic
 	c.qos = qos
 	c.retained = retained

@@ -10,6 +10,12 @@ apis:
       # The local broker is intentionally anonymous and loopback-only in this
       # MVP; production authentication/TLS/ACLs are a later boundary.
       security-defined: off
+  commands:
+    root: apps/api/api/asyncapi/commands.yaml
+    rules:
+      # This contract is available only on anonymous loopback development and
+      # isolated test brokers; production identity remains out of scope.
+      security-defined: off
 
 rules:
   # PulseGrid has no selected repository or API publication license yet.

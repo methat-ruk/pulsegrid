@@ -60,17 +60,19 @@ var (
 )
 
 type Command struct {
-	ID             uuid.UUID
-	DeviceID       uuid.UUID
-	Type           Type
-	Status         Status
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	ExpiresAt      time.Time
-	DispatchedAt   *time.Time
-	AcknowledgedAt *time.Time
-	TerminalAt     *time.Time
-	FailureCode    *FailureCode
+	ID               uuid.UUID
+	DeviceID         uuid.UUID
+	Type             Type
+	Status           Status
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	ExpiresAt        time.Time
+	DispatchedAt     *time.Time
+	AcknowledgedAt   *time.Time
+	TerminalAt       *time.Time
+	FailureCode      *FailureCode
+	DispatchAttempts int
+	NextDispatchAt   time.Time
 }
 
 type CreateInput struct {

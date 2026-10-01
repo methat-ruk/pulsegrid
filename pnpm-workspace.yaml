@@ -3,7 +3,11 @@ packages:
 # @nuxt/fonts -> fontless currently permits only the vulnerable 0.27 line;
 # keep that transitive edge on the patched esbuild release until upstream widens it.
 overrides:
+  # Keep affected transitive dependency ranges on patched releases in the same major.
+  "brace-expansion@>=2.0.0 <3.0.0": 2.1.7
+  "brace-expansion@>=5.0.0 <6.0.0": 5.0.12
   "fontless>esbuild": 0.28.2
+  "serialize-javascript@>=7.0.0 <8.0.0": 7.1.2
 allowBuilds:
   esbuild: true
   unrs-resolver: true

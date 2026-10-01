@@ -101,11 +101,14 @@ platform foundation” is not an acceptable PR boundary.
 
 ### MVP — Remote command intent — completed
 
-- [MVP-010 — Command model and GraphQL API](completed/MVP-010-command-model-graphql-api.md) — implementation and required evidence complete; PR #20 is open and ready for review, not merged
+- [MVP-010 — Command model and GraphQL API](completed/MVP-010-command-model-graphql-api.md) — merged as `9d78301` (PR #20); main CI passed
 
-### MVP — Remote delivery and console — planned
+### MVP — Remote command delivery — completed
 
-- [MVP-011 — MQTT command delivery and acknowledgement](planned/MVP-011-mqtt-command-delivery-acknowledgement.md)
+- [MVP-011 — MQTT command delivery and acknowledgement](completed/MVP-011-mqtt-command-delivery-acknowledgement.md) — review findings and local evidence complete; PR #21 remains open and unmerged, with required checks governing merge
+
+### MVP — Remote command console — planned
+
 - [MVP-012 — Command console](planned/MVP-012-command-console.md)
 
 ### MVP acceptance

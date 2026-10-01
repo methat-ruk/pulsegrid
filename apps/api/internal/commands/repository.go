@@ -14,7 +14,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const MaxExpireBatchSize = 100
+const (
+	MaxExpireBatchSize  = 100
+	MaxDispatchAttempts = 4
+	MinimumDispatchTime = 5 * time.Second
+)
 
 type Clock interface {
 	Now() time.Time
@@ -69,7 +73,9 @@ func (r *Repository) ValidateSchema(ctx context.Context) error {
 				('commands'::text, 'dispatched_at'::text),
 				('commands'::text, 'acknowledged_at'::text),
 				('commands'::text, 'terminal_at'::text),
-				('commands'::text, 'failure_code'::text)
+				('commands'::text, 'failure_code'::text),
+				('commands'::text, 'dispatch_attempts'::text),
+				('commands'::text, 'next_dispatch_at'::text)
 			) AS required(table_name, column_name)
 			WHERE NOT EXISTS (
 				SELECT 1 FROM information_schema.columns
@@ -134,9 +140,10 @@ func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, input
 	command, err = scanCommand(tx.QueryRow(ctx, `
 		INSERT INTO commands (
 			id, organization_id, device_id, type, status, idempotency_key,
-			created_request_id, created_at, updated_at, expires_at
+			created_request_id, created_at, updated_at, expires_at, dispatch_attempts,
+			next_dispatch_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, $8)
 		ON CONFLICT ON CONSTRAINT commands_idempotency_unique DO NOTHING
 		RETURNING `+commandColumns,
 		command.ID, organizationID, command.DeviceID, command.Type, command.Status,
@@ -247,11 +254,26 @@ func (r *Repository) Fail(ctx context.Context, organizationID, commandID uuid.UU
 	return r.apply(ctx, organizationID, commandID, EventFail, failureCode)
 }
 
+// ApplyDeviceResponse applies an outcome only when tenant, device, and command
+// identity all match inside the same row-lock transaction.
+func (r *Repository) ApplyDeviceResponse(ctx context.Context, organizationID, deviceID, commandID uuid.UUID, event Event, failureCode FailureCode) (Command, error) {
+	if (event != EventAck && event != EventComplete && event != EventFail) ||
+		(event == EventFail && failureCode != FailureDeviceReported) ||
+		(event != EventFail && failureCode != "") {
+		return Command{}, ErrInvalidInput
+	}
+	return r.applyScoped(ctx, organizationID, &deviceID, commandID, event, failureCode)
+}
+
 func (r *Repository) apply(ctx context.Context, organizationID, commandID uuid.UUID, event Event, failureCode FailureCode) (Command, error) {
+	return r.applyScoped(ctx, organizationID, nil, commandID, event, failureCode)
+}
+
+func (r *Repository) applyScoped(ctx context.Context, organizationID uuid.UUID, deviceID *uuid.UUID, commandID uuid.UUID, event Event, failureCode FailureCode) (Command, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if organizationID == uuid.Nil || commandID == uuid.Nil {
+	if organizationID == uuid.Nil || commandID == uuid.Nil || (deviceID != nil && *deviceID == uuid.Nil) {
 		return Command{}, ErrInvalidInput
 	}
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
@@ -259,12 +281,23 @@ func (r *Repository) apply(ctx context.Context, organizationID, commandID uuid.U
 		return Command{}, fmt.Errorf("begin command transition: %w", err)
 	}
 	defer func() { _ = tx.Rollback(context.Background()) }()
-	command, err := scanCommand(tx.QueryRow(ctx, `
-		SELECT `+commandColumns+`
+	query := `
+		SELECT ` + commandColumns + `
 		FROM commands
 		WHERE organization_id = $1 AND id = $2
 		FOR UPDATE
-	`, organizationID, commandID))
+	`
+	args := []any{organizationID, commandID}
+	if deviceID != nil {
+		query = `
+			SELECT ` + commandColumns + `
+			FROM commands
+			WHERE organization_id = $1 AND device_id = $2 AND id = $3
+			FOR UPDATE
+		`
+		args = []any{organizationID, *deviceID, commandID}
+	}
+	command, err := scanCommand(tx.QueryRow(ctx, query, args...))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Command{}, ErrNotFound
 	}
@@ -303,9 +336,91 @@ func (r *Repository) apply(ctx context.Context, organizationID, commandID uuid.U
 	return updated, transitionErr
 }
 
+// ClaimNextDispatch durably reserves one due publish before the MQTT side
+// effect. A consumed slot survives restart, including a crash before publish.
+func (r *Repository) ClaimNextDispatch(ctx context.Context, organizationID uuid.UUID) (*Command, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if organizationID == uuid.Nil {
+		return nil, ErrInvalidInput
+	}
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+	if err != nil {
+		return nil, fmt.Errorf("begin dispatch reservation: %w", err)
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+
+	now := normalizeTime(r.clock.Now())
+	command, err := scanCommand(tx.QueryRow(ctx, `
+		SELECT `+commandColumns+`
+		FROM commands
+		WHERE organization_id = $1
+		  AND status IN ('PENDING', 'DISPATCHED')
+		  AND dispatch_attempts < $2
+		  AND next_dispatch_at <= $3
+		  AND expires_at > $3 + interval '5 seconds'
+		ORDER BY next_dispatch_at ASC, created_at ASC, id ASC
+		LIMIT 1
+		FOR UPDATE SKIP LOCKED
+	`, organizationID, MaxDispatchAttempts, now))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("select due command for dispatch: %w", err)
+	}
+
+	// Recheck after acquiring the row lock; waiting cannot grant an expired
+	// command a publish slot.
+	now = normalizeTime(r.clock.Now())
+	if (command.Status != StatusPending && command.Status != StatusDispatched) ||
+		command.DispatchAttempts >= MaxDispatchAttempts || command.NextDispatchAt.After(now) ||
+		!now.Add(MinimumDispatchTime).Before(command.ExpiresAt) {
+		return nil, nil
+	}
+	attempt := command.DispatchAttempts + 1
+	nextAt := command.ExpiresAt
+	switch attempt {
+	case 1:
+		nextAt = now.Add(10 * time.Second)
+	case 2:
+		nextAt = now.Add(20 * time.Second)
+	case 3:
+		nextAt = now.Add(40 * time.Second)
+	}
+	command, err = scanCommand(tx.QueryRow(ctx, `
+		UPDATE commands
+		SET dispatch_attempts = $3, next_dispatch_at = $4
+		WHERE organization_id = $1 AND id = $2
+		RETURNING `+commandColumns,
+		organizationID, command.ID, attempt, nextAt,
+	))
+	if err != nil {
+		return nil, fmt.Errorf("persist dispatch reservation: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit dispatch reservation: %w", err)
+	}
+	return &command, nil
+}
+
 // ExpireDue marks at most limit active commands whose immutable deadlines have
 // passed. SKIP LOCKED lets a future set of bounded workers divide the due set.
 func (r *Repository) ExpireDue(ctx context.Context, limit int) ([]Command, error) {
+	return r.expireDue(ctx, nil, limit)
+}
+
+// ExpireDueForOrganization bounds the local command runtime's mutation scope
+// to the server-selected tenant.
+func (r *Repository) ExpireDueForOrganization(ctx context.Context, organizationID uuid.UUID, limit int) ([]Command, error) {
+	if organizationID == uuid.Nil {
+		return nil, ErrInvalidInput
+	}
+	return r.expireDue(ctx, &organizationID, limit)
+}
+
+func (r *Repository) expireDue(ctx context.Context, organizationID *uuid.UUID, limit int) ([]Command, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -313,11 +428,17 @@ func (r *Repository) ExpireDue(ctx context.Context, limit int) ([]Command, error
 		return nil, ErrInvalidInput
 	}
 	now := normalizeTime(r.clock.Now())
-	rows, err := r.pool.Query(ctx, `
+	scopeFilter := ""
+	args := []any{now, limit}
+	if organizationID != nil {
+		scopeFilter = "organization_id = $3 AND"
+		args = append(args, *organizationID)
+	}
+	rows, err := r.pool.Query(ctx, fmt.Sprintf(`
 		WITH due AS (
 			SELECT id
 			FROM commands
-			WHERE status IN ('PENDING', 'DISPATCHED', 'ACKNOWLEDGED')
+			WHERE %s status IN ('PENDING', 'DISPATCHED', 'ACKNOWLEDGED')
 			  AND expires_at <= $1
 			ORDER BY expires_at ASC, id ASC
 			LIMIT $2
@@ -328,7 +449,7 @@ func (r *Repository) ExpireDue(ctx context.Context, limit int) ([]Command, error
 		FROM due
 		WHERE command.id = due.id
 		RETURNING `+qualifiedCommandColumns("command")+`
-	`, now, limit)
+	`, scopeFilter), args...)
 	if err != nil {
 		return nil, fmt.Errorf("expire due commands: %w", err)
 	}
@@ -348,7 +469,8 @@ func (r *Repository) ExpireDue(ctx context.Context, limit int) ([]Command, error
 }
 
 const commandColumns = `id, device_id, type, status, created_at, updated_at,
-       expires_at, dispatched_at, acknowledged_at, terminal_at, failure_code`
+       expires_at, dispatched_at, acknowledged_at, terminal_at, failure_code,
+       dispatch_attempts, next_dispatch_at`
 
 func qualifiedCommandColumns(alias string) string {
 	columns := strings.Split(commandColumns, ", ")
@@ -370,10 +492,12 @@ func scanCommand(row rowScanner) (Command, error) {
 	var acknowledgedAt pgtype.Timestamptz
 	var terminalAt pgtype.Timestamptz
 	var failureCode pgtype.Text
+	var nextDispatchAt pgtype.Timestamptz
 	err := row.Scan(
 		&command.ID, &command.DeviceID, &commandType, &status,
 		&command.CreatedAt, &command.UpdatedAt, &command.ExpiresAt,
 		&dispatchedAt, &acknowledgedAt, &terminalAt, &failureCode,
+		&command.DispatchAttempts, &nextDispatchAt,
 	)
 	if err != nil {
 		return Command{}, err
@@ -392,6 +516,9 @@ func scanCommand(row rowScanner) (Command, error) {
 	if failureCode.Valid {
 		value := FailureCode(failureCode.String)
 		command.FailureCode = &value
+	}
+	if nextDispatchAt.Valid {
+		command.NextDispatchAt = nextDispatchAt.Time.UTC()
 	}
 	command.CreatedAt = command.CreatedAt.UTC()
 	command.UpdatedAt = command.UpdatedAt.UTC()

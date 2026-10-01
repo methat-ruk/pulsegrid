@@ -26,10 +26,28 @@ const (
 	DevelopmentBrokerURL   = "mqtt://127.0.0.1:1883"
 	TestBrokerURL          = "mqtt://127.0.0.1:11883"
 
-	brokerURLKey   = "PULSEGRID_MQTT_BROKER_URL"
-	tenantSlugKey  = "PULSEGRID_MQTT_TENANT_SLUG"
-	deviceIDKey    = "PULSEGRID_MQTT_DEVICE_ID"
-	temperatureKey = "PULSEGRID_SIMULATOR_TEMPERATURE_CELSIUS"
+	brokerURLKey       = "PULSEGRID_MQTT_BROKER_URL"
+	tenantSlugKey      = "PULSEGRID_MQTT_TENANT_SLUG"
+	deviceIDKey        = "PULSEGRID_MQTT_DEVICE_ID"
+	temperatureKey     = "PULSEGRID_SIMULATOR_TEMPERATURE_CELSIUS"
+	simulatorModeKey   = "PULSEGRID_SIMULATOR_MODE"
+	commandResponseKey = "PULSEGRID_SIMULATOR_COMMAND_RESPONSE"
+)
+
+type Mode string
+
+const (
+	ModeTelemetry Mode = "telemetry"
+	ModeCommands  Mode = "commands"
+)
+
+type CommandResponseMode string
+
+const (
+	ResponseSuccess CommandResponseMode = "success"
+	ResponseFailure CommandResponseMode = "failure"
+	ResponseSilent  CommandResponseMode = "silent"
+	ResponseAckOnly CommandResponseMode = "ack-only"
 )
 
 // Config is the complete standalone simulator configuration. It contains no
@@ -37,6 +55,8 @@ const (
 // process rather than an application client.
 type Config struct {
 	Environment        string
+	Mode               Mode
+	CommandResponse    CommandResponseMode
 	BrokerURL          string
 	TenantSlug         string
 	DeviceID           uuid.UUID
@@ -101,18 +121,62 @@ func LoadFrom(processEnvironment map[string]string, workingDirectory string, rea
 	if err != nil {
 		return Config{}, err
 	}
-	temperature, err := parseTemperature(values[temperatureKey])
+	mode, err := parseMode(values[simulatorModeKey])
 	if err != nil {
 		return Config{}, err
+	}
+	responseMode, err := parseCommandResponse(values, mode)
+	if err != nil {
+		return Config{}, err
+	}
+	var temperature float64
+	if mode == ModeTelemetry {
+		temperature, err = parseTemperature(values[temperatureKey])
+		if err != nil {
+			return Config{}, err
+		}
 	}
 
 	return Config{
 		Environment:        environment,
+		Mode:               mode,
+		CommandResponse:    responseMode,
 		BrokerURL:          brokerURL,
 		TenantSlug:         ExpectedTenantSlug,
 		DeviceID:           deviceID,
 		TemperatureCelsius: temperature,
 	}, nil
+}
+
+func parseMode(raw string) (Mode, error) {
+	mode := Mode(strings.ToLower(strings.TrimSpace(raw)))
+	if mode == "" {
+		return ModeTelemetry, nil
+	}
+	if mode != ModeTelemetry && mode != ModeCommands {
+		return "", errors.New("simulator configuration PULSEGRID_SIMULATOR_MODE must be telemetry or commands")
+	}
+	return mode, nil
+}
+
+func parseCommandResponse(values map[string]string, mode Mode) (CommandResponseMode, error) {
+	raw, explicitlySet := values[commandResponseKey]
+	if mode == ModeTelemetry {
+		if explicitlySet {
+			return "", errors.New("simulator configuration PULSEGRID_SIMULATOR_COMMAND_RESPONSE is only allowed in commands mode")
+		}
+		return ResponseSuccess, nil
+	}
+	if !explicitlySet {
+		return ResponseSuccess, nil
+	}
+	response := CommandResponseMode(strings.ToLower(strings.TrimSpace(raw)))
+	switch response {
+	case ResponseSuccess, ResponseFailure, ResponseSilent, ResponseAckOnly:
+		return response, nil
+	default:
+		return "", errors.New("simulator configuration PULSEGRID_SIMULATOR_COMMAND_RESPONSE must be success, failure, silent, or ack-only")
+	}
 }
 
 func parseBrokerURL(rawURL string, environment string) (string, error) {
