@@ -92,6 +92,11 @@ flowchart TD
     class MVP004 complete;
     class MVP005 complete;
     class MVP006 complete;
+    class MVP007 complete;
+    class MVP008 complete;
+    class MVP009 complete;
+    class MVP010 complete;
+    class MVP011 complete;
 ```
 
 FND-001 implementation establishes the backend runtime shell, FND-002
@@ -104,10 +109,11 @@ MVP-005 provides the completed local/test telemetry ingestion boundary; and
 MVP-006 provides the completed bounded telemetry history/current-state
 projection. MVP-007 adds the operator-visible telemetry console and was merged
 as `9ce9e7c` after its reviewed candidate and required checks passed. M2 is
-complete; MVP-008 merged as `fd0a383` (PR #18). MVP-009's alert console
-implementation and review-comment evidence are complete on its feature branch;
-the project owner accepted PR #19 for merge. M3 remains in progress until that
-PR is merged into `main`.
+complete; MVP-008 merged as `fd0a383` (PR #18), and MVP-009 merged as `7e3c336`
+(PR #19), completing M3. MVP-010 merged as `9d78301` (PR #20), and MVP-011
+merged as `b209861` (PR #21), with main CI passing. MVP-012's command-console
+plan was revised and author-reviewed on 2026-10-02; implementation has not
+started. M4 remains in progress until that console outcome is accepted.
 
 ## Milestones
 
@@ -201,8 +207,8 @@ acknowledgement, completion, explicit failure, or timeout.
 Plans:
 
 - [MVP-010 — Command model and GraphQL API](feature-plans/completed/MVP-010-command-model-graphql-api.md) — merged as `9d78301` (PR #20); main CI passed
-- [MVP-011 — MQTT command delivery and acknowledgement](feature-plans/completed/MVP-011-mqtt-command-delivery-acknowledgement.md) — implementation and review findings complete with real PostgreSQL/Mosquitto evidence; PR #21 remains open and unmerged, with required CI gates controlling merge
-- [MVP-012 — Command console](feature-plans/planned/MVP-012-command-console.md)
+- [MVP-011 — MQTT command delivery and acknowledgement](feature-plans/completed/MVP-011-mqtt-command-delivery-acknowledgement.md) — merged as `b209861` (PR #21); main CI passed
+- [MVP-012 — Command console](feature-plans/planned/MVP-012-command-console.md) — revised and author-reviewed 2026-10-02; implementation has not started
 
 ### M5 — MVP acceptance
 

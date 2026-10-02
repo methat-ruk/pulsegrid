@@ -5,7 +5,7 @@
 Connect devices · Stream telemetry · Detect conditions · Deliver commands ·
 Operate fleets
 
-![Status](https://img.shields.io/badge/status-mvp--011--in--progress-yellow)
+![Status](https://img.shields.io/badge/status-mvp--012--planned-yellow)
 
 > [!IMPORTANT]
 > PulseGrid's documentation foundation, Go API foundation, Nuxt console
@@ -18,7 +18,8 @@ Operate fleets
 > in PR #19. MVP-010's command model and development GraphQL create/read API
 > merged in PR #20 as `9d78301`, with main CI passing on that commit.
 > MVP-011 command delivery, device acknowledgement/results, and automatic
-> timeout are in implementation on its feature branch and are not yet merged.
+> timeout merged in PR #21 as `b209861`, with main CI passing. MVP-012's command
+> console plan is reviewed; its UI implementation has not started.
 > Production identity and production readiness remain deferred.
 
 ## What is PulseGrid?
@@ -107,7 +108,7 @@ The decision state and adoption trigger for each technology are maintained in
 
 ## Project status
 
-**Current phase: MVP-011 MQTT command delivery in implementation**
+**Current phase: MVP-012 command console planned; backend command loop merged**
 
 - Product intent and MVP boundary: documented.
 - Architecture and technology adoption rules: documented.
@@ -128,10 +129,11 @@ The decision state and adoption trigger for each technology are maintained in
   `feat/mvp-009-alert-console` and merged as `7e3c336` (PR #19). MVP-010 adds
   persisted `PING` command intent and tenant-scoped GraphQL create/detail/history
   operations merged as `9d78301` (PR #20), with main CI passing.
-  MVP-011 now adds MQTT delivery, response ingestion, durable retry, and
-  automatic timeout on its feature branch; final integration evidence and
-  review remain pending. Production identity and production readiness remain
-  deferred.
+  MVP-011's MQTT delivery, response ingestion, durable retry and automatic
+  timeout merged as `b209861` (PR #21), with main CI passing. The
+  [MVP-012 command-console plan](docs/roadmap/feature-plans/planned/MVP-012-command-console.md)
+  was revised and author-reviewed on 2026-10-02; implementation has not started.
+  Production identity and production readiness remain deferred.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
   required checks include browser evidence for the real local API readiness
   journey.

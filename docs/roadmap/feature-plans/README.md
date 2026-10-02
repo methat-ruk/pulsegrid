@@ -105,11 +105,11 @@ platform foundation” is not an acceptable PR boundary.
 
 ### MVP — Remote command delivery — completed
 
-- [MVP-011 — MQTT command delivery and acknowledgement](completed/MVP-011-mqtt-command-delivery-acknowledgement.md) — review findings and local evidence complete; PR #21 remains open and unmerged, with required checks governing merge
+- [MVP-011 — MQTT command delivery and acknowledgement](completed/MVP-011-mqtt-command-delivery-acknowledgement.md) — merged as `b209861` (PR #21); main CI passed
 
 ### MVP — Remote command console — planned
 
-- [MVP-012 — Command console](planned/MVP-012-command-console.md)
+- [MVP-012 — Command console](planned/MVP-012-command-console.md) — revised and author-reviewed 2026-10-02; implementation has not started
 
 ### MVP acceptance
 

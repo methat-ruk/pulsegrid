@@ -6,11 +6,11 @@ ingestion, MVP-006 telemetry persistence/current-state projection, MVP-008
 rules/alerts, and MVP-009 alert console are implemented. MVP-009 merged as
 `7e3c336` (PR #19). MVP-010 command intent and GraphQL merged as `9d78301`
 (PR #20), with main CI passing on that commit. MVP-011 command delivery and
-acknowledgement are implemented in the PR #21 candidate. Its review findings
+acknowledgement merged as `b209861` (PR #21). Its review findings
 are addressed with response-admission synchronization, strict failure-code
 presence validation, real broker-outage expiry and forced shutdown-drain
-evidence. PR #21 remains open and unmerged; merge remains subject to required
-CI checks.
+evidence; main CI passed on the merge commit. MVP-012's command-console plan
+is reviewed, with implementation not yet started.
 Production identity, production MQTT, and permanent high-volume storage remain
 deferred.
 
@@ -58,7 +58,7 @@ and are review artifacts only; they are not published or served at runtime.
 | Operator product API | GraphQL/gqlgen | Development-only MVP-002; MVP-010 merged as `9d78301` (PR #20) | [`device.graphqls`](../../apps/api/graph/schema/device.graphqls), [`command.graphqls`](../../apps/api/graph/schema/command.graphqls), and committed generated artifacts |
 | Device telemetry | MQTT + PostgreSQL | MVP-004 producer fixture, MVP-005 local/test consumer, and MVP-006 bounded persistence/current state implemented; production delivery deferred | [AsyncAPI telemetry contract](../../apps/api/api/asyncapi/telemetry.yaml), [MVP-005 plan](../roadmap/feature-plans/completed/MVP-005-mqtt-telemetry-ingestion.md), and [MVP-006 plan](../roadmap/feature-plans/completed/MVP-006-telemetry-current-state-projection.md) |
 | Command intent and status | GraphQL/gqlgen | MVP-010 merged as `9d78301` (PR #20) | [`command.graphqls`](../../apps/api/graph/schema/command.graphqls) and [MVP-010 plan](../roadmap/feature-plans/completed/MVP-010-command-model-graphql-api.md) |
-| Device command delivery | MQTT | MVP-011 implemented on open PR #21; unmerged | [Command delivery contract](../../apps/api/api/asyncapi/commands.yaml) |
+| Device command delivery | MQTT | MVP-011 merged as `b209861` (PR #21) | [Command delivery contract](../../apps/api/api/asyncapi/commands.yaml) |
 | Durable event distribution | Kafka | Post-MVP conditional | A flow-specific AsyncAPI/message contract |
 | Internal synchronous service calls | gRPC/Protobuf | Post-MVP conditional | A flow-specific protobuf contract |
 
@@ -195,11 +195,11 @@ different device returns `CONFLICT`.
 with a cursor bound to tenant and device. Lifecycle fields are owned by the
 command module and are not writable through GraphQL. The fixed end-to-end
 deadline is two minutes. MQTT dispatch, ACK/result handling, and automatic
-timeout processing are implemented by MVP-011 in open PR #21; see the
+timeout processing are implemented by merged MVP-011 (PR #21); see the
 [command wire contract](../../apps/api/api/asyncapi/commands.yaml) and the
 implementation status below.
 
-## MVP-011 command delivery (PR #21 candidate; unmerged)
+## MVP-011 command delivery (merged PR #21)
 
 The opt-in local/test runtime publishes committed PING intent from PostgreSQL
 over its own MQTT 3.1.1 QoS-1 client and listens for device responses on a
@@ -216,8 +216,13 @@ still time out; responses are not durably replayed. The command client is
 separate from telemetry so an uncertain publish can retire its own connection.
 This remains an anonymous loopback development/test path and is not production
 device authentication or multi-replica coordination. The PR review comments
-are addressed in the current candidate; branch protection remains the merge
-gate.
+were addressed before merge; main CI passed on `b209861`.
+
+The planned device-detail consumer is owned by the
+[MVP-012 plan](../roadmap/feature-plans/planned/MVP-012-command-console.md).
+It reuses create/detail/recent-history operations and server-owned statuses;
+no API field, deadline or tenant-authority change is planned. The command UI
+is not implemented yet.
 
 ## Current operational contract
 

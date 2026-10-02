@@ -202,8 +202,8 @@ simulator, verifies committed current state and bounded history through
 GraphQL, checks strict rejection, exact replay, and late-observation semantics,
 exercises retained input and readiness recovery across broker stop/start,
 signals the API for drain, and removes only its own disposable resources on
-success or failure. The MVP-011 candidate extends this same run with command
-delivery, duplicate idempotency, explicit device failure, ACK-only and silent
+success or failure. The merged MVP-011 implementation extends this run with
+command delivery, duplicate idempotency, explicit device failure, ACK-only and silent
 expiry, broker recovery, expiry while the broker is unavailable, and response
 worker shutdown with an in-flight database lock. The isolated runner reports
 timestamps and durations for each long scenario. CI runs four suites
