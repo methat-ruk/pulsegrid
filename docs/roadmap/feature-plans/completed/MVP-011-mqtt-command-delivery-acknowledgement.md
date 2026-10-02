@@ -1,8 +1,8 @@
 # MVP-011 — MQTT Command Delivery and Acknowledgement
 
-Status: Complete for the requested PR handoff — review findings F1/F2 and
-evidence gap G1 are addressed and locally verified. PR #21 remains open and
-unmerged; its required branch-protection checks must pass before merge.
+Status: Complete — PR #21 merged as
+`b209861d7ce204e0e94ab02510ea66c1502d51d5` on 2026-10-01; main CI passed.
+Review findings F1/F2 and evidence gap G1 were addressed before merge.
 
 Branch: `feat/mvp-011-mqtt-command-delivery-acknowledgement`
 
@@ -519,13 +519,26 @@ remains open and unmerged; the user requested that the plan move with the
 implementation and review response, while branch protection remains the final
 merge gate.
 
+## Merged closeout (verified 2026-10-02)
+
+[PR #21](https://github.com/methat-ruk/pulsegrid/pull/21) merged on 2026-10-01
+as `b209861d7ce204e0e94ab02510ea66c1502d51d5`. Live GitHub `main`, local
+`main`, cached `origin/main` and the MVP-012 planning branch identify that
+commit. [Main CI run 36838619395](https://github.com/methat-ruk/pulsegrid/actions/runs/36838619395)
+completed successfully, including every required status context and all four
+MQTT integration suites. The dated candidate/handoff statements above describe
+pre-merge evidence and are superseded by this closeout for current status.
+
+MVP-011 is an accepted dependency of MVP-012. Command UI and the combined
+MVP-013 product-loop acceptance remain separate work; this merge adds no
+production identity, deployment or production-readiness claim.
+
 ## Done Criteria
 
 Every accepted PING keeps one logical identity, bounded durable retry and
 truthful terminal COMPLETED, explicit FAILED or stored TIMED_OUT. ACK is
 intermediate, not completion. Required real-store/transport/restart/negative-
-input/identity/deadline/regression evidence and the requested review fixes pass
-on this candidate; CI status remains enforced on PR #21. The author completed
-self-review; no additional context-isolated review was requested. PR #21 is
-open and unmerged. No production migration, deployment or external runtime
-mutation was performed.
+input/identity/deadline/regression evidence and requested review fixes passed
+before merge; main CI passed on `b209861`. The author completed self-review;
+no additional context-isolated review was requested. PR #21 is merged. No
+production migration, deployment or external runtime mutation was performed.

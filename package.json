@@ -54,7 +54,7 @@
     "web:test:typecheck": "pnpm --filter @pulsegrid/web-console typecheck:tests",
     "browser:typecheck": "pnpm --filter @pulsegrid/web-console exec tsc --project ../../tsconfig.browser.json",
     "web:test": "NUXT_TELEMETRY_DISABLED=1 NUXT_APP_ENV=test NUXT_BACKEND_ORIGIN=http://127.0.0.1:18080 pnpm --filter @pulsegrid/web-console test",
-    "web:build": "node scripts/build-web.mjs production",
+    "web:build": "node scripts/build-web.mjs production && node scripts/prepare-runtime-artifact.mjs",
     "openapi:lint": "pnpm exec redocly lint --config redocly.yaml apps/api/api/openapi/operational.yaml",
     "openapi:bundle": "pnpm exec redocly bundle --config redocly.yaml apps/api/api/openapi/operational.yaml -o .openapi/operational.yaml",
     "openapi:html": "pnpm exec redocly build-docs --config redocly.yaml apps/api/api/openapi/operational.yaml --disableGoogleFont -o .openapi/operational.html",

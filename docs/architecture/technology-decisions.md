@@ -81,7 +81,9 @@ consumer or independently owned runtime requires one.
 
 ## Decisions intentionally left open
 
-- Polling, GraphQL subscriptions, SSE, or WebSocket transport for live UI state.
+- Production/fleet live-state transport. MVP-007 uses manual telemetry refresh;
+  MVP-012 plans bounded command-only polling without selecting a shared
+  realtime transport.
 - Production identity provider and RBAC model.
 - Production MQTT broker topology, device identity/credential lifecycle, TLS,
   authorization, and durable-session policy. MVP-004 owns only the reviewed
@@ -253,7 +255,7 @@ service, queue, or environment key is added.
 
 The API fixes one two-minute end-to-end deadline. At the MVP-010 merge, the
 command module provided guarded transitions and bounded due-expiration
-operations but no scheduler. The MVP-011 feature branch now composes durable
+operations but no scheduler. Merged MVP-011 now composes durable
 dispatch/retry, response ingestion, and the scanner in the existing process.
 A device response can prove receipt and atomically record missing dispatch/ACK
 milestones if it races the saved post-publish transition. GraphQL reads continue
@@ -263,14 +265,14 @@ This boundary keeps accepted intent separate from uncertain device delivery.
 Revisit it if a concrete actuator command, automatic recovery, longer
 deduplication retention, or production identity/permissions become required.
 
-## MVP-011 command transport decision (PR #21 candidate; unmerged)
+## MVP-011 command transport decision (merged PR #21)
 
 The [MVP-011 plan](../roadmap/feature-plans/completed/MVP-011-mqtt-command-delivery-acknowledgement.md)
-records the accepted design and the latest review disposition. PR #21 adds
+records the accepted design, review disposition and merged closeout. PR #21 adds
 real PostgreSQL/Mosquitto evidence for response admission at shutdown, strict
 outcome-specific failure-code presence, expiry while the broker is down, and
-forced response-drain cancellation. The PR remains open and unmerged; required
-CI checks remain the merge gate.
+forced response-drain cancellation. The PR merged as `b209861` on 2026-10-01;
+main CI passed on that commit.
 Existing Paho `v1.5.1`, pgx, Goose, PostgreSQL and Mosquitto suffice. No dependency
 upgrade, extra service, generic bus or external queue is selected.
 
@@ -284,6 +286,32 @@ implementation follows the plan's alternatives, exact wire/budget policy,
 recovery and validation. Revisit
 before effectful commands, production identity, multiple dispatchers, required
 durable response replay or measured backlog pressure.
+
+## MVP-012 command-console decision (accepted, 2026-10-02)
+
+The [MVP-012 plan](../roadmap/feature-plans/completed/MVP-012-command-console.md)
+selects existing native fetch, local component state, section-local bounded
+command polling and manual recent-history refresh. No GraphQL cache, polling
+library, global store, subscription/SSE/WebSocket, broker or dependency change
+to the frontend architecture is selected. The device-detail client and panel
+are implemented on the MVP-012 branch with required browser/recovery evidence.
+PR #22's production artifact dependency gate and required CI pass on
+`c289648`; the PR remains open and unmerged. The workspace `node-forge` finding
+remains unresolved and is reported separately. The technology choices and
+boundaries above remain unchanged.
+
+Manual-only refresh is simpler but leaves automatic progress unclear for the
+two-minute command journey. A shared realtime transport adds server/runtime
+work before a concrete fleet-scale need exists. A small same-tab session record
+preserves the idempotency key through reload; memory-only recovery loses that
+identity, while persistent cross-tab storage adds policy and coordination.
+Metadata is untrusted and never owns tenant scope or lifecycle state. The plan
+owns exact budgets, explicit recovery, limits and required evidence.
+
+Owner: MVP-012 implementer. Revisit for actuator commands, tenant switching,
+durable/cross-tab recovery, multi-command monitoring, measured poll traffic or
+an explicit realtime freshness requirement. Reverting the frontend does not
+cancel accepted commands or require a backend/schema rollback.
 
 ## Foundation selection evidence
 

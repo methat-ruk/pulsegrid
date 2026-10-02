@@ -202,8 +202,8 @@ simulator, verifies committed current state and bounded history through
 GraphQL, checks strict rejection, exact replay, and late-observation semantics,
 exercises retained input and readiness recovery across broker stop/start,
 signals the API for drain, and removes only its own disposable resources on
-success or failure. The MVP-011 candidate extends this same run with command
-delivery, duplicate idempotency, explicit device failure, ACK-only and silent
+success or failure. The merged MVP-011 implementation extends this run with
+command delivery, duplicate idempotency, explicit device failure, ACK-only and silent
 expiry, broker recovery, expiry while the broker is unavailable, and response
 worker shutdown with an in-flight database lock. The isolated runner reports
 timestamps and durations for each long scenario. CI runs four suites
@@ -222,6 +222,41 @@ corepack pnpm run mqtt:test:integration:deadlines
 corepack pnpm run mqtt:test:integration:outage
 corepack pnpm run mqtt:test:integration:shutdown
 ```
+
+### MVP-012 command console
+
+The device detail page has a **Diagnostic command** panel. Keep the local API
+command runtime enabled with `PULSEGRID_MQTT_COMMAND_MODE=development`,
+`PULSEGRID_IDENTITY_MODE=development`, and the development loopback broker;
+after migration through `008`, restart the API and run a receiver for the device
+in another terminal:
+
+```sh
+PULSEGRID_SIMULATOR_MODE=commands \
+PULSEGRID_SIMULATOR_COMMAND_RESPONSE=success \
+PULSEGRID_MQTT_DEVICE_ID=REPLACE_WITH_DEVICE_UUID \
+corepack pnpm run mqtt:simulator
+```
+
+Open `/devices/:id`, choose **Send PING**, review the diagnostic and
+acceptance-versus-completion explanation, then confirm. The panel shows the
+stored state and latest 20 commands. `failure` returns an explicit device
+failure; `ack-only` records receipt and later reaches the server's stored
+two-minute timeout; `silent` sends no response. The UI never treats broker
+acceptance, ACK or its own tracking budget as completion/timeout.
+
+When the HTTP response is lost, return to the same device and choose **Recover
+this submission**. It reuses the same device/type/key; it cannot create a second
+logical command for an already committed intent. This recovery record lives in
+the current browser tab's session storage. Closing the tab, clearing site data,
+or using another tab is outside this recovery guarantee; inspect recent command
+history before intentionally issuing a new PING.
+
+`corepack pnpm run test:browser` exercises console completion, explicit failure,
+lost-response recovery after reload, and ACK-only expiry through real
+PostgreSQL, Mosquitto, and the standalone simulator. The expiry scenario follows
+the unchanged backend two-minute deadline and has a longer bounded browser-test
+budget; the rest of the suite keeps its normal test timeout.
 
 If `127.0.0.1:1883` or `127.0.0.1:11883` is already occupied, stop the process
 that owns that port or use the service-specific cleanup command. Do not use a
@@ -504,11 +539,25 @@ configuration; they do not load development or test dotenv files.
 - If `corepack pnpm run setup` reports a lockfile or peer diagnostic, do not
   replace the lockfile. The current `@bomb.sh/tab`/`cac` peer mismatch is an
   upstream diagnostic and is not an authoritative gate.
-- `corepack pnpm run node:audit` keeps low and informational advisories visible
-  but blocks moderate, high, and critical production findings. The current
-  lockfile has no production advisories; the scoped `fontless>esbuild` override
-  keeps its transitive edge on the patched release until upstream widens its
-  dependency range.
+- `corepack pnpm run web:build` creates `.output` once and writes separate
+  runtime evidence and `.runtime-bundle-provenance.json` beside it, bound to the
+  frozen root lock. The provenance sidecar is uploaded with `.output` as gate
+  evidence; it is not part of the deployed `.output` tree. The build records
+  every Nitro Rollup chunk module and matching source-map package paths;
+  preparation ties each bundled name/version and source file to the exact
+  frozen production graph node, lock integrity, and package source hash.
+  `corepack pnpm run node:audit` consumes that same artifact without rebuilding
+  or installing another runtime tree. It verifies the chunk/source-map
+  inventory and provenance, then intersects the complete workspace
+  `pnpm audit --prod` findings with both physical and bundled artifact package
+  versions before smoking the artifact. Missing or inconsistent provenance,
+  affected versions, or failed smoke blocks the gate. The workspace report
+  still shows high `node-forge@1.4.0` via Nuxt and `listhen`; neither
+  `node-forge` nor `listhen` is in the verified artifact. This changes the
+  required audit boundary; the workspace vulnerability remains unresolved and
+  visible. See the
+  [MVP-012 review evidence](../roadmap/feature-plans/completed/MVP-012-command-console.md#pr-22-review-response)
+  and [artifact-gate decision](../roadmap/feature-plans/completed/MVP-012-command-console.md#re-plan-3-standalone-nitro-contract-and-artifact-gate-implementation).
 - `govulncheck` may list vulnerabilities in required Go modules that current
   code does not reach. They remain visible and are not reported as reachable
   application vulnerabilities.

@@ -119,6 +119,95 @@ export const test = base.extend<{}, { apiProcess: ApiProcess }>({
   }, { scope: 'worker', auto: true }],
 })
 
+type CommandSimulator = {
+  child: ChildProcess
+  output: string
+  exited: Promise<{ status: number | null, signal: NodeJS.Signals | null }>
+}
+
+const commandSimulators = new Map<string, CommandSimulator>()
+
+export async function startCommandSimulator(
+  deviceID: string,
+  responseMode: 'success' | 'failure' | 'silent' | 'ack-only' = 'success',
+): Promise<void> {
+  if (commandSimulators.has(deviceID)) throw new Error(`command simulator for ${deviceID} is already running`)
+  await access(simulatorBinary)
+  const child = spawn(simulatorBinary, [], {
+    env: {
+      ...process.env,
+      PULSEGRID_ENV: 'test',
+      PULSEGRID_MQTT_BROKER_URL: 'mqtt://127.0.0.1:11883',
+      PULSEGRID_MQTT_TENANT_SLUG: 'pulsegrid-dev',
+      PULSEGRID_MQTT_DEVICE_ID: deviceID,
+      PULSEGRID_SIMULATOR_MODE: 'commands',
+      PULSEGRID_SIMULATOR_COMMAND_RESPONSE: responseMode,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  const simulator: CommandSimulator = {
+    child,
+    output: '',
+    exited: new Promise((resolve) => {
+      child.once('close', (status, signal) => resolve({ status, signal }))
+      child.once('error', () => resolve({ status: 1, signal: null }))
+    }),
+  }
+  commandSimulators.set(deviceID, simulator)
+  const append = (chunk: Buffer) => {
+    simulator.output = `${simulator.output}${chunk.toString()}`.slice(-64 * 1024)
+  }
+  child.stdout?.on('data', append)
+  child.stderr?.on('data', append)
+
+  const deadline = Date.now() + 15_000
+  while (Date.now() < deadline) {
+    if (simulator.output.includes('reason_code=simulator_command_ready')) return
+    const exited = await Promise.race([
+      simulator.exited.then(result => ({ result })),
+      new Promise<{ result?: never }>(resolve => setTimeout(() => resolve({}), 100)),
+    ])
+    if (exited.result !== undefined) {
+      commandSimulators.delete(deviceID)
+      throw new Error(`command simulator exited before subscribing (${exited.result.status ?? exited.result.signal})`)
+    }
+  }
+
+  await stopCommandSimulator(deviceID)
+  throw new Error(`command simulator did not subscribe for device ${deviceID} within 15 seconds: ${simulator.output.slice(-1000)}`)
+}
+
+export async function stopCommandSimulator(deviceID: string): Promise<void> {
+  const simulator = commandSimulators.get(deviceID)
+  if (!simulator) return
+  commandSimulators.delete(deviceID)
+  if (simulator.child.exitCode === null) simulator.child.kill('SIGTERM')
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const result = await Promise.race([
+    simulator.exited,
+    new Promise<undefined>(resolve => { timer = setTimeout(() => resolve(undefined), 15_000) }),
+  ])
+  if (timer !== undefined) clearTimeout(timer)
+  if (result === undefined) {
+    simulator.child.kill('SIGKILL')
+    await simulator.exited
+    throw new Error(`command simulator for ${deviceID} did not stop within 15 seconds`)
+  }
+  if (result.status !== 0) {
+    throw new Error(`command simulator for ${deviceID} stopped with ${result.status ?? result.signal}`)
+  }
+}
+
+export async function stopAllCommandSimulators(): Promise<void> {
+  const results = await Promise.allSettled([...commandSimulators.keys()].map(stopCommandSimulator))
+  const failure = results.find(result => result.status === 'rejected')
+  if (failure?.status === 'rejected') throw failure.reason
+}
+
+test.afterEach(async () => {
+  await stopAllCommandSimulators()
+})
+
 export async function publishSimulatorTelemetry(deviceID: string, temperatureCelsius: number): Promise<{ messageID: string }> {
   await access(simulatorBinary)
   const child = spawn(simulatorBinary, [], {

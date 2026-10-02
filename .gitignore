@@ -13,6 +13,9 @@
 # Local tool output
 .nuxt/
 .output/
+apps/web-console/.runtime-bundle-provenance.json
+.runtime-evidence.json
+runtime-audit-report.json
 node_modules/
 coverage/
 .openapi/

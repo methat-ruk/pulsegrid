@@ -24,13 +24,14 @@ persisted `PING` command intent and development GraphQL create/read operations
 using migration `007`. PR #20 merged as `9d78301` on 2026-09-30, with main CI
 passing on the merge commit. It does not include MQTT delivery or
 automatic timeout scanning in the merged MVP-010 baseline. The MVP-011
-implementation on `feat/mvp-011-mqtt-command-delivery-acknowledgement` adds
+implementation merged in PR #21 as `b209861` adds
 migration `008`, a durable bounded dispatcher, a separate command MQTT client,
 response validation, and automatic expiry. PR #21 review findings now have
 implementation and real PostgreSQL/Mosquitto evidence, including synchronized
 response admission at shutdown, expiry while the broker is down, and a forced
-response-drain deadline with an in-flight database lock. PR #21 remains open
-and unmerged subject to required CI checks. Production identity, deployment
+response-drain deadline with an in-flight database lock. Main CI passed on
+the merge commit. MVP-012's command-console plan is reviewed; implementation
+is in progress. Production identity, deployment
 exposure, durable broker replay, and later event contracts remain
 unimplemented.
 
@@ -184,12 +185,12 @@ implementation passed local API and browser validation and merged as `7e3c336`
 The [MVP-008 plan](../roadmap/feature-plans/completed/MVP-008-threshold-rule-alert-backend.md)
 owns the limits, GraphQL contract, recovery boundary, and evidence.
 
-### MVP-011 command transport boundary (PR #21 candidate; unmerged)
+### MVP-011 command transport boundary (merged PR #21)
 
 The [MVP-011 plan](../roadmap/feature-plans/completed/MVP-011-mqtt-command-delivery-acknowledgement.md)
-records the accepted design and latest review disposition. The PR #21
-candidate keeps commands in
-the existing API process and PostgreSQL authority, adds durable bounded retry
+records the accepted design, review disposition and merged closeout. PR #21
+keeps commands in the existing API process and PostgreSQL authority, adds
+durable bounded retry
 metadata and independent expiry, and uses a command-specific MQTT client
 alongside the existing telemetry client. The separate client allows uncertain
 command publish cleanup without resetting telemetry. The neutral wire-contract
@@ -206,8 +207,30 @@ matching AsyncAPI's outcome-specific schema. Shutdown closes callback admission
 and joins the response worker after canceling an in-flight database operation;
 real-broker tests cover broker-outage expiry and the forced drain deadline.
 Production identity, durable response replay and multi-replica execution remain
-out of scope. PR #21 remains open and unmerged; required CI checks control
-merge.
+out of scope. PR #21 merged as `b209861`; main CI passed on that commit.
+
+### MVP-012 command console boundary (implemented on feature branch)
+
+The [MVP-012 plan](../roadmap/feature-plans/completed/MVP-012-command-console.md)
+was revised and author-reviewed on 2026-10-02; the owner accepted its required
+evidence on the review-ready candidate. PR #22 remains open and unmerged.
+It places a device-keyed command panel on loaded device detail and a typed
+feature client over the existing same-origin GraphQL transport. PostgreSQL and
+the command module remain lifecycle authority; browser storage holds only
+untrusted same-tab recovery metadata for exact idempotency-key reuse.
+
+The panel implementation uses bounded polling of one selected command, manual
+recent-history refresh, and explicit unknown/stale/recovery states. HTTP acceptance,
+broker dispatch, ACK and browser clock expiry cannot become device completion.
+The panel owns its requests/timers and cleanup independently from telemetry and
+alerts. No backend contract, runtime/service boundary, tenant authority,
+production path or shared realtime transport is added. The plan owns exact
+budgets and recovery limits. PR #22's required dependency gate audits the
+production artifact's physical packages and bundled sources against the frozen
+graph. The workspace `node-forge` finding remains unresolved and separately
+reported. Review fixes and affected local browser/runtime evidence pass, and
+all hosted required checks passed on `c289648`. MVP-012 is marked Complete by
+owner acceptance; M4 remains in progress until PR #22 is integrated into `main`.
 
 ## Conditional target architecture
 
