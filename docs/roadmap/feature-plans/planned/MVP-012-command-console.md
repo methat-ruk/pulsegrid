@@ -682,28 +682,34 @@ a claim of a new independent review.
 
 | Finding / gap | Fix and evidence |
 | --- | --- |
-| F1 — bundled runtime packages were absent from the physical `server/node_modules` inventory | Nitro's `rollup:before` hook writes `.runtime-bundle-provenance.json` beside `.output`, outside the deployable tree. It records normalized module identities for every emitted chunk. Evidence preparation reconciles those IDs and every `.output` source map with exact package/store-key contexts from the frozen `pnpm list --prod` graph, then verifies lock integrity/snapshot and package source-file hashes. The gate consumes the same-run `.output` plus this sidecar, rechecks the 19 chunk/map pairs and inventories, and matches advisories against physical and bundled package/version sets. The final local build proved 21 physical packages, 54 bundled package contexts across 126 Rollup modules, and 19 source maps. It detected `h3@1.15.11`, `destr@2.0.5`, `defu@6.1.7`, `ofetch@1.5.1`, `hookable@5.5.3` and `@iconify-json/lucide@1.2.130`. A synthetic advisory for bundled-only `h3@1.15.11` blocks the gate; missing sidecar/map and mismatched provenance tests also fail closed. The actual artifact audit passed with no matching advisory. |
+| F1 — bundled runtime packages were absent from the physical `server/node_modules` inventory | Nitro's `rollup:before` hook writes `.runtime-bundle-provenance.json` beside `.output`, outside the deployable tree. It records normalized module identities for every emitted chunk. Evidence preparation reconciles those IDs and every `.output` source map with exact package/store-key contexts from the frozen `pnpm list --prod` graph, then verifies lock integrity/snapshot and package source-file hashes. The gate consumes the same-run `.output` plus this sidecar, rechecks the 19 chunk/map pairs and inventories, and matches advisories against physical and bundled package/version sets. The production build proved 21 physical packages, 54 bundled package contexts across 126 Rollup modules, and 19 source maps. It detected `h3@1.15.11`, `destr@2.0.5`, `defu@6.1.7`, `ofetch@1.5.1`, `hookable@5.5.3` and `@iconify-json/lucide@1.2.130`. Linux CI exposed that Nuxt can name its generated `.nuxt/nuxt-icon-server-bundle.mjs` source directly in a map; the provenance collector now accepts it only when the resolved path exactly matches an application module identity recorded for that same Rollup chunk. A focused regression proves the matching path is accepted and a different generated path fails closed. A synthetic advisory for bundled-only `h3@1.15.11` blocks the gate; missing sidecar/map and mismatched provenance tests also fail closed. The actual artifact audit passed with no matching advisory. |
 | F2 — failed direct lookup of a saved command ID exposed no retry when it was outside the latest 20 rows | Selected-command loading/error/retry presentation is independent of history. A regression seeds a known ID absent from latest history, fails the first direct read, then retries and verifies the saved command becomes visible without a new submission. |
 | F3 — initial history failure hid a successful selected-command read | The selected-command card now renders independently of `historyState`. A regression makes initial history fail while a recovered direct read returns a terminal snapshot, then verifies the command ID and status remain visible alongside the separate history error. |
 | F4 — storage failure while recording a pending command ID showed terminal-cleanup copy | The write/update failure remains in the submission-recovery alert. Separate regressions prove that a pending result never shows terminal cleanup copy and that cleanup retry appears only after a known terminal result and failed storage removal. |
-| Failure combinations in F1–F4 | The runtime gate suite passes 12 tests, including a bundled-only advisory, missing/inconsistent evidence, smoke failure and artifact mutation. The panel suite passes 80 tests across 12 files. |
+| Failure combinations in F1–F4 | The runtime gate suite passes 13 tests, including a bundled-only advisory, missing/inconsistent evidence, mismatched generated-source attribution, smoke failure and artifact mutation. The panel suite passes 80 tests across 12 files. |
 | Visibility and stale-result evidence | Component regressions prove hidden-tab polling pauses and resumes, an older read cannot replace a newly selected command, and a read for the previous device cannot replace the new device selection. |
 | Visual/focus evidence | All 35 Chromium browser cases pass. The command journey verified page title/route, no Vite error overlay, keyboard focus and Enter-driven confirmation/cancel, server-recorded completion/failure, and no page/console errors. Desktop and 320px mobile views have no horizontal overflow. Confirmation-focus, desktop and mobile screenshots are captured; the workflow retains them as a successful-run artifact. |
 | Status/documentation conflict | The active roadmap, architecture, local audit instructions, and plan describe the artifact-scoped gate and keep the workspace `node-forge` finding separate. Earlier Blocked/unblocked dispositions are labeled as historical. This plan remains under `planned/` until the PR outcome is accepted. |
 
 The final local production build produced artifact SHA-256
-`6b13d418f01d346ed81251089faf65bc57e83d688cc11fcf189d3a009a84fef8`. Local
+`3a5281df3217d06fee32a2f4693e8e614059c5167e70564a328539a96b4205be`. Local
 `node:audit` passed, smoked that artifact with HTTP 200, and reported no
 runtime-artifact advisory. Its workspace report still reports high
 `node-forge@1.4.0` through both Nuxt/Listhen paths. This gate change proves the
 current finding does not match this production artifact; it does not fix or
 suppress the workspace vulnerability.
 
+The first hosted check run, [36994171786](https://github.com/methat-ruk/pulsegrid/actions/runs/36994171786),
+failed `web-build` because the Linux-generated source-map path did not match
+the macOS cache-prefixed path. The dependent artifact audit then failed closed
+because the build had not uploaded an artifact. The exact-source identity check
+and regression above address that build blocker; hosted checks must be rerun on
+the new head before calling the candidate ready for merge review.
+
 Other local checks passed: `web:test` (80 tests), `web:lint`, `web:typecheck`
-(including test types), `browser:typecheck`, repository policy, 12 runtime-gate
-tests, and `git diff --check`. Required hosted checks must pass on the pushed
-PR #22 head before calling the candidate ready for merge review. Do not merge
-or move this plan to `completed/` in this task.
+(including test types), `browser:typecheck`, repository policy, 13 runtime-gate
+tests, and `git diff --check`. Do not merge or move this plan to `completed/`
+in this task.
 
 ## Done Criteria
 

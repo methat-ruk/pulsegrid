@@ -129,7 +129,7 @@ function sourceMapReference(moduleSource) {
   return reference
 }
 
-function sourceMapPackageIdentity(source, sourceRoot = '') {
+function sourceMapPackageIdentity(source, sourceRoot = '', generatedApplicationContext = null) {
   const combinedSource = sourceRoot ? path.posix.join(sourceRoot, source) : source
   const identity = parsePackageModuleId(combinedSource)
   if (identity) return identity
@@ -143,6 +143,18 @@ function sourceMapPackageIdentity(source, sourceRoot = '') {
     || normalized.includes('/server/')
     || normalized.includes('/shared/')
     || normalized.includes('/node_modules/.cache/nuxt/')) return null
+  if (generatedApplicationContext) {
+    const generatedSourcePath = path.resolve(
+      generatedApplicationContext.serverDirectory,
+      path.dirname(generatedApplicationContext.mapFile),
+      sourceRoot,
+      source,
+    )
+    const relativeSource = path.relative(generatedApplicationContext.applicationRoot, generatedSourcePath)
+    if (!relativeSource.startsWith('..')
+      && !path.isAbsolute(relativeSource)
+      && generatedApplicationContext.moduleSources.has(relativeSource.split(path.sep).join('/'))) return null
+  }
   throw new Error(`source map source is neither application code nor a frozen package: ${source}`)
 }
 
@@ -244,9 +256,17 @@ export async function collectRuntimeBundleProvenance(outputDirectory, metadataPa
       }
     }
     const mappedPackages = new Map()
+    const applicationModuleSources = new Set(chunk.modules
+      .filter(module => module.kind === 'application')
+      .map(module => module.sourceFile))
     for (const source of sourceMap.sources) {
       if (typeof source !== 'string' || source.length === 0) throw new Error(`runtime bundle source map has an invalid source: ${mapFile}`)
-      const identity = sourceMapPackageIdentity(source, sourceMap.sourceRoot ?? '')
+      const identity = sourceMapPackageIdentity(source, sourceMap.sourceRoot ?? '', {
+        applicationRoot: path.dirname(outputDirectory),
+        serverDirectory,
+        mapFile,
+        moduleSources: applicationModuleSources,
+      })
       if (!identity) continue
       const key = `${identity.name}@${identity.version}\0${identity.storeKey}\0${identity.sourceFile}`
       mappedPackages.set(key, identity)

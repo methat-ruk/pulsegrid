@@ -13,6 +13,7 @@ import {
   validateAuditResult,
   verifyRuntimeEvidence,
 } from './runtime-artifact-gate.mjs'
+import { collectRuntimeBundleProvenance } from './runtime-bundle-provenance.mjs'
 
 async function fixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), 'pulsegrid-runtime-gate-test-'))
@@ -229,6 +230,47 @@ test('runtime evidence fails closed when the audited bundle loses its source map
     const result = await verifyRuntimeEvidence({ outputDirectory: output, evidence, lockPath: path.join(root, 'pnpm-lock.yaml') })
     assert.ok(result.failures.some(failure => failure.includes('source map is missing from the artifact')))
     assert.ok(result.failures.some(failure => failure.includes('downloaded .output hash does not match')))
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('generated Nuxt source map inputs require an exact matching Rollup module identity', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'pulsegrid-runtime-provenance-test-'))
+  const output = path.join(root, '.output')
+  const server = path.join(output, 'server')
+  const chunkDirectory = path.join(server, 'chunks/nitro')
+  const chunkFile = 'chunks/nitro/nitro.mjs'
+  const generatedSource = '.nuxt/nuxt-icon-server-bundle.mjs'
+  const moduleIdentity = { kind: 'application', sourceFile: generatedSource }
+  const metadataPath = path.join(root, '.runtime-bundle-provenance.json')
+  try {
+    await mkdir(chunkDirectory, { recursive: true })
+    await writeFile(path.join(chunkDirectory, 'nitro.mjs'), 'export {}\n//# sourceMappingURL=nitro.mjs.map\n')
+    await writeFile(path.join(chunkDirectory, 'nitro.mjs.map'), JSON.stringify({
+      version: 3,
+      file: 'nitro.mjs',
+      sources: ['../../../../.nuxt/nuxt-icon-server-bundle.mjs'],
+      names: [],
+      mappings: '',
+    }))
+    const provenance = {
+      format: 'nitro-rollup-modules-v1',
+      chunks: [{ file: chunkFile, modules: [moduleIdentity] }],
+    }
+    await writeFile(metadataPath, JSON.stringify(provenance))
+
+    const result = await collectRuntimeBundleProvenance(output, metadataPath)
+    assert.equal(result.chunkCount, 1)
+    assert.equal(result.packages.length, 0)
+    assert.equal(result.chunks[0].modules[0].sourceFile, generatedSource)
+
+    provenance.chunks[0].modules = [{ kind: 'application', sourceFile: '.nuxt/unrelated-generated-module.mjs' }]
+    await writeFile(metadataPath, JSON.stringify(provenance))
+    await assert.rejects(
+      collectRuntimeBundleProvenance(output, metadataPath),
+      /source map source is neither application code nor a frozen package/,
+    )
   } finally {
     await rm(root, { recursive: true, force: true })
   }
