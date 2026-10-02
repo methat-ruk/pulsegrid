@@ -1,8 +1,8 @@
 # MVP-012 — Command Console
 
-Status: Blocked — command-console implementation and behavior evidence are
-complete; the required production dependency audit blocks PR handoff pending a
-separate dependency decision.
+Status: Blocked — command-console implementation and post-patch behavior checks
+pass. The fail-closed production audit still reports one high `node-forge`
+advisory with no published patch, so PR handoff remains blocked.
 
 Branch: `feat/mvp-012-command-console`
 
@@ -393,9 +393,10 @@ supersedes that planning-only limit where applicable.
 ## Implementation evidence and handoff state (2026-10-02)
 
 The user authorized implementation of this reviewed plan on 2026-10-02. The
-current candidate is the working tree on `feat/mvp-012-command-console`, based
-on documentation commit `216af3e`; implementation changes are not committed.
-No API schema, Go behavior, dependency manifest or lockfile changed.
+command-console candidate is committed on `feat/mvp-012-command-console` as
+`27b18ca` (`feat(web): add device command console`), after the earlier planning
+commit `216af3e`. The dependency-audit remediation is a separate, user-authorized
+scope extension dated 2026-10-02. No API schema or Go behavior changed.
 
 The device-detail panel and command feature client now validate canonical
 identifiers/snapshots, confirm a diagnostic PING, persist same-tab idempotency
@@ -411,21 +412,45 @@ states. No production runtime was mutated.
 | --- | --- |
 | Frontend and component behavior | Passed: `web:test`, 73 tests across 12 files. Covers request/snapshot validation, recovery metadata, explicit confirmation, exact-key retry, intent scoping, intermediate states, history-vs-detail freshness, sequential polling, budget exhaustion and unmount cleanup. |
 | Static and source checks | Passed on the reviewed working tree: frontend lint, Nuxt/TypeScript/test typechecks, browser fixture typecheck, repository policy and `git diff --check`. |
-| Browser and user journey | Passed: `test:browser`, all 35 Chromium cases. Command cases exercise actual browser → Nuxt proxy → GraphQL → PostgreSQL/Mosquitto → simulator success/failure, lost-response recovery after reload with one stored command ID, ACK-only -> server-recorded timeout (~2.1 min), keyboard confirm/cancel, a long device key at 320 px, no horizontal overflow and no page/console errors. Screenshot was inspected visually. The runner removed its isolated Compose resources. |
-| API/database integration | Passed: `api:test:integration`, including migrations/schema behavior and integration-tagged race tests against disposable PostgreSQL; owned containers/volume were removed. |
-| MQTT integration | Passed: `mqtt:test:integration`, all core, deadlines, broker-outage expiry and forced-shutdown suites against disposable PostgreSQL/Mosquitto. The deadline cases ran concurrently (~119 s); outage expiry passed (~127 s); runner removed owned resources. |
-| Production build, API race and contract generation/lint | Passed in the full-check run before its audit gate stopped the aggregate. These backend/generated contracts are unchanged by this feature. |
+| Browser and user journey | Passed after the dependency update: `test:browser`, all 35 Chromium cases. Command cases exercise actual browser → Nuxt proxy → GraphQL → PostgreSQL/Mosquitto → simulator success/failure, lost-response recovery after reload with one stored command ID, ACK-only → server-recorded timeout (~2.0 min), keyboard confirm/cancel, a long device key at 320 px, no horizontal overflow and no page/console errors. The prior implementation screenshot was visually inspected. The runner removed its isolated Compose resources. |
+| API/database integration | Passed for command-console commit `27b18ca`: `api:test:integration`, including migrations/schema behavior and integration-tagged race tests against disposable PostgreSQL; owned containers/volume were removed. Not rerun after the dependency-only update; API/Go sources and contracts did not change. |
+| MQTT integration | Passed for command-console commit `27b18ca`: `mqtt:test:integration`, all core, deadlines, broker-outage expiry and forced-shutdown suites against disposable PostgreSQL/Mosquitto. The deadline cases ran concurrently (~119 s); outage expiry passed (~127 s); runner removed owned resources. Not rerun after the dependency-only update; MQTT sources and runtime did not change. |
+| Nuxt/Nitro production runtime | Passed after the dependency update: `web:build` generated Nuxt 4.5.2/Nitro 2.13.4 with the existing `node-server` preset. `.output/server/package.json` lists `devalue@5.9.4` and has no `listhen`/`node-forge`; generated server files contain no references to either package. The known generated Rollup annotation warning remains non-fatal. |
+| Dependency security regression | Passed focused Node reproduction using a pooled 512-byte backing buffer with a secret canary outside a 2-byte view. `stringify`, `stringifyAsync`, and `uneval` emitted only the visible bytes; `stringify`/`stringifyAsync` parse round-tripped `[65, 65]`, `uneval` evaluated to the same values, and malformed `__proto__` parsing was rejected. |
+| Frozen dependency install | Passed: `pnpm install --frozen-lockfile` selected `devalue@5.9.4`; only the devalue lock entry/snapshots changed. The install's Husky prepare hook could not write `.git/config` under the workspace's Git metadata permissions, but the install exited successfully and subsequent checks ran. |
+| Patch candidate review | A read-only review found no concrete compatibility regression or audit bypass. The review confirmed both Nuxt parent ranges accept `5.9.4`, the production audit remains unchanged/fail-closed, and the generated Nitro artifact omits `listhen`/`node-forge`. This was a focused candidate review, not an independent PR review. |
 | Go vulnerability check | Passed separately: govulncheck reports no vulnerable imported/called code paths; three required modules were reported as not apparently called by code. |
-| Production dependency audit | **Failed required gate.** `pnpm run check` stopped at `node:audit`: 7 production advisory records, 6 moderate-or-higher. The unchanged workspace tree resolves `devalue@5.9.2` from Nuxt/Nitro (patched release `5.9.3`) and `node-forge@1.4.0` through `listhen@1.10.1`; npm reports no published patched `node-forge` version. Registry inventory reports installed Nuxt `4.5.2` is also the current version. `package.json` and `pnpm-lock.yaml` are byte-for-byte unchanged from the base. The prior successful `main` CI run predates this current audit result; it does not close it. |
+| Production dependency audit | **Failed required gate after remediation.** `pnpm run node:audit` and `pnpm audit --prod --json` report one high advisory: `node-forge@1.4.0` via `listhen`; all six `devalue` advisories are gone. npm currently publishes no `node-forge` version after `1.4.0`; the verified GitHub advisory lists no patched release and upstream PR [#1152](https://github.com/digitalbazaar/forge/pull/1152) remains open. The Nuxt CLI/Nitro dependency graph remains subject to the project gate even though the inspected production artifact excludes the affected verification path. No finding was suppressed or waived. |
 
-No audit finding was waived, suppressed or turned into a passing result. The
-repository's fail-closed `node-dependency-audit` required check therefore
-remains unsatisfied. Dependency updates/overrides or a replacement runtime
-boundary change the reviewed dependency scope and require explicit approval
-before changing this plan. The feature branch is locally implemented and its
-behavioral evidence passes, but it is not ready for PR handoff or merge while
-that required gate fails. Revisit after a separately approved dependency
-remediation decision or an upstream patched release makes the audit pass.
+### Authorized dependency-audit scope extension (2026-10-02)
+
+The user authorized resolving the production dependency audit blocker before
+PR handoff. The extension is limited to published, same-major compatible
+security patches and the smallest necessary lockfile changes. Do not change
+Nuxt/Nitro architecture or majors, reclassify dependencies, alter audit policy,
+or consume an unmerged dependency patch without a new review and re-plan.
+
+| Advisory group | Root cause and path | Exposure assessment | Decision |
+| --- | --- | --- | --- |
+| Six `devalue@5.9.2` advisories: GHSA-j22f-vq7h-c4qm, GHSA-hx4r-w6wj-j8fg, GHSA-mcm9-63f2-9j32, GHSA-wf3x-273g-mvxv, GHSA-x5rw-q4pp-hg5g, GHSA-4q55-j62x-fr9h | Nuxt and `@nuxt/nitro-server` resolve the same `devalue` package. Nitro serializes SSR payload/config with `stringify` and `uneval` in `@nuxt/nitro-server/dist/runtime/utils/renderer/payload.mjs`; Nuxt reads serialized payloads with `parse` in `nuxt/dist/app/composables/payload.js`. The advisories cover Buffer backing-memory disclosure, `uneval` sparse/repeated-value amplification, client allocation from generated sparse arrays, an unhandled rejection in `stringifyAsync`, and malformed `__proto__` keys in `parse`. `stringifyAsync` is not called by the inspected Nuxt/Nitro paths. | SSR serialization and client parsing are part of the framework runtime. The current app does not establish every advisory-specific hostile input, but the framework exposes the affected serialization/parser operations and the registry provides a compatible patch. | Resolve the existing `^5.9.0` range to published `devalue@5.9.4` in the lockfile. Advisory fixes begin at `5.9.3`; `5.9.4` is the latest compatible patch selected by pnpm and adds no manifest override or framework upgrade. |
+| `node-forge@1.4.0`, [GHSA-86w9-cpqp-85rv](https://github.com/advisories/GHSA-86w9-cpqp-85rv) / CVE-2026-85393 | `nuxt -> @nuxt/cli -> listhen -> node-forge` and `nuxt -> @nuxt/nitro-server -> nitropack -> listhen -> node-forge`. The vulnerable sink is RSA PKCS#1 v1.5 signature verification. The installed `listhen` callsites use Forge to parse configured certificates/keystores, generate keys/certificates, and sign generated certificates; the inspected paths do not call signature verification. Pulsegrid's generated production output uses Nitro's native Node HTTP(S) server and excludes `listhen` and `node-forge`. | The advisory is real and the vulnerable API is present in the dependency, but no call to that API was found in the app, `listhen`, or generated production artifact. The production-only audit still reports it because Nuxt is in the app dependency graph. npm lists `1.4.0` as latest and GitHub lists no patched release; upstream PR [#1152](https://github.com/digitalbazaar/forge/pull/1152) is open. | Do not suppress the finding, reclassify Nuxt to change audit scope, or resolve to an unmerged contributor patch. Leave this advisory visible and the fail-closed audit blocked until a published patched version is available. `listhen`'s existing `^1.4.0` range can accept a future compatible patch, so re-resolve the lockfile then. |
+
+The `devalue` lockfile update is reversible by restoring the lockfile to
+checkpoint `27b18ca`; rollback would restore the six published advisories, so
+keep the patch unless validation finds a compatibility regression. After the
+update, web tests (73), lint, Nuxt/test/browser typechecks, repository policy,
+the production build, the security regression, and all 35 Chromium browser
+tests passed. The required audit remains failed on the single `node-forge`
+advisory. The inspected package callsites do not reach RSA signature
+verification, and the generated production artifact omits Forge, but this
+exposure assessment does not clear the audit gate. Do not represent it as a
+pass by changing scanner scope, dependency classification, or policy. Revisit
+after upstream publishes a patched `node-forge` and the existing transitive
+ranges resolve it.
+
+The command-console behavior evidence remains valid for commit `27b18ca`. The
+remaining audit finding blocks PR handoff/merge; no production deployment or
+readiness is implied.
 
 ## Done Criteria
 

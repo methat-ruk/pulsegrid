@@ -540,10 +540,14 @@ configuration; they do not load development or test dotenv files.
   replace the lockfile. The current `@bomb.sh/tab`/`cac` peer mismatch is an
   upstream diagnostic and is not an authoritative gate.
 - `corepack pnpm run node:audit` keeps low and informational advisories visible
-  but blocks moderate, high, and critical production findings. The current
-  lockfile has no production advisories; the scoped `fontless>esbuild` override
-  keeps its transitive edge on the patched release until upstream widens its
-  dependency range.
+  but blocks moderate, high, and critical production findings. As of
+  2026-10-02, the lockfile resolves the six reported `devalue` advisories to
+  patched `5.9.4`; one high `node-forge@1.4.0` advisory remains through Nuxt and
+  `listhen`, with no published patched release. The check must remain failed
+  until a published compatible fix resolves it. Keep the existing scoped
+  `fontless>esbuild` override on its patched release until upstream widens its
+  dependency range. See the [MVP-012 audit assessment](../roadmap/feature-plans/planned/MVP-012-command-console.md#authorized-dependency-audit-scope-extension-2026-10-02)
+  for the path and exposure evidence.
 - `govulncheck` may list vulnerabilities in required Go modules that current
   code does not reach. They remain visible and are not reported as reachable
   application vulnerabilities.
