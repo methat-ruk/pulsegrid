@@ -108,7 +108,7 @@ The decision state and adoption trigger for each technology are maintained in
 
 ## Project status
 
-**Current phase: MVP-012 console implemented on branch; dependency audit blocks PR handoff**
+**Current phase: MVP-012 console accepted; production artifact audit passes and PR #22 is ready for review**
 
 - Product intent and MVP boundary: documented.
 - Architecture and technology adoption rules: documented.

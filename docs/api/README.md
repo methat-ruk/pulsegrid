@@ -10,9 +10,10 @@ acknowledgement merged as `b209861` (PR #21). Its review findings
 are addressed with response-admission synchronization, strict failure-code
 presence validation, real broker-outage expiry and forced shutdown-drain
 evidence; main CI passed on the merge commit. MVP-012's command-console plan
-is implemented on `feat/mvp-012-command-console`; its real-browser evidence
-passes, while a repository production dependency-audit finding blocks PR
-handoff. No command API contract change was needed.
+is implemented on `feat/mvp-012-command-console`, its real-browser evidence
+passes, and PR #22's production artifact dependency-audit gate passes. The
+separate workspace audit still reports the `node-forge` advisory; it does not
+block the artifact-scoped gate. No command API contract change was needed.
 Production identity, production MQTT, and permanent high-volume storage remain
 deferred.
 
