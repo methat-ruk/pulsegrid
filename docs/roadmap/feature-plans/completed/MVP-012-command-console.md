@@ -1,10 +1,10 @@
 # MVP-012 — Command Console
 
-Status: Complete by explicit owner acceptance on 2026-10-02, with required
-evidence passing. PR #22 remains open, ready for review, and unmerged. The
-runtime gate audits the exact production artifact, including bundled package
-provenance. The workspace audit still reports unresolved high
-`node-forge@1.4.0`; no dependency remediation is claimed. See
+Status: Complete. PR #22 merged into `main` as `1142eb7` on 2026-10-02; main CI
+passed on the merge commit. The runtime gate audits the exact production
+artifact, including bundled package provenance. The workspace audit still
+reports unresolved high `node-forge@1.4.0`; no dependency remediation is
+claimed. See
 [PR #22 review response](#pr-22-review-response) for finding-by-finding
 evidence.
 
@@ -329,7 +329,9 @@ blocker was replaced by the approved production-artifact gate. PR #22 review
 identified four implementation gaps and missing evidence; the fixes and local
 evidence are now complete without changing the product contract or claiming
 that the workspace `node-forge` finding is fixed. Hosted checks and review
-outcome remain tracked on PR #22.
+outcome were recorded on PR #22; the PR has since merged as `1142eb7`, and
+post-merge main CI passed. The unresolved workspace advisory remains separately
+reported.
 
 | Assumption / accepted limit | Evidence, falsifier and response |
 | --- | --- |
@@ -689,7 +691,7 @@ a claim of a new independent review.
 | Failure combinations in F1–F4 | The runtime gate suite passes 13 tests, including a bundled-only advisory, missing/inconsistent evidence, mismatched generated-source attribution, smoke failure and artifact mutation. The panel suite passes 80 tests across 12 files. |
 | Visibility and stale-result evidence | Component regressions prove hidden-tab polling pauses and resumes, an older read cannot replace a newly selected command, and a read for the previous device cannot replace the new device selection. |
 | Visual/focus evidence | All 35 Chromium browser cases pass. The command journey verified page title/route, no Vite error overlay, keyboard focus and Enter-driven confirmation/cancel, server-recorded completion/failure, and no page/console errors. Desktop and 320px mobile views have no horizontal overflow. Confirmation-focus, desktop and mobile screenshots are captured; the workflow retains them as a successful-run artifact. |
-| Status/documentation conflict | The roadmap, architecture, API guide, local audit instructions, plan index, and this plan describe the artifact-scoped gate and keep the workspace `node-forge` finding separate. Earlier Blocked/unblocked dispositions are labeled as historical. The owner accepted the candidate with required evidence; this plan is `Complete` in `completed/` while PR #22 remains open and unmerged. M4 remains `In progress` until the PR is integrated into `main`. |
+| Status/documentation conflict | The roadmap, architecture, API guide, local audit instructions, plan index, and this plan describe the artifact-scoped gate and keep the workspace `node-forge` finding separate. Earlier Blocked/unblocked dispositions are labeled as historical. PR #22 merged as `1142eb7`, main CI passed on the merge commit, this plan is Complete in `completed/`, and M4 is Complete. |
 
 The final local production build produced artifact SHA-256
 `3a5281df3217d06fee32a2f4693e8e614059c5167e70564a328539a96b4205be`. Local
@@ -713,6 +715,14 @@ Other local checks passed: `web:test` (80 tests), `web:lint`, `web:typecheck`
 (including test types), `browser:typecheck`, repository policy, 13 runtime-gate
 tests, and `git diff --check`.
 
+## Merge update (2026-10-02)
+
+PR #22 merged into `main` as `1142eb785cf8b65045388c5b41e4b2c07e980220`.
+The post-merge main workflow [36998916243](https://github.com/methat-ruk/pulsegrid/actions/runs/36998916243)
+passed on the merge commit. M4 is Complete. The workspace `node-forge@1.4.0`
+advisory remains visible and unresolved; the production artifact audit gate
+does not claim dependency remediation.
+
 ## Done Criteria
 
 Planning closeout: decisions, ownership, API/data/security boundaries,
@@ -724,9 +734,6 @@ one logical identity, follows truthful server-owned progress and understands
 COMPLETED, explicit FAILED or stored TIMED_OUT without logs. Required real-
 boundary, negative, async/cleanup, accessibility and adjacent regression
 evidence passes on the reviewed candidate; docs match actual behavior. The
-required dependency-audit gate and any later applicable approvals/blockers must
-be resolved before PR handoff/merge and completed placement. The owner explicitly
-accepted this candidate after all required branch-protection checks passed; PR
-#22 remains open and unmerged. M4 remains in progress until the PR is integrated
-into `main`. This does not certify MVP-013's combined journey or production
-readiness.
+required dependency-audit gate passed, PR #22 merged as `1142eb7`, and post-
+merge main CI passed. M4 is Complete. This does not certify MVP-013's combined
+journey or production readiness.
