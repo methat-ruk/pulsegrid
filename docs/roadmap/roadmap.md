@@ -112,12 +112,13 @@ as `9ce9e7c` after its reviewed candidate and required checks passed. M2 is
 complete; MVP-008 merged as `fd0a383` (PR #18), and MVP-009 merged as `7e3c336`
 (PR #19), completing M3. MVP-010 merged as `9d78301` (PR #20), and MVP-011
 merged as `b209861` (PR #21), with main CI passing. MVP-012's command-console
-implementation and behavioral evidence are on PR #22. The production runtime
+implementation and behavioral evidence are on PR #22. Its production runtime
 audit gate checks the exact built artifact, including bundled package
 provenance; the workspace `node-forge` advisory remains separately unresolved.
-PR #22 review fixes are implemented and local validation passes; its hosted
-required checks and review outcome determine merge readiness. M4 remains in
-progress until the console outcome is accepted.
+After F1–F4 were fixed, all 14 required branch-protection contexts passed on
+`c289648`; the owner accepted MVP-012 with that evidence and the PR is ready for
+review but remains open and unmerged. Its plan is Complete by explicit owner
+acceptance. M4 remains in progress until the console is integrated into `main`.
 
 ## Milestones
 
@@ -212,7 +213,7 @@ Plans:
 
 - [MVP-010 — Command model and GraphQL API](feature-plans/completed/MVP-010-command-model-graphql-api.md) — merged as `9d78301` (PR #20); main CI passed
 - [MVP-011 — MQTT command delivery and acknowledgement](feature-plans/completed/MVP-011-mqtt-command-delivery-acknowledgement.md) — merged as `b209861` (PR #21); main CI passed
-- [MVP-012 — Command console](feature-plans/planned/MVP-012-command-console.md) — PR #22 review fixes implemented; hosted required checks are tracked on the PR, while workspace `node-forge` remains unresolved outside the runtime artifact gate
+- [MVP-012 — Command console](feature-plans/completed/MVP-012-command-console.md) — owner-accepted with required checks passing on `c289648`; PR #22 is open and unmerged; workspace `node-forge` remains unresolved outside the runtime artifact gate
 
 ### M5 — MVP acceptance
 

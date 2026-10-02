@@ -1,12 +1,12 @@
 # MVP-012 — Command Console
 
-Status: PR #22 review fixes are implemented and locally validated. The active
-delivery candidate and hosted check results are tracked on PR #22; this plan
-remains under `planned/` until the outcome is accepted. The runtime gate audits
-the exact production artifact, including bundled package provenance. The
-workspace audit still reports unresolved high `node-forge@1.4.0`; no dependency
-remediation is claimed. See [PR #22 review response](#pr-22-review-response)
-for finding-by-finding evidence.
+Status: Complete by explicit owner acceptance on 2026-10-02, with required
+evidence passing. PR #22 remains open, ready for review, and unmerged. The
+runtime gate audits the exact production artifact, including bundled package
+provenance. The workspace audit still reports unresolved high
+`node-forge@1.4.0`; no dependency remediation is claimed. See
+[PR #22 review response](#pr-22-review-response) for finding-by-finding
+evidence.
 
 Branch: `feat/mvp-012-command-console`
 
@@ -689,7 +689,7 @@ a claim of a new independent review.
 | Failure combinations in F1–F4 | The runtime gate suite passes 13 tests, including a bundled-only advisory, missing/inconsistent evidence, mismatched generated-source attribution, smoke failure and artifact mutation. The panel suite passes 80 tests across 12 files. |
 | Visibility and stale-result evidence | Component regressions prove hidden-tab polling pauses and resumes, an older read cannot replace a newly selected command, and a read for the previous device cannot replace the new device selection. |
 | Visual/focus evidence | All 35 Chromium browser cases pass. The command journey verified page title/route, no Vite error overlay, keyboard focus and Enter-driven confirmation/cancel, server-recorded completion/failure, and no page/console errors. Desktop and 320px mobile views have no horizontal overflow. Confirmation-focus, desktop and mobile screenshots are captured; the workflow retains them as a successful-run artifact. |
-| Status/documentation conflict | The active roadmap, architecture, local audit instructions, and plan describe the artifact-scoped gate and keep the workspace `node-forge` finding separate. Earlier Blocked/unblocked dispositions are labeled as historical. This plan remains under `planned/` until the PR outcome is accepted. |
+| Status/documentation conflict | The roadmap, architecture, API guide, local audit instructions, plan index, and this plan describe the artifact-scoped gate and keep the workspace `node-forge` finding separate. Earlier Blocked/unblocked dispositions are labeled as historical. The owner accepted the candidate with required evidence; this plan is `Complete` in `completed/` while PR #22 remains open and unmerged. M4 remains `In progress` until the PR is integrated into `main`. |
 
 The final local production build produced artifact SHA-256
 `3a5281df3217d06fee32a2f4693e8e614059c5167e70564a328539a96b4205be`. Local
@@ -700,16 +700,18 @@ current finding does not match this production artifact; it does not fix or
 suppress the workspace vulnerability.
 
 The first hosted check run, [36994171786](https://github.com/methat-ruk/pulsegrid/actions/runs/36994171786),
-failed `web-build` because the Linux-generated source-map path did not match
-the macOS cache-prefixed path. The dependent artifact audit then failed closed
-because the build had not uploaded an artifact. The exact-source identity check
-and regression above address that build blocker; hosted checks must be rerun on
-the new head before calling the candidate ready for merge review.
+failed `web-build` because Linux emitted a direct generated `.nuxt` source-map
+path that the collector did not yet recognize. The dependent artifact audit
+then failed closed because the build had not uploaded an artifact. The exact
+Rollup-source identity check and regression above fixed that blocker. Follow-up
+[run 36995769777](https://github.com/methat-ruk/pulsegrid/actions/runs/36995769777)
+passed all jobs on `c2896487ee6517c2c14c2aab4db73f58c2c09e85`, including all 14
+required branch-protection contexts, `web-build`, `node-dependency-audit`, and
+`browser-smoke`.
 
 Other local checks passed: `web:test` (80 tests), `web:lint`, `web:typecheck`
 (including test types), `browser:typecheck`, repository policy, 13 runtime-gate
-tests, and `git diff --check`. Do not merge or move this plan to `completed/`
-in this task.
+tests, and `git diff --check`.
 
 ## Done Criteria
 
@@ -723,5 +725,8 @@ COMPLETED, explicit FAILED or stored TIMED_OUT without logs. Required real-
 boundary, negative, async/cleanup, accessibility and adjacent regression
 evidence passes on the reviewed candidate; docs match actual behavior. The
 required dependency-audit gate and any later applicable approvals/blockers must
-be resolved before PR handoff/merge and completed placement. This does not
-certify MVP-013's combined journey or production readiness.
+be resolved before PR handoff/merge and completed placement. The owner explicitly
+accepted this candidate after all required branch-protection checks passed; PR
+#22 remains open and unmerged. M4 remains in progress until the PR is integrated
+into `main`. This does not certify MVP-013's combined journey or production
+readiness.

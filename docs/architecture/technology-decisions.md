@@ -287,15 +287,17 @@ recovery and validation. Revisit
 before effectful commands, production identity, multiple dispatchers, required
 durable response replay or measured backlog pressure.
 
-## MVP-012 command-console decision (planned, 2026-10-02)
+## MVP-012 command-console decision (accepted, 2026-10-02)
 
-The [MVP-012 plan](../roadmap/feature-plans/planned/MVP-012-command-console.md)
+The [MVP-012 plan](../roadmap/feature-plans/completed/MVP-012-command-console.md)
 selects existing native fetch, local component state, section-local bounded
 command polling and manual recent-history refresh. No GraphQL cache, polling
 library, global store, subscription/SSE/WebSocket, broker or dependency change
-is selected. The device-detail client and panel are implemented on the MVP-012
-branch, and required browser/recovery evidence passes. The branch's production
-dependency audit gate currently blocks PR handoff; the technology choices and
+to the frontend architecture is selected. The device-detail client and panel
+are implemented on the MVP-012 branch with required browser/recovery evidence.
+PR #22's production artifact dependency gate and required CI pass on
+`c289648`; the PR remains open and unmerged. The workspace `node-forge` finding
+remains unresolved and is reported separately. The technology choices and
 boundaries above remain unchanged.
 
 Manual-only refresh is simpler but leaves automatic progress unclear for the

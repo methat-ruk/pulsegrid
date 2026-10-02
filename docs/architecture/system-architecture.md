@@ -211,8 +211,9 @@ out of scope. PR #21 merged as `b209861`; main CI passed on that commit.
 
 ### MVP-012 command console boundary (implemented on feature branch)
 
-The [MVP-012 plan](../roadmap/feature-plans/planned/MVP-012-command-console.md)
-was revised and author-reviewed on 2026-10-02; implementation is in progress.
+The [MVP-012 plan](../roadmap/feature-plans/completed/MVP-012-command-console.md)
+was revised and author-reviewed on 2026-10-02; the owner accepted its required
+evidence on the review-ready candidate. PR #22 remains open and unmerged.
 It places a device-keyed command panel on loaded device detail and a typed
 feature client over the existing same-origin GraphQL transport. PostgreSQL and
 the command module remain lifecycle authority; browser storage holds only
@@ -227,9 +228,9 @@ production path or shared realtime transport is added. The plan owns exact
 budgets and recovery limits. PR #22's required dependency gate audits the
 production artifact's physical packages and bundled sources against the frozen
 graph. The workspace `node-forge` finding remains unresolved and separately
-reported. Review fixes and affected local browser/runtime evidence pass;
-hosted required checks and review outcome are tracked on PR #22. MVP-012 is
-not marked complete before the PR outcome is accepted.
+reported. Review fixes and affected local browser/runtime evidence pass, and
+all hosted required checks passed on `c289648`. MVP-012 is marked Complete by
+owner acceptance; M4 remains in progress until PR #22 is integrated into `main`.
 
 ## Conditional target architecture
 

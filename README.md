@@ -131,11 +131,11 @@ The decision state and adoption trigger for each technology are maintained in
   operations merged as `9d78301` (PR #20), with main CI passing.
   MVP-011's MQTT delivery, response ingestion, durable retry and automatic
   timeout merged as `b209861` (PR #21), with main CI passing. The
-  [MVP-012 command-console plan](docs/roadmap/feature-plans/planned/MVP-012-command-console.md)
-  is implemented on `feat/mvp-012-command-console`; behavioral evidence passes.
-  The current production dependency-audit gate blocks PR handoff pending a
-  dependency decision. Production identity and production readiness remain
-  deferred.
+  [MVP-012 command-console plan](docs/roadmap/feature-plans/completed/MVP-012-command-console.md)
+  is Complete by explicit owner acceptance on the review-ready PR #22 candidate;
+  required CI passed on `c289648`. PR #22 remains open and unmerged, so M4 stays
+  in progress until integration to `main`. Its production artifact audit gate
+  passes; the workspace `node-forge` advisory remains unresolved and separate.
   Production identity and production readiness remain deferred.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
   required checks include browser evidence for the real local API readiness

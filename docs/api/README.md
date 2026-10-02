@@ -220,10 +220,11 @@ This remains an anonymous loopback development/test path and is not production
 device authentication or multi-replica coordination. The PR review comments
 were addressed before merge; main CI passed on `b209861`.
 
-The planned device-detail consumer is owned by the
-[MVP-012 plan](../roadmap/feature-plans/planned/MVP-012-command-console.md).
-It reuses create/detail/recent-history operations and server-owned statuses;
-no API field, deadline or tenant-authority change is part of the implementation.
+The device-detail consumer is implemented under the accepted
+[MVP-012 plan](../roadmap/feature-plans/completed/MVP-012-command-console.md)
+and is tracked on the open, unmerged PR #22. It reuses create/detail/recent-history
+operations and server-owned statuses; no API field, deadline or tenant-authority
+change is part of the implementation.
 
 ## Current operational contract
 

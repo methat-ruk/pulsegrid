@@ -556,8 +556,8 @@ configuration; they do not load development or test dotenv files.
   `node-forge` nor `listhen` is in the verified artifact. This changes the
   required audit boundary; the workspace vulnerability remains unresolved and
   visible. See the
-  [MVP-012 review evidence](../roadmap/feature-plans/planned/MVP-012-command-console.md#pr-22-review-response)
-  and [artifact-gate decision](../roadmap/feature-plans/planned/MVP-012-command-console.md#re-plan-3-standalone-nitro-contract-and-artifact-gate-implementation).
+  [MVP-012 review evidence](../roadmap/feature-plans/completed/MVP-012-command-console.md#pr-22-review-response)
+  and [artifact-gate decision](../roadmap/feature-plans/completed/MVP-012-command-console.md#re-plan-3-standalone-nitro-contract-and-artifact-gate-implementation).
 - `govulncheck` may list vulnerabilities in required Go modules that current
   code does not reach. They remain visible and are not reported as reachable
   application vulnerabilities.
