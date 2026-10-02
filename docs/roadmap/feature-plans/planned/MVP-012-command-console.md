@@ -1,8 +1,9 @@
 # MVP-012 — Command Console
 
-Status: Blocked — command-console implementation and post-patch behavior checks
-pass. The fail-closed production audit still reports one high `node-forge`
-advisory with no published patch, so PR handoff remains blocked.
+Status: Ready for PR handoff — local validation passed for the required
+production runtime artifact gate. Hosted GitHub CI remains pending for the PR.
+The workspace audit still reports the unresolved high `node-forge` advisory as
+a separate finding; no dependency remediation is claimed.
 
 Branch: `feat/mvp-012-command-console`
 
@@ -451,6 +452,224 @@ ranges resolve it.
 The command-console behavior evidence remains valid for commit `27b18ca`. The
 remaining audit finding blocks PR handoff/merge; no production deployment or
 readiness is implied.
+
+### Re-plan 1: audit the supported Nitro runtime artifact (approved 2026-10-02; implementation paused)
+
+The previous workspace audit blocks on `node-forge@1.4.0` because the root app
+manifest lists `nuxt` as a production dependency. The production build is the
+Nuxt/Nitro `node-server` preset. Its generated `.output/server/package.json`
+lists the external runtime dependencies, including patched `devalue@5.9.4`,
+and does not list Nuxt, `listhen`, or `node-forge`. The official Nuxt v4 Node
+deployment contract runs `node .output/server/index.mjs`; the official minimal
+Nuxt v4 package example still lists `nuxt` under `dependencies`. Keep that
+supported workspace convention and audit the generated runtime graph as a
+separate, isolated artifact boundary. See [Nuxt Node deployment](https://nuxt.com/docs/4.x/getting-started/deployment),
+[Nuxt package guidance](https://nuxt.com/docs/4.x/directory-structure/package),
+and the [node-forge advisory](https://github.com/advisories/GHSA-86w9-cpqp-85rv).
+
+Current registry checks on 2026-10-02 find no published patched dependency
+route: `node-forge` latest is `1.4.0`; Nuxt `4.5.2`, `@nuxt/cli` `3.37.0`,
+Nitro `2.13.4`, and Listhen `1.10.1` are also their current latest versions.
+Listhen `1.10.1` still declares `node-forge: ^1.4.0`. The advisory lists no
+patched release, and upstream [PR #1152](https://github.com/digitalbazaar/forge/pull/1152)
+remains open. A same-major update or override cannot select a published fixed
+version today.
+
+| Option | Impact / disposition |
+| --- | --- |
+| Wait for an official patched `node-forge`, Listhen, Nuxt, or Nitro release | Smallest future dependency fix: resolve the existing compatible range and lock it, then rerun the current gate and runtime regression checks. It does not unblock MVP-012 now. |
+| Consume upstream PR #1152, a fork, or a locally patched package | Rejected: the fix is unmerged and unpublished, package provenance/review is unresolved, and the user prohibits using it to pass validation. |
+| Upgrade Nuxt/Nitro to a major or replace their listener architecture | Rejected for this plan: no newer published parent version fixes the path; changing the framework/runtime adds unnecessary compatibility and maintenance risk. Re-plan separately if a supported parent release requires it. |
+| Audit the exact generated Nitro production runtime package | **Selected and approved.** Keep the current Nuxt/Nitro versions and workspace dependency classifications. Build `.output` with the `node-server` preset and stage the complete output outside the workspace. Use its generated `server/package.json` to create a lock with the pinned pnpm version, install that locked runtime closure, run a fail-closed `pnpm audit --prod`, and smoke the same staged artifact with those exact installed dependencies. The workspace advisory remains visible as a separate report and is not described as fixed or as a clean workspace audit. Only the artifact-scoped production audit can satisfy the production runtime gate. |
+
+An isolated feasibility check already copied the generated Nitro runtime
+manifest to a temporary directory, generated a temporary pnpm lock, and ran
+`pnpm audit --prod`: it returned zero advisories. The temporary directory was
+removed. This proves the audit target is technically usable; it does not prove
+the staged runtime can start, that CI passes the same artifact, or that a
+production installation uses this package boundary.
+
+This is a **Material Change (Tier 2)** to the required audit graph and CI
+ordering, rather than a package-version remediation. The user approved the
+artifact-scoped boundary on 2026-10-02. To preserve fail-closed behavior, the
+implementation must:
+
+- build and pass the exact complete `.output` artifact from the audited
+  revision into the audit job; missing or stale output is a failure
+- reject an unexpected Nitro preset or malformed/missing runtime manifest
+- create and retain the isolated runtime lock with the audited artifact; run
+  the audit and production smoke using that same locked dependency tree
+- fail if the artifact runtime audit reports any moderate-or-higher advisory,
+  package installation fails, or the production smoke fails
+- emit the workspace `pnpm audit --prod` result separately, retain the
+  `node-forge` advisory and its dependency path, and state that the workspace
+  advisory remains unresolved; do not label that workspace scan clean or
+  suppress its output
+- fail if the artifact manifest, lock/install, runtime audit, dependency-tree
+  inspection, or production smoke is incomplete; the artifact audit must not
+  pass by falling back to the root workspace graph
+- revisit the disposition if `listhen`/`node-forge` enters the generated
+  artifact, a vulnerable verification call becomes reachable, or the actual
+  production start/install contract changes
+
+The approved change touches the Node audit runner, `node-dependency-audit` CI
+job, and local audit instructions. It does not require changing
+`package.json`, `pnpm-lock.yaml`, Nuxt/Nitro versions, production app code, or
+the supported Node server entry point. Rollback is to restore the
+workspace-based audit job/script; the production gate will then fail on the
+visible `node-forge` workspace finding. The workspace scan remains independent
+evidence after this change and continues to report `node-forge` while that
+published advisory applies. MVP-012 remains Blocked until the approved
+artifact-scoped audit, frozen install, production smoke, and affected regression
+checks all pass. MVP-013/M5 remains planned behind M4.
+
+**Approval record:** the user approved implementation of this exact
+artifact-scoped audit boundary on 2026-10-02, with no suppression, no
+unmerged patch, and no dependency-classification changes. This approval does
+not authorize changing the production deployment artifact or its install/start
+contract; if evidence requires either change, stop and re-plan.
+
+### Re-plan 2: preserve the frozen build dependency resolutions (approved 2026-10-02)
+
+Implementation of re-plan 1 is paused. An end-to-end probe that generated a
+new lock from `.output/server/package.json` passed its own audit and HTTP smoke,
+but its installed graph did not match the graph used by the frozen workspace
+build: it selected `@antfu/install-pkg@2.1.0` instead of `2.0.1`,
+`nanoid@3.3.19` instead of `3.3.18`, and `unplugin@3.4.0` instead of the
+workspace's `3.3.0`/`2.3.11` resolutions. That zero-advisory result is not
+valid evidence for this gate and must not be used to pass it.
+
+A temporary feasibility probe appeared to seed an isolated runtime-package
+workspace from the repository's `pnpm-lock.yaml`, audit it, and return HTTP
+200. Later direct-resolution and filesystem checks invalidated that result.
+The 30 package name/version entries appeared in the workspace production
+graph, but that did not prove their installed peer-context snapshots or package
+contents existed.
+
+That probe is not yet proof of an identical full graph. A follow-up comparison
+found different peer-context snapshot keys for `unhead@3.4.0` and
+`vue@3.5.42` between the runtime-only importer and the full workspace importer.
+Those may reflect build-only peers absent from the Nitro runtime manifest, but
+they must be reconciled against the intended production install contract before
+this becomes a required gate. The repository has no production deploy/container
+workflow today (`OPS-001` remains deferred), so the verified target is the
+supported Nitro Node-server output, not an unconfigured deployment platform.
+
+| Option | Impact / disposition |
+| --- | --- |
+| Keep resolving the generated runtime manifest against current registry ranges | Rejected: the installed tree drifted from the build lock for three packages, so its audit/smoke result did not prove the dependency set under review. |
+| Seed an isolated runtime-package lock from the audited revision's frozen workspace lock | **Selected and approved, but implementation stopped at the proof gate.** Transfer the exact complete `.output` tar from `web-build`; construct a temporary `runtime` package around the unchanged output; copy its Nitro server manifest to that staging package root; seed lock generation from the same revision's `pnpm-lock.yaml` and existing workspace overrides/build-script policy; prove a frozen install, artifact-package-scoped audit, and smoke all use that staged tree. Preserve a separate raw workspace audit report showing `node-forge`. |
+| Put a new lockfile or a different package manifest into the shipped `.output`, change dependency classification, or alter the deployment start/install contract | Rejected for this re-plan: each changes the deployment artifact or a key assumption and requires a separate plan/approval. |
+
+Before this revised gate can pass, implementation must validate the exact
+runtime importer and every installed package resolution against the source
+lock, including integrity and peer-context identity. It must explicitly
+resolve the observed `unhead` and `vue` peer-context differences; name/version
+membership alone is insufficient. Any runtime resolution not derivable from
+the frozen source lock, or any required install/build-script behavior that
+cannot be reproduced with the repository's policy, keeps MVP-012 Blocked and
+requires another re-plan. CI must continue to pass the exact same-run build
+artifact, fail on missing/stale output, preserve the original `.output`, and
+use the same installed tree for audit and smoke. The workspace report must
+remain separate and must state that the `node-forge` advisory remains in the
+workspace dependency graph.
+
+The user approved this revised lock provenance and staging layout on
+2026-10-02. The earlier fresh-lock implementation attempt was reverted after
+it selected transitive versions outside the build graph; no result from that
+attempt is counted as gate evidence. Re-plan 2 was then implemented far enough
+to test frozen staging, but the peer-context proof below failed. No result from
+the earlier audit-zero/HTTP-200 probe is counted as gate evidence.
+
+### Re-plan 3: standalone Nitro contract and artifact-gate implementation (approved 2026-10-02)
+
+The failed Re-plan 2 staging experiments were not the production install
+contract. The isolated package importer tried to install a new peer-resolved
+tree, although Nitro already places the required package files inside the
+production output. The default frozen install left dangling `unhead` and `vue`
+links. Setting `autoInstallPeers: false` instead retained build peer contexts
+and added `vite`/`typescript` to the 145-package staged graph. Neither staging
+tree is used as evidence for the current contract.
+
+#### Verified production contract
+
+| Contract item | Evidence |
+| --- | --- |
+| Runtime target and command | Repository build and fresh artifact metadata select Nuxt 4.5.2 with Nitro 2.13.4 `node-server`; the supported command is `NODE_ENV=production node .output/server/index.mjs`. Nuxt and Nitro document copying the standalone `.output` directory and running Node; they prescribe no runtime package manager, install command, or runtime lock for this preset ([Nuxt deployment](https://nuxt.com/docs/4.x/getting-started/deployment), [Nitro Node runtime](https://nitro.build/deploy/runtimes/node)). |
+| Runtime package tree | The generated `.output/server/package.json` has 21 exact-version dependencies and no `packageManager` or lockfile. `.output/server/node_modules` contains exactly those 21 package directories as pruned files inside the artifact; all 145 non-`package.json` files match the frozen-install package contents byte-for-byte. Running a byte-identical `.output` copy from a temporary directory with no workspace or parent `node_modules` returned HTTP 200 for `/`; the artifact hash was unchanged by the smoke. Nitro prunes package exports, so verification must resolve emitted import specifiers rather than assume every manifest package root is independently importable. |
+| Build package manager and lock provenance | The repository pins Node `24.20.0` and pnpm `12.3.4`. `web-build` runs `corepack pnpm install --frozen-lockfile`, then `corepack pnpm run web:build`; that script runs `nuxt build` in production mode. The project lock document in `pnpm-lock.yaml` is the second YAML document and contains the `apps/web-console` importer; the first document records pnpm's environment packages. This two-document distinction is part of pnpm's documented lock format ([pnpm lockfile](https://pnpm.io/lockfile)). |
+| Package resolution and integrity | All 21 vendored name/version pairs have resolution-integrity entries in the frozen project lock and appear in the workspace production graph. Nitro's 145 non-`package.json` package files match the corresponding frozen-install package files byte-for-byte. The generated manifest and physical package inventory match 21/21. |
+| Runtime edges | A static traversal from `.output/server/index.mjs`, including literal dynamic imports, reached 154 JavaScript module files and found 23 package-to-package edges. All 23 edges and all 21 runtime nodes are present in the frozen workspace production graph; no emitted import was unresolved and no non-literal dynamic import or `require` was found. |
+| Optional peers | The frozen workspace contexts bind `unhead@3.4.0` to optional peer `vite` and `vue@3.5.42` to optional peer `typescript`. Their package metadata marks both peers optional. Nitro's vendored output contains neither provider; the emitted runtime import graph has no edge to them and the isolated server smoke passes. The runtime graph is therefore the exact packaged graph, not a peerless pnpm reconstruction or the larger workspace graph. |
+| Production advisory report | The current raw workspace `pnpm audit --prod` remains failed with one high `node-forge@1.4.0` advisory through `nuxt > @nuxt/cli > listhen` and `nuxt > @nuxt/nitro-server > nitropack > listhen`. Neither `node-forge` nor `listhen` is in the 21-package Nitro artifact. Intersecting the workspace audit findings with the verified artifact package/version inventory currently yields no matching advisory; this is a scope-projection result, not a required-gate pass. |
+
+The repo has no provider-specific deployment workflow or container image
+(`OPS-001` remains deferred). That does not leave the Node-server runtime
+install contract open: the selected production output is the complete Nitro
+`.output` tree and the deployed process starts it directly with Node. No
+package-manager install runs at runtime; pnpm and the frozen root lock govern
+build-time dependency resolution only. There is no runtime lockfile or install
+option to reconstruct.
+
+#### Required-gate implementation
+
+The approved change keeps Nuxt's standard standalone Node-server contract:
+`apps/web-console/.output` is built once by `web-build`, and its complete
+contents plus a lock-backed evidence sidecar are uploaded as one same-run
+workflow artifact. `node-dependency-audit` depends on `web-build`, downloads
+that artifact, and does not install packages, rebuild `.output`, or construct a
+second dependency tree. It verifies the source commit/run, frozen-lock hash,
+artifact hash, Nitro manifest and physical package inventory, package
+resolution integrity and source file content, emitted runtime imports, and
+peer dispositions. It then runs the production smoke directly from the
+downloaded `.output` and checks that the artifact hash is unchanged.
+
+The build evidence is generated from the frozen production importer and
+contains the complete static module traversal. It matched all 21 artifact
+packages to the frozen production graph and their lock integrity entries. The
+emitted traversal reached 154 JavaScript modules and verified all 23
+package-to-package edges against that graph. `unhead@3.4.0`'s optional `vite`
+peer and `vue@3.5.42`'s optional `typescript` peer retain their frozen workspace
+contexts; both are absent from the artifact and have no emitted runtime edge.
+All 145 non-`package.json` files across the vendored packages match the frozen
+source package contents. Package identity and dependency/peer metadata match
+the selected frozen package instances separately.
+
+The required job runs `pnpm audit --prod` without installing or reconstructing
+dependencies. It keeps the full workspace JSON report as a separate uploaded
+artifact and projects each finding onto the verified runtime package/version
+inventory. Any affected artifact version blocks, regardless of severity. The
+gate also fails when artifact metadata or provenance is unavailable or
+mismatched, a package or lock integrity cannot be proven, an import is
+unresolved or absent from the frozen graph, peer disposition changes,
+`node-forge`/`listhen` enters the artifact, or the production smoke fails. The
+required GitHub status context remains `node-dependency-audit`.
+
+The workspace audit continues to report high `node-forge@1.4.0` through both
+`nuxt > @nuxt/cli > listhen > node-forge` and
+`nuxt > @nuxt/nitro-server > nitropack > listhen > node-forge`. The exact
+artifact inventory contains neither `node-forge` nor `listhen`, so the current
+workspace finding does not match the production artifact. The finding remains
+visible and unresolved; this gate change does not suppress it, alter dependency
+classification, or claim that the vulnerability was fixed.
+
+#### Implementation validation
+
+The final local validation passed `pnpm install --frozen-lockfile`, one
+production Nuxt/Nitro build, runtime evidence preparation, eight fail-closed
+gate tests, the workspace audit and production smoke. A byte-identical
+download simulation passed audit and smoke with the same artifact hash
+(`72ccd370fb50dc10cdbb273894e9d920161d7ea1397a1297b3bc39be5ad9d354`) before
+and after smoke and returned HTTP 200 from `/`. The audit report retained the
+high `node-forge` finding and both paths. The affected web regression checks
+also passed: 73 frontend tests, web lint, Nuxt/test/browser typechecks and
+repository policy. The workflow YAML and artifact/job relationship were
+validated locally, and `git diff --check` passed. GitHub branch protection
+still requires the strict `node-dependency-audit` context. Hosted CI has not
+run for this unpushed revision.
+
+**Current disposition:** MVP-012 is unblocked for PR handoff; the hosted
+required checks will run on the PR. MVP-013 remains planned behind M4.
 
 ## Done Criteria
 

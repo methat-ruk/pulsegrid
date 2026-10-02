@@ -539,14 +539,19 @@ configuration; they do not load development or test dotenv files.
 - If `corepack pnpm run setup` reports a lockfile or peer diagnostic, do not
   replace the lockfile. The current `@bomb.sh/tab`/`cac` peer mismatch is an
   upstream diagnostic and is not an authoritative gate.
-- `corepack pnpm run node:audit` keeps low and informational advisories visible
-  but blocks moderate, high, and critical production findings. As of
-  2026-10-02, the lockfile resolves the six reported `devalue` advisories to
-  patched `5.9.4`; one high `node-forge@1.4.0` advisory remains through Nuxt and
-  `listhen`, with no published patched release. The check must remain failed
-  until a published compatible fix resolves it. Keep the existing scoped
-  `fontless>esbuild` override on its patched release until upstream widens its
-  dependency range. See the [MVP-012 audit assessment](../roadmap/feature-plans/planned/MVP-012-command-console.md#authorized-dependency-audit-scope-extension-2026-10-02)
+- `corepack pnpm run web:build` creates `.output` once and writes a temporary
+  runtime evidence file bound to that output and the frozen root lock.
+  `corepack pnpm run node:audit` requires that build evidence, retains the full
+  workspace `pnpm audit --prod` report, and blocks when the exact production
+  artifact contains a package version affected by an advisory or its evidence
+  and production smoke are incomplete. As of 2026-10-02, the workspace report
+  still shows the high `node-forge@1.4.0` advisory through Nuxt and `listhen`;
+  `node-forge` is absent from the generated production artifact, so the runtime
+  artifact gate can pass while the workspace finding remains unresolved and
+  visible. This is an audit-boundary change, not a vulnerability fix. Keep the
+  existing scoped `fontless>esbuild` override on its patched release until
+  upstream widens its dependency range. See the
+  [MVP-012 audit assessment](../roadmap/feature-plans/planned/MVP-012-command-console.md#re-plan-3-standalone-nitro-contract-and-artifact-gate-implementation)
   for the path and exposure evidence.
 - `govulncheck` may list vulnerabilities in required Go modules that current
   code does not reach. They remain visible and are not reported as reachable
