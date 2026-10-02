@@ -293,8 +293,10 @@ The [MVP-012 plan](../roadmap/feature-plans/planned/MVP-012-command-console.md)
 selects existing native fetch, local component state, section-local bounded
 command polling and manual recent-history refresh. No GraphQL cache, polling
 library, global store, subscription/SSE/WebSocket, broker or dependency change
-is selected. This is a reviewed implementation direction; no command UI has
-been implemented yet.
+is selected. The device-detail client and panel are implemented on the MVP-012
+branch, and required browser/recovery evidence passes. The branch's production
+dependency audit gate currently blocks PR handoff; the technology choices and
+boundaries above remain unchanged.
 
 Manual-only refresh is simpler but leaves automatic progress unclear for the
 two-minute command journey. A shared realtime transport adds server/runtime

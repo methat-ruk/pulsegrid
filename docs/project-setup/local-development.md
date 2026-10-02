@@ -223,6 +223,41 @@ corepack pnpm run mqtt:test:integration:outage
 corepack pnpm run mqtt:test:integration:shutdown
 ```
 
+### MVP-012 command console
+
+The device detail page has a **Diagnostic command** panel. Keep the local API
+command runtime enabled with `PULSEGRID_MQTT_COMMAND_MODE=development`,
+`PULSEGRID_IDENTITY_MODE=development`, and the development loopback broker;
+after migration through `008`, restart the API and run a receiver for the device
+in another terminal:
+
+```sh
+PULSEGRID_SIMULATOR_MODE=commands \
+PULSEGRID_SIMULATOR_COMMAND_RESPONSE=success \
+PULSEGRID_MQTT_DEVICE_ID=REPLACE_WITH_DEVICE_UUID \
+corepack pnpm run mqtt:simulator
+```
+
+Open `/devices/:id`, choose **Send PING**, review the diagnostic and
+acceptance-versus-completion explanation, then confirm. The panel shows the
+stored state and latest 20 commands. `failure` returns an explicit device
+failure; `ack-only` records receipt and later reaches the server's stored
+two-minute timeout; `silent` sends no response. The UI never treats broker
+acceptance, ACK or its own tracking budget as completion/timeout.
+
+When the HTTP response is lost, return to the same device and choose **Recover
+this submission**. It reuses the same device/type/key; it cannot create a second
+logical command for an already committed intent. This recovery record lives in
+the current browser tab's session storage. Closing the tab, clearing site data,
+or using another tab is outside this recovery guarantee; inspect recent command
+history before intentionally issuing a new PING.
+
+`corepack pnpm run test:browser` exercises console completion, explicit failure,
+lost-response recovery after reload, and ACK-only expiry through real
+PostgreSQL, Mosquitto, and the standalone simulator. The expiry scenario follows
+the unchanged backend two-minute deadline and has a longer bounded browser-test
+budget; the rest of the suite keeps its normal test timeout.
+
 If `127.0.0.1:1883` or `127.0.0.1:11883` is already occupied, stop the process
 that owns that port or use the service-specific cleanup command. Do not use a
 broad `docker compose down -v` because it can erase development PostgreSQL

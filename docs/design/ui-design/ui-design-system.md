@@ -502,6 +502,12 @@ The MVP alert console presents immutable occurrences and their stored
 comparison in text. It has no active/resolved state or severity classification;
 do not assign a status color or label that implies either one.
 
+Asynchronous operations must show stored intent, transport acceptance, device
+acknowledgement, terminal result, and unknown/stale state as distinct text. Bound
+automatic refresh and give the user an explicit recovery action when a
+mutation's response is uncertain. A client timer must not manufacture a server
+terminal status; color only supports the visible label.
+
 ---
 
 ## 15. Charts

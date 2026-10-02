@@ -207,6 +207,11 @@ onBeforeUnmount(() => {
           View alerts for {{ device.deviceKey }}
         </NuxtLink>
       </div>
+      <DeviceCommandPanel
+        :key="device.id"
+        :device-id="device.id"
+        :device-key="device.deviceKey"
+      />
       <DeviceTelemetryPanel :device-id="device.id" />
     </template>
   </section>

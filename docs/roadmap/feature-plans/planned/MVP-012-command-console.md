@@ -1,8 +1,8 @@
 # MVP-012 — Command Console
 
-Status: Planned — revised and author-reviewed; implementation has not started.
-The 2026-10-02 request authorizes plan/document work only. Execution awaits a
-separate implementation instruction.
+Status: Blocked — command-console implementation and behavior evidence are
+complete; the required production dependency audit blocks PR handoff pending a
+separate dependency decision.
 
 Branch: `feat/mvp-012-command-console`
 
@@ -11,9 +11,8 @@ regression evidence and documentation. No backend product-contract change.
 
 Milestone: M4 — Remote command loop
 
-Impact: Material Change (Tier 2) for the proposed tenant-scoped mutation and
-asynchronous journey. This episode changes documentation only and uses full
-reasoning to review that future implementation.
+Impact: Material Change (Tier 2) for the tenant-scoped mutation and asynchronous
+journey. Preserve full reasoning through implementation and validation.
 
 ## Goal
 
@@ -114,8 +113,8 @@ boundaries; this is not a whole-codebase audit.
 
 ### Locked decisions and alternatives
 
-Owner: MVP-012 implementer; reviewed 2026-10-02. These decisions are planned,
-not implemented behavior.
+Owner: MVP-012 implementer; reviewed 2026-10-02. These decisions govern the
+implementation; document verified behavior at feature closeout.
 
 | Decision | Selected approach / accepted trade-off | Alternative / revisit |
 | --- | --- | --- |
@@ -273,8 +272,8 @@ do not expose raw errors or render them as HTML.
 
 ### Reviewed implementation sequence
 
-1. Obtain implementation authorization; recheck base/dependencies, schema,
-   lockfile and test capabilities without dependency changes.
+1. Recheck base/dependencies, schema, lockfile and test capabilities without
+   dependency changes.
 2. Add feature client/recovery helpers and input/contract/error tests.
 3. Add device-keyed panel, confirmation, explicit states and bounded read
    ownership; prove uncertain/stale/hidden/unmount edges in components.
@@ -282,11 +281,12 @@ do not expose raw errors or render them as HTML.
    ACK-only expiry, lost-response recovery and adjacent regressions.
 5. Update docs below; reconcile plan/actual/evidence, fix author-review findings,
    validate final candidate and hand off PR. Stop/re-plan on changed guarantees.
-   This planning request does not authorize implementation, merge or deployment.
+   This request authorizes implementation within this plan; merge/deployment
+   remain separate actions.
 
 ## Documentation Updates
 
-Planning closeout in this episode:
+Planning decisions (completed before this implementation episode):
 
 - Keep this plan in `planned/`; it owns detailed decisions, assumptions,
   evidence selection and implementation/closeout boundaries.
@@ -319,8 +319,10 @@ and update its canonical docs/examples if one becomes necessary.
 
 ## Risks / Open Decisions
 
-No architecture, confirmation, retry or refresh decision remains open within
-this local/test PING boundary. Authorization and implementation evidence remain.
+No command-console architecture, confirmation, retry or refresh decision
+remains open within this local/test PING boundary. Required repository
+dependency-audit evidence currently blocks PR handoff; its disposition is
+outside the dependency-neutral plan and requires a separate decision.
 
 | Assumption / accepted limit | Evidence, falsifier and response |
 | --- | --- |
@@ -384,20 +386,58 @@ module verification, repository policy, final diff/required-section/local-link
 checks. The Go shim initially hit sandbox cache permissions; the pinned binary
 succeeded with temporary writable build cache and existing module cache. No
 dependencies were installed/changed. Fresh local build/race/DB/MQTT/browser/
-interactive QA/advisory audits were not run for this documentation episode;
-accepted main CI is baseline evidence. New behavior awaits implementation gates.
+interactive QA/advisory audits were not run for that documentation episode;
+accepted main CI was baseline evidence. The implementation evidence below
+supersedes that planning-only limit where applicable.
+
+## Implementation evidence and handoff state (2026-10-02)
+
+The user authorized implementation of this reviewed plan on 2026-10-02. The
+current candidate is the working tree on `feat/mvp-012-command-console`, based
+on documentation commit `216af3e`; implementation changes are not committed.
+No API schema, Go behavior, dependency manifest or lockfile changed.
+
+The device-detail panel and command feature client now validate canonical
+identifiers/snapshots, confirm a diagnostic PING, persist same-tab idempotency
+metadata before mutation, recover uncertain submission with the same key,
+render stored lifecycle/timestamps, refresh bounded history and track one
+selected nonterminal command with bounded polling. Recovery data never owns
+tenant/lifecycle authority. Browser fixtures enable the existing command
+runtime only in the isolated test process and stop real per-device receivers.
+Documentation now describes the local operator path and reusable async UI
+states. No production runtime was mutated.
+
+| Check | Result and evidence boundary |
+| --- | --- |
+| Frontend and component behavior | Passed: `web:test`, 73 tests across 12 files. Covers request/snapshot validation, recovery metadata, explicit confirmation, exact-key retry, intent scoping, intermediate states, history-vs-detail freshness, sequential polling, budget exhaustion and unmount cleanup. |
+| Static and source checks | Passed on the reviewed working tree: frontend lint, Nuxt/TypeScript/test typechecks, browser fixture typecheck, repository policy and `git diff --check`. |
+| Browser and user journey | Passed: `test:browser`, all 35 Chromium cases. Command cases exercise actual browser → Nuxt proxy → GraphQL → PostgreSQL/Mosquitto → simulator success/failure, lost-response recovery after reload with one stored command ID, ACK-only -> server-recorded timeout (~2.1 min), keyboard confirm/cancel, a long device key at 320 px, no horizontal overflow and no page/console errors. Screenshot was inspected visually. The runner removed its isolated Compose resources. |
+| API/database integration | Passed: `api:test:integration`, including migrations/schema behavior and integration-tagged race tests against disposable PostgreSQL; owned containers/volume were removed. |
+| MQTT integration | Passed: `mqtt:test:integration`, all core, deadlines, broker-outage expiry and forced-shutdown suites against disposable PostgreSQL/Mosquitto. The deadline cases ran concurrently (~119 s); outage expiry passed (~127 s); runner removed owned resources. |
+| Production build, API race and contract generation/lint | Passed in the full-check run before its audit gate stopped the aggregate. These backend/generated contracts are unchanged by this feature. |
+| Go vulnerability check | Passed separately: govulncheck reports no vulnerable imported/called code paths; three required modules were reported as not apparently called by code. |
+| Production dependency audit | **Failed required gate.** `pnpm run check` stopped at `node:audit`: 7 production advisory records, 6 moderate-or-higher. The unchanged workspace tree resolves `devalue@5.9.2` from Nuxt/Nitro (patched release `5.9.3`) and `node-forge@1.4.0` through `listhen@1.10.1`; npm reports no published patched `node-forge` version. Registry inventory reports installed Nuxt `4.5.2` is also the current version. `package.json` and `pnpm-lock.yaml` are byte-for-byte unchanged from the base. The prior successful `main` CI run predates this current audit result; it does not close it. |
+
+No audit finding was waived, suppressed or turned into a passing result. The
+repository's fail-closed `node-dependency-audit` required check therefore
+remains unsatisfied. Dependency updates/overrides or a replacement runtime
+boundary change the reviewed dependency scope and require explicit approval
+before changing this plan. The feature branch is locally implemented and its
+behavioral evidence passes, but it is not ready for PR handoff or merge while
+that required gate fails. Revisit after a separately approved dependency
+remediation decision or an upstream patched release makes the audit pass.
 
 ## Done Criteria
 
 Planning closeout: decisions, ownership, API/data/security boundaries,
 failure/recovery, validation, documentation and acceptance limits are explicit;
-revised plan reviewed and document checks passed. Status remains Planned.
+revised plan was reviewed and document checks passed.
 
 Feature closeout: an operator confirms PING, recovers unknown submission with
 one logical identity, follows truthful server-owned progress and understands
 COMPLETED, explicit FAILED or stored TIMED_OUT without logs. Required real-
 boundary, negative, async/cleanup, accessibility and adjacent regression
-evidence passes on the reviewed candidate; docs match actual behavior;
-applicable CI/approvals/blockers are resolved; merge or owner acceptance is
-recorded before completed placement. This does not certify MVP-013's combined
-journey or production readiness.
+evidence passes on the reviewed candidate; docs match actual behavior. The
+required dependency-audit gate and any later applicable approvals/blockers must
+be resolved before PR handoff/merge and completed placement. This does not
+certify MVP-013's combined journey or production readiness.

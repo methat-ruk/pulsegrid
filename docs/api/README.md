@@ -10,7 +10,9 @@ acknowledgement merged as `b209861` (PR #21). Its review findings
 are addressed with response-admission synchronization, strict failure-code
 presence validation, real broker-outage expiry and forced shutdown-drain
 evidence; main CI passed on the merge commit. MVP-012's command-console plan
-is reviewed, with implementation not yet started.
+is implemented on `feat/mvp-012-command-console`; its real-browser evidence
+passes, while a repository production dependency-audit finding blocks PR
+handoff. No command API contract change was needed.
 Production identity, production MQTT, and permanent high-volume storage remain
 deferred.
 
@@ -221,8 +223,7 @@ were addressed before merge; main CI passed on `b209861`.
 The planned device-detail consumer is owned by the
 [MVP-012 plan](../roadmap/feature-plans/planned/MVP-012-command-console.md).
 It reuses create/detail/recent-history operations and server-owned statuses;
-no API field, deadline or tenant-authority change is planned. The command UI
-is not implemented yet.
+no API field, deadline or tenant-authority change is part of the implementation.
 
 ## Current operational contract
 

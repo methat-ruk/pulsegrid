@@ -15,6 +15,7 @@ const environment = {
   PULSEGRID_ENV: 'test',
   PULSEGRID_IDENTITY_MODE: 'development',
   PULSEGRID_MQTT_INGESTION_MODE: 'development',
+  PULSEGRID_MQTT_COMMAND_MODE: 'development',
   PULSEGRID_MQTT_BROKER_URL: `mqtt://127.0.0.1:${brokerPort}`,
   PULSEGRID_DATABASE_URL: databaseUrl,
   PULSEGRID_POSTGRES_PASSWORD: password,
@@ -37,7 +38,7 @@ try {
     && run('go', ['-C', 'apps/api', 'run', './cmd/db', 'seed'], environment, 120_000)
     && run('node', ['scripts/build-api-test.mjs'], environment, 180_000)
     && run('node', ['scripts/build-web.mjs', 'test'], environment, 180_000)
-    && run('pnpm', ['exec', 'playwright', 'test'], environment, 180_000)
+    && run('pnpm', ['exec', 'playwright', 'test'], environment, 360_000)
   ) {
     exitCode = 0
   }

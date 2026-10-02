@@ -31,7 +31,7 @@ implementation and real PostgreSQL/Mosquitto evidence, including synchronized
 response admission at shutdown, expiry while the broker is down, and a forced
 response-drain deadline with an in-flight database lock. Main CI passed on
 the merge commit. MVP-012's command-console plan is reviewed; implementation
-has not started. Production identity, deployment
+is in progress. Production identity, deployment
 exposure, durable broker replay, and later event contracts remain
 unimplemented.
 
@@ -209,22 +209,24 @@ real-broker tests cover broker-outage expiry and the forced drain deadline.
 Production identity, durable response replay and multi-replica execution remain
 out of scope. PR #21 merged as `b209861`; main CI passed on that commit.
 
-### MVP-012 command console boundary (planned)
+### MVP-012 command console boundary (implemented on feature branch)
 
 The [MVP-012 plan](../roadmap/feature-plans/planned/MVP-012-command-console.md)
-was revised and author-reviewed on 2026-10-02; implementation has not started.
+was revised and author-reviewed on 2026-10-02; implementation is in progress.
 It places a device-keyed command panel on loaded device detail and a typed
 feature client over the existing same-origin GraphQL transport. PostgreSQL and
 the command module remain lifecycle authority; browser storage holds only
 untrusted same-tab recovery metadata for exact idempotency-key reuse.
 
-The planned panel uses bounded polling of one selected command, manual recent
-history refresh, and explicit unknown/stale/recovery states. HTTP acceptance,
+The panel implementation uses bounded polling of one selected command, manual
+recent-history refresh, and explicit unknown/stale/recovery states. HTTP acceptance,
 broker dispatch, ACK and browser clock expiry cannot become device completion.
 The panel owns its requests/timers and cleanup independently from telemetry and
 alerts. No backend contract, runtime/service boundary, tenant authority,
 production path or shared realtime transport is added. The plan owns exact
-budgets, recovery limits, fixture evidence and closeout requirements.
+budgets and recovery limits. The browser journey and existing database/MQTT
+regression evidence pass; a separate production dependency-audit gate still
+blocks PR handoff. No production readiness is implied.
 
 ## Conditional target architecture
 

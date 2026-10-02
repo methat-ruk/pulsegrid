@@ -109,7 +109,7 @@ platform foundation” is not an acceptable PR boundary.
 
 ### MVP — Remote command console — planned
 
-- [MVP-012 — Command console](planned/MVP-012-command-console.md) — revised and author-reviewed 2026-10-02; implementation has not started
+- [MVP-012 — Command console](planned/MVP-012-command-console.md) — implementation complete on branch; production dependency audit blocks PR handoff
 
 ### MVP acceptance
 
