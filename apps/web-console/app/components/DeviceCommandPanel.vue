@@ -463,7 +463,6 @@ async function submitIntent(selectedIntent: CommandIntent) {
     const resolvedIntent = { ...selectedIntent, commandId: snapshot.id }
     intent.value = resolvedIntent
     if (!writeCommandIntent(resolvedIntent)) {
-      intentCleanupError.value = true
       submissionError.value = 'The command was stored, but its recovery record could not be updated. Keep this page open and check the command result.'
     }
     submissionUnknown.value = false
@@ -771,7 +770,46 @@ onBeforeUnmount(() => {
       Loading command history…
     </div>
 
-    <template v-else-if="historyState === 'ready'">
+    <div
+      v-if="selectedCommandId !== null && selectedCommand === null && selectedCommandMissing"
+      class="command-alert"
+      role="alert"
+    >
+      <span>{{ selectedCommandError }}</span>
+      <button
+        class="text-action"
+        type="button"
+        :disabled="selectedReadPending"
+        @click="refreshSelectedCommand"
+      >
+        Retry command lookup
+      </button>
+    </div>
+    <div
+      v-else-if="selectedCommandId !== null && selectedCommand === null && selectedReadPending"
+      class="command-empty"
+      role="status"
+      aria-live="polite"
+    >
+      Checking the saved command status…
+    </div>
+    <div
+      v-else-if="selectedCommandId !== null && selectedCommand === null && selectedCommandError"
+      class="command-alert"
+      role="alert"
+    >
+      <span>{{ selectedCommandError }}</span>
+      <button
+        class="text-action"
+        type="button"
+        :disabled="selectedReadPending"
+        @click="refreshSelectedCommand"
+      >
+        Retry command lookup
+      </button>
+    </div>
+
+    <template v-if="historyState === 'ready' || selectedCommand !== null">
       <div
         v-if="selectedCommand === null && !selectedCommandMissing && intent?.commandId === null"
         class="command-empty"
@@ -786,22 +824,6 @@ onBeforeUnmount(() => {
       >
         No command has been sent to this device yet.
       </div>
-      <div
-        v-else-if="selectedCommandMissing"
-        class="command-alert"
-        role="alert"
-      >
-        <span>{{ selectedCommandError }}</span>
-        <button
-          class="text-action"
-          type="button"
-          :disabled="selectedReadPending"
-          @click="refreshSelectedCommand"
-        >
-          Refresh command status
-        </button>
-      </div>
-
       <article
         v-if="selectedCommand"
         class="command-current"
@@ -914,6 +936,7 @@ onBeforeUnmount(() => {
       </article>
 
       <section
+        v-if="historyState === 'ready'"
         class="command-history"
         aria-labelledby="command-history-heading"
       >

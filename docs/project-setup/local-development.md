@@ -539,20 +539,25 @@ configuration; they do not load development or test dotenv files.
 - If `corepack pnpm run setup` reports a lockfile or peer diagnostic, do not
   replace the lockfile. The current `@bomb.sh/tab`/`cac` peer mismatch is an
   upstream diagnostic and is not an authoritative gate.
-- `corepack pnpm run web:build` creates `.output` once and writes a temporary
-  runtime evidence file bound to that output and the frozen root lock.
-  `corepack pnpm run node:audit` requires that build evidence, retains the full
-  workspace `pnpm audit --prod` report, and blocks when the exact production
-  artifact contains a package version affected by an advisory or its evidence
-  and production smoke are incomplete. As of 2026-10-02, the workspace report
-  still shows the high `node-forge@1.4.0` advisory through Nuxt and `listhen`;
-  `node-forge` is absent from the generated production artifact, so the runtime
-  artifact gate can pass while the workspace finding remains unresolved and
-  visible. This is an audit-boundary change, not a vulnerability fix. Keep the
-  existing scoped `fontless>esbuild` override on its patched release until
-  upstream widens its dependency range. See the
-  [MVP-012 audit assessment](../roadmap/feature-plans/planned/MVP-012-command-console.md#re-plan-3-standalone-nitro-contract-and-artifact-gate-implementation)
-  for the path and exposure evidence.
+- `corepack pnpm run web:build` creates `.output` once and writes separate
+  runtime evidence and `.runtime-bundle-provenance.json` beside it, bound to the
+  frozen root lock. The provenance sidecar is uploaded with `.output` as gate
+  evidence; it is not part of the deployed `.output` tree. The build records
+  every Nitro Rollup chunk module and matching source-map package paths;
+  preparation ties each bundled name/version and source file to the exact
+  frozen production graph node, lock integrity, and package source hash.
+  `corepack pnpm run node:audit` consumes that same artifact without rebuilding
+  or installing another runtime tree. It verifies the chunk/source-map
+  inventory and provenance, then intersects the complete workspace
+  `pnpm audit --prod` findings with both physical and bundled artifact package
+  versions before smoking the artifact. Missing or inconsistent provenance,
+  affected versions, or failed smoke blocks the gate. The workspace report
+  still shows high `node-forge@1.4.0` via Nuxt and `listhen`; neither
+  `node-forge` nor `listhen` is in the verified artifact. This changes the
+  required audit boundary; the workspace vulnerability remains unresolved and
+  visible. See the
+  [MVP-012 review evidence](../roadmap/feature-plans/planned/MVP-012-command-console.md#pr-22-review-response)
+  and [artifact-gate decision](../roadmap/feature-plans/planned/MVP-012-command-console.md#re-plan-3-standalone-nitro-contract-and-artifact-gate-implementation).
 - `govulncheck` may list vulnerabilities in required Go modules that current
   code does not reach. They remain visible and are not reported as reachable
   application vulnerabilities.

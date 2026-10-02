@@ -1,9 +1,12 @@
 # MVP-012 — Command Console
 
-Status: Ready for PR handoff — local validation passed for the required
-production runtime artifact gate. Hosted GitHub CI remains pending for the PR.
-The workspace audit still reports the unresolved high `node-forge` advisory as
-a separate finding; no dependency remediation is claimed.
+Status: PR #22 review fixes are implemented and locally validated. The active
+delivery candidate and hosted check results are tracked on PR #22; this plan
+remains under `planned/` until the outcome is accepted. The runtime gate audits
+the exact production artifact, including bundled package provenance. The
+workspace audit still reports unresolved high `node-forge@1.4.0`; no dependency
+remediation is claimed. See [PR #22 review response](#pr-22-review-response)
+for finding-by-finding evidence.
 
 Branch: `feat/mvp-012-command-console`
 
@@ -321,9 +324,12 @@ and update its canonical docs/examples if one becomes necessary.
 ## Risks / Open Decisions
 
 No command-console architecture, confirmation, retry or refresh decision
-remains open within this local/test PING boundary. Required repository
-dependency-audit evidence currently blocks PR handoff; its disposition is
-outside the dependency-neutral plan and requires a separate decision.
+remains open within this local/test PING boundary. The earlier workspace-audit
+blocker was replaced by the approved production-artifact gate. PR #22 review
+identified four implementation gaps and missing evidence; the fixes and local
+evidence are now complete without changing the product contract or claiming
+that the workspace `node-forge` finding is fixed. Hosted checks and review
+outcome remain tracked on PR #22.
 
 | Assumption / accepted limit | Evidence, falsifier and response |
 | --- | --- |
@@ -434,7 +440,7 @@ or consume an unmerged dependency patch without a new review and re-plan.
 | Advisory group | Root cause and path | Exposure assessment | Decision |
 | --- | --- | --- | --- |
 | Six `devalue@5.9.2` advisories: GHSA-j22f-vq7h-c4qm, GHSA-hx4r-w6wj-j8fg, GHSA-mcm9-63f2-9j32, GHSA-wf3x-273g-mvxv, GHSA-x5rw-q4pp-hg5g, GHSA-4q55-j62x-fr9h | Nuxt and `@nuxt/nitro-server` resolve the same `devalue` package. Nitro serializes SSR payload/config with `stringify` and `uneval` in `@nuxt/nitro-server/dist/runtime/utils/renderer/payload.mjs`; Nuxt reads serialized payloads with `parse` in `nuxt/dist/app/composables/payload.js`. The advisories cover Buffer backing-memory disclosure, `uneval` sparse/repeated-value amplification, client allocation from generated sparse arrays, an unhandled rejection in `stringifyAsync`, and malformed `__proto__` keys in `parse`. `stringifyAsync` is not called by the inspected Nuxt/Nitro paths. | SSR serialization and client parsing are part of the framework runtime. The current app does not establish every advisory-specific hostile input, but the framework exposes the affected serialization/parser operations and the registry provides a compatible patch. | Resolve the existing `^5.9.0` range to published `devalue@5.9.4` in the lockfile. Advisory fixes begin at `5.9.3`; `5.9.4` is the latest compatible patch selected by pnpm and adds no manifest override or framework upgrade. |
-| `node-forge@1.4.0`, [GHSA-86w9-cpqp-85rv](https://github.com/advisories/GHSA-86w9-cpqp-85rv) / CVE-2026-85393 | `nuxt -> @nuxt/cli -> listhen -> node-forge` and `nuxt -> @nuxt/nitro-server -> nitropack -> listhen -> node-forge`. The vulnerable sink is RSA PKCS#1 v1.5 signature verification. The installed `listhen` callsites use Forge to parse configured certificates/keystores, generate keys/certificates, and sign generated certificates; the inspected paths do not call signature verification. Pulsegrid's generated production output uses Nitro's native Node HTTP(S) server and excludes `listhen` and `node-forge`. | The advisory is real and the vulnerable API is present in the dependency, but no call to that API was found in the app, `listhen`, or generated production artifact. The production-only audit still reports it because Nuxt is in the app dependency graph. npm lists `1.4.0` as latest and GitHub lists no patched release; upstream PR [#1152](https://github.com/digitalbazaar/forge/pull/1152) is open. | Do not suppress the finding, reclassify Nuxt to change audit scope, or resolve to an unmerged contributor patch. Leave this advisory visible and the fail-closed audit blocked until a published patched version is available. `listhen`'s existing `^1.4.0` range can accept a future compatible patch, so re-resolve the lockfile then. |
+| `node-forge@1.4.0`, [GHSA-86w9-cpqp-85rv](https://github.com/advisories/GHSA-86w9-cpqp-85rv) / CVE-2026-85393 | `nuxt -> @nuxt/cli -> listhen -> node-forge` and `nuxt -> @nuxt/nitro-server -> nitropack -> listhen -> node-forge`. The vulnerable sink is RSA PKCS#1 v1.5 signature verification. The installed `listhen` callsites use Forge to parse configured certificates/keystores, generate keys/certificates, and sign generated certificates; the inspected paths do not call signature verification. PulseGrid's generated production output uses Nitro's native Node HTTP(S) server and excludes `listhen` and `node-forge`. | The advisory is real and the vulnerable API is present in the dependency, but no call to that API was found in the app, `listhen`, or generated production artifact. The production-only audit still reports it because Nuxt is in the app dependency graph. npm lists `1.4.0` as latest and GitHub lists no patched release; upstream PR [#1152](https://github.com/digitalbazaar/forge/pull/1152) is open. | Do not suppress the finding, reclassify Nuxt to change audit scope, or resolve to an unmerged contributor patch. Under the former workspace-wide required gate this finding blocked handoff; that disposition was superseded by the approved production-artifact gate. Keep the workspace finding visible and unresolved. The current gate blocks if an affected `node-forge` version appears in the verified artifact; this boundary change does not claim a vulnerability fix. `listhen`'s existing `^1.4.0` range can accept a future compatible patch, so re-resolve the lockfile then. |
 
 The `devalue` lockfile update is reversible by restoring the lockfile to
 checkpoint `27b18ca`; rollback would restore the six published advisories, so
@@ -449,9 +455,11 @@ pass by changing scanner scope, dependency classification, or policy. Revisit
 after upstream publishes a patched `node-forge` and the existing transitive
 ranges resolve it.
 
-The command-console behavior evidence remains valid for commit `27b18ca`. The
-remaining audit finding blocks PR handoff/merge; no production deployment or
-readiness is implied.
+At this historical checkpoint, the workspace audit finding still blocked
+handoff. The later approved artifact gate changed the required evidence
+boundary while preserving the unresolved workspace finding; see Re-plan 3 and
+the current review response below. No production deployment or readiness is
+implied by that checkpoint.
 
 ### Re-plan 1: audit the supported Nitro runtime artifact (approved 2026-10-02; implementation paused)
 
@@ -519,9 +527,10 @@ the supported Node server entry point. Rollback is to restore the
 workspace-based audit job/script; the production gate will then fail on the
 visible `node-forge` workspace finding. The workspace scan remains independent
 evidence after this change and continues to report `node-forge` while that
-published advisory applies. MVP-012 remains Blocked until the approved
-artifact-scoped audit, frozen install, production smoke, and affected regression
-checks all pass. MVP-013/M5 remains planned behind M4.
+published advisory applies. At the time of Re-plan 1, MVP-012 remained Blocked
+pending proof of the artifact-scoped gate, install contract and runtime smoke;
+that historical disposition was superseded by Re-plan 3. MVP-013/M5 remains
+planned behind M4.
 
 **Approval record:** the user approved implementation of this exact
 artifact-scoped audit boundary on 2026-10-02, with no suppression, no
@@ -567,8 +576,9 @@ lock, including integrity and peer-context identity. It must explicitly
 resolve the observed `unhead` and `vue` peer-context differences; name/version
 membership alone is insufficient. Any runtime resolution not derivable from
 the frozen source lock, or any required install/build-script behavior that
-cannot be reproduced with the repository's policy, keeps MVP-012 Blocked and
-requires another re-plan. CI must continue to pass the exact same-run build
+could not be reproduced with the repository's policy, kept MVP-012 Blocked at
+the Re-plan 2 checkpoint and required another re-plan. That status was
+superseded by Re-plan 3. CI must continue to pass the exact same-run build
 artifact, fail on missing/stale output, preserve the original `.output`, and
 use the same installed tree for audit and smoke. The workspace report must
 remain separate and must state that the `node-forge` advisory remains in the
@@ -653,23 +663,47 @@ workspace finding does not match the production artifact. The finding remains
 visible and unresolved; this gate change does not suppress it, alter dependency
 classification, or claim that the vulnerability was fixed.
 
-#### Implementation validation
+#### Re-plan 3 implementation checkpoint (historical)
 
-The final local validation passed `pnpm install --frozen-lockfile`, one
-production Nuxt/Nitro build, runtime evidence preparation, eight fail-closed
-gate tests, the workspace audit and production smoke. A byte-identical
-download simulation passed audit and smoke with the same artifact hash
-(`72ccd370fb50dc10cdbb273894e9d920161d7ea1397a1297b3bc39be5ad9d354`) before
-and after smoke and returned HTTP 200 from `/`. The audit report retained the
-high `node-forge` finding and both paths. The affected web regression checks
-also passed: 73 frontend tests, web lint, Nuxt/test/browser typechecks and
-repository policy. The workflow YAML and artifact/job relationship were
-validated locally, and `git diff --check` passed. GitHub branch protection
-still requires the strict `node-dependency-audit` context. Hosted CI has not
-run for this unpushed revision.
+The 2026-10-02 Re-plan 3 checkpoint passed its local build, artifact smoke,
+workspace audit, and then-eight gate tests. Its artifact hash and 73-test count
+refer to that earlier candidate and are superseded by the post-review evidence
+below. At that checkpoint, MVP-012 was unblocked for PR handoff with hosted
+checks pending; the later PR #22 review requested changes. MVP-013 remains
+planned behind M4.
 
-**Current disposition:** MVP-012 is unblocked for PR handoff; the hosted
-required checks will run on the PR. MVP-013 remains planned behind M4.
+### PR #22 review response (2026-10-02)
+
+The published review comment on PR #22 ([findings and requested evidence](https://github.com/methat-ruk/pulsegrid/pull/22#issuecomment-5948444989))
+reviewed original head `e87d731be0bf0ca7feb3f47db398b146ba5dc53e` against
+base `b209861d7ce204e0e94ab02510ea66c1502d51d5` and requested changes for
+F1–F4. The changes below address that comment; this is author remediation, not
+a claim of a new independent review.
+
+| Finding / gap | Fix and evidence |
+| --- | --- |
+| F1 — bundled runtime packages were absent from the physical `server/node_modules` inventory | Nitro's `rollup:before` hook writes `.runtime-bundle-provenance.json` beside `.output`, outside the deployable tree. It records normalized module identities for every emitted chunk. Evidence preparation reconciles those IDs and every `.output` source map with exact package/store-key contexts from the frozen `pnpm list --prod` graph, then verifies lock integrity/snapshot and package source-file hashes. The gate consumes the same-run `.output` plus this sidecar, rechecks the 19 chunk/map pairs and inventories, and matches advisories against physical and bundled package/version sets. The final local build proved 21 physical packages, 54 bundled package contexts across 126 Rollup modules, and 19 source maps. It detected `h3@1.15.11`, `destr@2.0.5`, `defu@6.1.7`, `ofetch@1.5.1`, `hookable@5.5.3` and `@iconify-json/lucide@1.2.130`. A synthetic advisory for bundled-only `h3@1.15.11` blocks the gate; missing sidecar/map and mismatched provenance tests also fail closed. The actual artifact audit passed with no matching advisory. |
+| F2 — failed direct lookup of a saved command ID exposed no retry when it was outside the latest 20 rows | Selected-command loading/error/retry presentation is independent of history. A regression seeds a known ID absent from latest history, fails the first direct read, then retries and verifies the saved command becomes visible without a new submission. |
+| F3 — initial history failure hid a successful selected-command read | The selected-command card now renders independently of `historyState`. A regression makes initial history fail while a recovered direct read returns a terminal snapshot, then verifies the command ID and status remain visible alongside the separate history error. |
+| F4 — storage failure while recording a pending command ID showed terminal-cleanup copy | The write/update failure remains in the submission-recovery alert. Separate regressions prove that a pending result never shows terminal cleanup copy and that cleanup retry appears only after a known terminal result and failed storage removal. |
+| Failure combinations in F1–F4 | The runtime gate suite passes 12 tests, including a bundled-only advisory, missing/inconsistent evidence, smoke failure and artifact mutation. The panel suite passes 80 tests across 12 files. |
+| Visibility and stale-result evidence | Component regressions prove hidden-tab polling pauses and resumes, an older read cannot replace a newly selected command, and a read for the previous device cannot replace the new device selection. |
+| Visual/focus evidence | All 35 Chromium browser cases pass. The command journey verified page title/route, no Vite error overlay, keyboard focus and Enter-driven confirmation/cancel, server-recorded completion/failure, and no page/console errors. Desktop and 320px mobile views have no horizontal overflow. Confirmation-focus, desktop and mobile screenshots are captured; the workflow retains them as a successful-run artifact. |
+| Status/documentation conflict | The active roadmap, architecture, local audit instructions, and plan describe the artifact-scoped gate and keep the workspace `node-forge` finding separate. Earlier Blocked/unblocked dispositions are labeled as historical. This plan remains under `planned/` until the PR outcome is accepted. |
+
+The final local production build produced artifact SHA-256
+`6b13d418f01d346ed81251089faf65bc57e83d688cc11fcf189d3a009a84fef8`. Local
+`node:audit` passed, smoked that artifact with HTTP 200, and reported no
+runtime-artifact advisory. Its workspace report still reports high
+`node-forge@1.4.0` through both Nuxt/Listhen paths. This gate change proves the
+current finding does not match this production artifact; it does not fix or
+suppress the workspace vulnerability.
+
+Other local checks passed: `web:test` (80 tests), `web:lint`, `web:typecheck`
+(including test types), `browser:typecheck`, repository policy, 12 runtime-gate
+tests, and `git diff --check`. Required hosted checks must pass on the pushed
+PR #22 head before calling the candidate ready for merge review. Do not merge
+or move this plan to `completed/` in this task.
 
 ## Done Criteria
 

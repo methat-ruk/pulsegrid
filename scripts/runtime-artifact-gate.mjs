@@ -4,6 +4,7 @@ import { createServer } from 'node:net'
 import { lstat, readFile, readdir, readlink, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { collectRuntimeBundleProvenance } from './runtime-bundle-provenance.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -109,7 +110,8 @@ export async function verifyRuntimeEvidence({
   const failures = []
   const add = (message) => failures.push(message)
   const evidencePackages = evidence?.artifact?.packages
-  if (!evidence || evidence.schemaVersion !== 1) return { failures: ['runtime evidence is missing or has an unsupported schema'] }
+  const evidenceBundleProvenance = evidence?.artifact?.bundleProvenance
+  if (!evidence || evidence.schemaVersion !== 2) return { failures: ['runtime evidence is missing or has an unsupported schema'] }
   if (!Array.isArray(evidencePackages) || evidencePackages.length === 0) add('runtime package evidence is missing')
   if (evidence.source?.commit !== expectedCommit && expectedCommit) add('artifact source revision does not match this workflow revision')
   if (evidence.source?.runId !== expectedRunId && expectedRunId) add('artifact was not produced by this workflow run')
@@ -138,11 +140,13 @@ export async function verifyRuntimeEvidence({
 
   let actualTree
   let inventory
+  let bundleProvenance
   try {
     actualTree = await treeDigest(outputDirectory)
     if (actualTree.digest !== evidence.artifact?.sha256) add('downloaded .output hash does not match the build artifact hash')
     if (actualTree.fileCount !== evidence.artifact?.fileCount) add('downloaded .output file inventory differs from build evidence')
     inventory = await physicalPackageInventory(outputDirectory)
+    bundleProvenance = await collectRuntimeBundleProvenance(outputDirectory)
   } catch (error) {
     add(`artifact or metadata cannot be inspected: ${error.message}`)
   }
@@ -167,6 +171,64 @@ export async function verifyRuntimeEvidence({
       if (!expected.sourceVirtualStoreKey?.startsWith(`${pkg.name.replaceAll('/', '+')}@`)) add(`frozen package resolution context is missing for ${pkg.name}@${pkg.version}`)
       if (!expected.sourceNonManifestFileProof?.nonManifestFileCount || !/^([a-f0-9]{64})$/.test(expected.sourceNonManifestFileProof?.nonManifestDigest ?? '')) {
         add(`frozen package content comparison is incomplete for ${pkg.name}@${pkg.version}`)
+      }
+    }
+  }
+
+  if (!bundleProvenance) add('bundled package provenance could not be read from the production artifact')
+  else if (!evidenceBundleProvenance || typeof evidenceBundleProvenance !== 'object') {
+    add('bundled package evidence is missing')
+  }
+  else {
+    const comparableEvidence = {
+      format: evidenceBundleProvenance.format,
+      moduleCount: evidenceBundleProvenance.moduleCount,
+      chunkCount: evidenceBundleProvenance.chunkCount,
+      sourceMapCount: evidenceBundleProvenance.sourceMapCount,
+      chunks: evidenceBundleProvenance.chunks,
+      packages: (evidenceBundleProvenance.packages ?? []).map(pkg => ({
+        name: pkg.name,
+        version: pkg.version,
+        sourceVirtualStoreKey: pkg.sourceVirtualStoreKey,
+        modules: pkg.modules,
+      })),
+    }
+    if (stable(comparableEvidence) !== stable(bundleProvenance)) {
+      add('downloaded bundle source maps differ from frozen package provenance evidence')
+    }
+    if (evidenceBundleProvenance.format !== 'nitro-rollup-and-sourcemap-v1'
+      || !Number.isInteger(evidenceBundleProvenance.moduleCount)
+      || evidenceBundleProvenance.moduleCount < 1
+      || evidenceBundleProvenance.chunkCount !== bundleProvenance.chunkCount
+      || evidenceBundleProvenance.sourceMapCount !== bundleProvenance.sourceMapCount
+      || !Array.isArray(evidenceBundleProvenance.chunks)
+      || !Array.isArray(evidenceBundleProvenance.packages)) {
+      add('Nitro Rollup module inventory is incomplete')
+    }
+    for (const pkg of evidenceBundleProvenance.packages ?? []) {
+      if (typeof pkg.name !== 'string' || !isExactVersion(pkg.version) || !Array.isArray(pkg.modules) || pkg.modules.length === 0) {
+        add('bundled package identity or module evidence is incomplete')
+        continue
+      }
+      const encodedName = pkg.name.replaceAll('/', '+')
+      if (pkg.sourceVirtualStoreKey !== `${encodedName}@${pkg.version}`
+        && !pkg.sourceVirtualStoreKey?.startsWith(`${encodedName}@${pkg.version}_`)) {
+        add(`bundled package does not identify an exact pnpm resolution: ${pkg.name}@${pkg.version}`)
+      }
+      if (pkg.lockVerified !== true
+        || !/^sha512-[A-Za-z0-9+/]+=*$/.test(pkg.lock?.integrity ?? '')
+        || !Array.isArray(pkg.lock?.packageRecords) || pkg.lock.packageRecords.length === 0
+        || !Array.isArray(pkg.lock?.snapshotKeys) || pkg.lock.snapshotKeys.length === 0) {
+        add(`bundled package is not tied to frozen lock integrity and snapshot evidence: ${pkg.name}@${pkg.version}`)
+      }
+      if (!/^[a-f0-9]{64}$/.test(pkg.packageManifestSha256 ?? '')) {
+        add(`bundled package manifest evidence is missing: ${pkg.name}@${pkg.version}`)
+      }
+      const moduleKeys = (pkg.modules ?? []).map(module => `${module.chunk}\0${module.sourceFile}\0${module.origin}`).sort()
+      const sourceProofKeys = (pkg.sourceFileProofs ?? []).map(module => `${module.chunk}\0${module.sourceFile}\0${module.origin}`).sort()
+      if (stable(moduleKeys) !== stable(sourceProofKeys)
+        || (pkg.sourceFileProofs ?? []).some(module => !/^[a-f0-9]{64}$/.test(module.sha256 ?? ''))) {
+        add(`bundled package source file hashes do not cover its emitted module sources: ${pkg.name}@${pkg.version}`)
       }
     }
   }
@@ -200,10 +262,19 @@ export async function verifyRuntimeEvidence({
     }
   }
 
-  if (inventory && inventory.actualNames.some(name => ['node-forge', 'listhen'].includes(name))) {
+  const artifactPackageNames = [
+    ...(inventory?.packages ?? []).map(pkg => pkg.name),
+    ...(evidenceBundleProvenance?.packages ?? []).map(pkg => pkg.name),
+  ]
+  if (artifactPackageNames.some(name => ['node-forge', 'listhen'].includes(name))) {
     add('node-forge/listhen entered the production artifact; dependency exposure requires re-plan')
   }
-  return { failures, artifactDigest: actualTree?.digest ?? null, packageCount: inventory?.packages.length ?? null }
+  return {
+    failures,
+    artifactDigest: actualTree?.digest ?? null,
+    packageCount: inventory?.packages.length ?? null,
+    bundlePackages: evidenceBundleProvenance?.packages ?? [],
+  }
 }
 
 export function validateAuditResult(result, report) {
@@ -241,8 +312,13 @@ export function validateAuditResult(result, report) {
   return { valid: failures.length === 0, failures, advisories: values }
 }
 
-export function projectAdvisories(report, artifactPackages) {
-  const packageVersions = new Map(artifactPackages.map(pkg => [pkg.name, new Set([pkg.version])]))
+export function projectAdvisories(report, artifactPackages, bundledPackages = []) {
+  const packageVersions = new Map()
+  for (const pkg of [...artifactPackages, ...bundledPackages]) {
+    const versions = packageVersions.get(pkg.name) ?? new Set()
+    versions.add(pkg.version)
+    packageVersions.set(pkg.name, versions)
+  }
   const findings = []
   for (const [id, advisory] of Object.entries(report?.advisories ?? {})) {
     for (const finding of advisory.findings ?? []) {
@@ -403,6 +479,7 @@ export async function runRuntimeArtifactGate() {
         ],
         artifactDigest: null,
         packageCount: null,
+        bundlePackages: [],
       }
     : await verifyRuntimeEvidence({
         outputDirectory,
@@ -413,7 +490,7 @@ export async function runRuntimeArtifactGate() {
         expectedRunAttempt: process.env.GITHUB_RUN_ATTEMPT,
       })
   const artifactFindings = evidenceValidation.failures.length === 0
-    ? projectAdvisories(workspaceReport, evidence.artifact.packages)
+    ? projectAdvisories(workspaceReport, evidence.artifact.packages, evidenceValidation.bundlePackages)
     : []
   const workspaceFindings = Object.values(workspaceReport?.advisories ?? {}).map(advisory => ({
     moduleName: advisory.module_name,
@@ -430,6 +507,7 @@ export async function runRuntimeArtifactGate() {
     artifact: {
       sha256: evidenceValidation.artifactDigest,
       packageCount: evidenceValidation.packageCount,
+      bundlePackageCount: evidenceValidation.bundlePackages.length,
       evidenceSha256: evidence ? sha256(JSON.stringify(evidence)) : null,
     },
     workspaceAudit: {
@@ -496,7 +574,7 @@ export async function runRuntimeArtifactGate() {
     process.exitCode = 1
     return
   }
-  console.log(`Runtime artifact dependency gate passed for ${evidenceValidation.packageCount} packages; artifact SHA-256 ${evidenceValidation.artifactDigest}.`)
+  console.log(`Runtime artifact dependency gate passed for ${evidenceValidation.packageCount} physical packages and ${evidenceValidation.bundlePackages.length} bundled package contexts across ${evidence.artifact.bundleProvenance.chunkCount} chunks; artifact SHA-256 ${evidenceValidation.artifactDigest}.`)
   console.log('The complete workspace audit report is retained separately; the node-forge workspace advisory remains unresolved.')
 }
 

@@ -224,9 +224,12 @@ broker dispatch, ACK and browser clock expiry cannot become device completion.
 The panel owns its requests/timers and cleanup independently from telemetry and
 alerts. No backend contract, runtime/service boundary, tenant authority,
 production path or shared realtime transport is added. The plan owns exact
-budgets and recovery limits. The browser journey and existing database/MQTT
-regression evidence pass; a separate production dependency-audit gate still
-blocks PR handoff. No production readiness is implied.
+budgets and recovery limits. PR #22's required dependency gate audits the
+production artifact's physical packages and bundled sources against the frozen
+graph. The workspace `node-forge` finding remains unresolved and separately
+reported. Review fixes and affected local browser/runtime evidence pass;
+hosted required checks and review outcome are tracked on PR #22. MVP-012 is
+not marked complete before the PR outcome is accepted.
 
 ## Conditional target architecture
 

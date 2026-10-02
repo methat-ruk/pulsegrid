@@ -109,7 +109,7 @@ platform foundation” is not an acceptable PR boundary.
 
 ### MVP — Remote command console — planned
 
-- [MVP-012 — Command console](planned/MVP-012-command-console.md) — implementation complete on branch; production dependency audit blocks PR handoff
+- [MVP-012 — Command console](planned/MVP-012-command-console.md) — PR #22 review fixes implemented and locally validated; hosted checks are tracked on the PR, while the workspace `node-forge` finding remains unresolved outside the runtime artifact gate
 
 ### MVP acceptance
 

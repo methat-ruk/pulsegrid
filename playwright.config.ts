@@ -9,6 +9,9 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   failOnFlakyTests: true,
   reporter: process.env.CI ? 'dot' : 'list',
+  ...(process.env.PULSEGRID_PLAYWRIGHT_OUTPUT_DIR
+    ? { outputDir: process.env.PULSEGRID_PLAYWRIGHT_OUTPUT_DIR }
+    : {}),
   timeout: 20_000,
   expect: { timeout: 5_000 },
   use: {

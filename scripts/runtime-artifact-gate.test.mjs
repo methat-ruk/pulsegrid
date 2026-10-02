@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, unlink, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -21,7 +21,25 @@ async function fixture() {
   const packageDirectory = path.join(server, 'node_modules/safe-package')
   await mkdir(packageDirectory, { recursive: true })
   await writeFile(path.join(server, 'package.json'), JSON.stringify({ dependencies: { 'safe-package': '1.0.0' } }))
-  await writeFile(path.join(server, 'index.mjs'), 'process.exit(1)\n')
+  await writeFile(path.join(server, 'index.mjs'), 'process.exit(1)\n//# sourceMappingURL=index.mjs.map\n')
+  await writeFile(path.join(server, 'index.mjs.map'), JSON.stringify({
+    version: 3,
+    file: 'index.mjs',
+    sources: ['../../../node_modules/.pnpm/safe-package@1.0.0/node_modules/safe-package/index.js'],
+    names: [],
+    mappings: 'AAAA',
+  }))
+  const bundlePackageModule = {
+    kind: 'package',
+    name: 'safe-package',
+    version: '1.0.0',
+    sourceFile: 'index.js',
+    sourceVirtualStoreKey: 'safe-package@1.0.0',
+  }
+  await writeFile(path.join(root, '.runtime-bundle-provenance.json'), JSON.stringify({
+    format: 'nitro-rollup-modules-v1',
+    chunks: [{ file: 'index.mjs', modules: [bundlePackageModule] }],
+  }))
   await writeFile(path.join(packageDirectory, 'package.json'), JSON.stringify({ name: 'safe-package', version: '1.0.0' }))
   await writeFile(path.join(packageDirectory, 'index.js'), 'export default 1\n')
   const packageManifestMetadata = {
@@ -33,11 +51,12 @@ async function fixture() {
     peerDependenciesMeta: {},
   }
   const packageTree = await treeDigest(packageDirectory)
+  const sourceFileSha256 = sha256(await readFile(path.join(packageDirectory, 'index.js')))
   const outputTree = await treeDigest(output)
   const runtimeManifest = await readFile(path.join(server, 'package.json'))
   const lockText = 'frozen lock fixture\n'
   const evidence = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     source: {
       commit: 'test-commit',
       runId: '42',
@@ -63,10 +82,41 @@ async function fixture() {
         sourceNonManifestFileProof: { nonManifestFileCount: 1, nonManifestDigest: sha256('verified') },
         lock: { integrity: 'sha512-YWJjZA==', snapshotKeys: ['safe-package@1.0.0'] },
       }],
+      bundleProvenance: {
+        format: 'nitro-rollup-and-sourcemap-v1',
+        moduleCount: 1,
+        chunkCount: 1,
+        sourceMapCount: 1,
+        chunks: [{
+          file: 'index.mjs',
+          modules: [bundlePackageModule],
+          sourceMap: {
+            file: 'index.mjs.map',
+            sourceCount: 1,
+            packages: [{ name: 'safe-package', version: '1.0.0', storeKey: 'safe-package@1.0.0', sourceFile: 'index.js' }],
+          },
+        }],
+        packages: [{
+          name: 'safe-package',
+          version: '1.0.0',
+          sourceVirtualStoreKey: 'safe-package@1.0.0',
+          modules: [
+            { chunk: 'index.mjs', sourceFile: 'index.js', origin: 'rollup' },
+            { chunk: 'index.mjs', sourceFile: 'index.js', origin: 'source-map' },
+          ],
+          packageManifestSha256: sha256(stable(packageManifestMetadata)),
+          sourceFileProofs: [
+            { chunk: 'index.mjs', sourceFile: 'index.js', origin: 'rollup', sha256: sourceFileSha256 },
+            { chunk: 'index.mjs', sourceFile: 'index.js', origin: 'source-map', sha256: sourceFileSha256 },
+          ],
+          lock: { integrity: 'sha512-YWJjZA==', packageRecords: ['safe-package@1.0.0'], snapshotKeys: ['safe-package@1.0.0'] },
+          lockVerified: true,
+        }],
+      },
       graph: {
         entry: 'apps/web-console/.output/server/index.mjs',
         moduleCount: 1,
-        packageEdges: [{ from: 'safe-package@1.0.0', to: 'other@1.0.0', specifier: 'other', lockVerified: true }],
+        packageEdges: [{ from: 'safe-package@1.0.0', to: 'safe-package@1.0.0', specifier: 'safe-package', lockVerified: true }],
         unresolved: [],
         nonLiteral: [],
         sourceGraphNodeCount: 2,
@@ -146,6 +196,44 @@ test('runtime evidence fails closed when same-run artifact download fails', asyn
   }
 })
 
+test('runtime evidence fails closed when the adjacent Rollup provenance sidecar is absent', async () => {
+  const { root, output, evidence } = await fixture()
+  try {
+    await unlink(path.join(root, '.runtime-bundle-provenance.json'))
+    const result = await verifyRuntimeEvidence({ outputDirectory: output, evidence, lockPath: path.join(root, 'pnpm-lock.yaml') })
+    assert.ok(result.failures.some(failure => failure.includes('artifact or metadata cannot be inspected')))
+    assert.ok(result.failures.some(failure => failure.includes('bundled package provenance could not be read')))
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('runtime evidence fails closed when adjacent Rollup provenance no longer matches the built chunks', async () => {
+  const { root, output, evidence } = await fixture()
+  try {
+    const provenancePath = path.join(root, '.runtime-bundle-provenance.json')
+    const provenance = JSON.parse(await readFile(provenancePath, 'utf8'))
+    provenance.chunks[0].modules = [{ kind: 'application', sourceFile: 'index.mjs' }]
+    await writeFile(provenancePath, JSON.stringify(provenance))
+    const result = await verifyRuntimeEvidence({ outputDirectory: output, evidence, lockPath: path.join(root, 'pnpm-lock.yaml') })
+    assert.ok(result.failures.some(failure => failure.includes('bundle source maps differ from frozen package provenance evidence')))
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('runtime evidence fails closed when the audited bundle loses its source map', async () => {
+  const { root, output, evidence } = await fixture()
+  try {
+    await unlink(path.join(output, 'server/index.mjs.map'))
+    const result = await verifyRuntimeEvidence({ outputDirectory: output, evidence, lockPath: path.join(root, 'pnpm-lock.yaml') })
+    assert.ok(result.failures.some(failure => failure.includes('source map is missing from the artifact')))
+    assert.ok(result.failures.some(failure => failure.includes('downloaded .output hash does not match')))
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 test('workspace node-forge finding remains visible but does not match an artifact without that version', () => {
   const report = {
     advisories: {
@@ -177,6 +265,35 @@ test('workspace node-forge finding remains visible but does not match an artifac
     artifactFindings: affectedArtifactFindings,
     smoke: { failures: [] },
   }).some(failure => failure.includes('affected node-forge@1.4.0')))
+})
+
+test('an advisory for a package present only in a bundled chunk blocks the artifact gate', () => {
+  const report = {
+    advisories: {
+      'synthetic-bundled-package': {
+        module_name: 'h3',
+        severity: 'high',
+        title: 'Synthetic regression advisory for a package omitted from node_modules',
+        url: 'https://example.invalid/synthetic-bundled-package',
+        findings: [
+          { version: '1.14.0', paths: ['apps__web-console>package-a>h3'] },
+          { version: '1.15.11', paths: ['apps__web-console>nuxt>nitropack>h3'] },
+        ],
+      },
+    },
+  }
+  const runtimePackages = [{ name: 'h3', version: '1.14.0' }]
+  const bundledPackages = [{ name: 'h3', version: '1.15.11' }]
+  const findings = projectAdvisories(report, runtimePackages, bundledPackages)
+  assert.deepEqual(findings.map(finding => finding.version), ['1.14.0', '1.15.11'])
+  const bundledOnlyFindings = projectAdvisories(report, [], bundledPackages)
+  assert.deepEqual(bundledOnlyFindings.map(finding => finding.version), ['1.15.11'])
+  assert.ok(gateFailures({
+    auditValidation: { failures: [] },
+    evidenceValidation: { failures: [] },
+    artifactFindings: bundledOnlyFindings,
+    smoke: { failures: [] },
+  }).some(failure => failure.includes('affected h3@1.15.11')))
 })
 
 test('audit command output must be valid and consistent with its process status', () => {

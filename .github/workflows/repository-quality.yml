@@ -303,6 +303,7 @@ jobs:
           name: web-runtime-output-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             apps/web-console/.output/
+            apps/web-console/.runtime-bundle-provenance.json
             .runtime-evidence.json
           if-no-files-found: error
           include-hidden-files: true
@@ -487,6 +488,14 @@ jobs:
           NUXT_APP_ENV: test
           PULSEGRID_DATABASE_URL: postgres://pulsegrid:pulsegrid-browser-ci@127.0.0.1:15432/pulsegrid_test?sslmode=disable
         run: corepack pnpm run test:browser
+      - name: Upload command-console visual QA evidence
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: command-console-visual-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/device-commands-*/mvp012-command-console-*.png
+          if-no-files-found: error
+          retention-days: 30
       - name: Upload Playwright diagnostics
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

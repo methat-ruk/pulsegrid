@@ -1,3 +1,5 @@
+import { attachRuntimeBundleProvenance } from '../../scripts/runtime-bundle-provenance.mjs'
+
 export default defineNuxtConfig({
   modules: ['@nuxt/ui', '@nuxt/eslint', '@nuxt/test-utils/module'],
   devtools: { enabled: false },
@@ -19,6 +21,11 @@ export default defineNuxtConfig({
     backendOrigin: '',
   },
   compatibilityDate: '2025-07-15',
+  nitro: {
+    hooks: {
+      'rollup:before': attachRuntimeBundleProvenance,
+    },
+  },
   typescript: {
     strict: true,
     typeCheck: true,

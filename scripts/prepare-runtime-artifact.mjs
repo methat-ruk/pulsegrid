@@ -4,6 +4,7 @@ import { builtinModules, createRequire } from 'node:module'
 import { lstat, readFile, readdir, realpath, readlink, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { collectRuntimeBundleProvenance } from './runtime-bundle-provenance.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const outputDirectory = path.join(root, 'apps/web-console/.output')
@@ -551,6 +552,68 @@ function validatePeerContext(packageRecord, lockRecords, lockSnapshots, producti
   return absentOptionalPeers
 }
 
+async function proveBundledPackages(bundleProvenance, productionNodes, packageRecords, snapshots) {
+  const packageEvidence = []
+  for (const bundledPackage of bundleProvenance.packages) {
+    const key = `${bundledPackage.name}@${bundledPackage.version}`
+    const candidate = productionNodes.find(node => node.name === bundledPackage.name
+      && node.version === bundledPackage.version
+      && node.virtualStoreKey === bundledPackage.sourceVirtualStoreKey
+      && node.path)
+    if (!candidate) fail(`bundled package source is absent from the frozen production graph: ${key} (${bundledPackage.sourceVirtualStoreKey})`)
+
+    const sourcePath = await realpath(candidate.path)
+    const sourceManifest = JSON.parse(await readFile(path.join(sourcePath, 'package.json'), 'utf8'))
+    const sourceMetadata = {
+      name: sourceManifest.name,
+      version: sourceManifest.version,
+      dependencies: sourceManifest.dependencies ?? {},
+      optionalDependencies: sourceManifest.optionalDependencies ?? {},
+      peerDependencies: sourceManifest.peerDependencies ?? {},
+      peerDependenciesMeta: sourceManifest.peerDependenciesMeta ?? {},
+    }
+    if (sourceMetadata.name !== bundledPackage.name || sourceMetadata.version !== bundledPackage.version) {
+      fail(`bundled package manifest identity differs from its frozen production graph node: ${key}`)
+    }
+
+    const lockedRecords = packageRecords.get(key) ?? []
+    const integrityValues = [...new Set(lockedRecords.map(record => record.integrity).filter(Boolean))]
+    if (integrityValues.length !== 1) fail(`expected one frozen integrity for bundled ${key}; found ${integrityValues.length}`)
+    const sourceFileProofs = []
+    for (const module of bundledPackage.modules) {
+      const sourceFilePath = path.resolve(sourcePath, module.sourceFile)
+      const relativeSourceFile = path.relative(sourcePath, sourceFilePath)
+      if (relativeSourceFile.startsWith('..') || path.isAbsolute(relativeSourceFile)) {
+        fail(`bundled module source escapes its frozen package: ${key}/${module.sourceFile}`)
+      }
+      const resolvedSourceFile = await realpath(sourceFilePath)
+      const resolvedRelativeSource = path.relative(sourcePath, resolvedSourceFile)
+      if (resolvedRelativeSource.startsWith('..') || path.isAbsolute(resolvedRelativeSource)) {
+        fail(`bundled module source resolves outside its frozen package: ${key}/${module.sourceFile}`)
+      }
+      sourceFileProofs.push({
+        ...module,
+        sha256: sha256(await readFile(resolvedSourceFile)),
+      })
+    }
+
+    const lockedSnapshots = snapshots.get(key) ?? []
+    if (lockedSnapshots.length === 0) fail(`frozen lock snapshot is missing for bundled ${key}`)
+    packageEvidence.push({
+      ...bundledPackage,
+      packageManifestSha256: sha256(stable(sourceMetadata)),
+      sourceFileProofs,
+      lock: {
+        integrity: integrityValues[0],
+        packageRecords: lockedRecords.map(record => record.key),
+        snapshotKeys: lockedSnapshots.map(snapshot => snapshot.key),
+      },
+      lockVerified: true,
+    })
+  }
+  return packageEvidence
+}
+
 async function prepare() {
   const topManifest = JSON.parse(await readFile(packagePath, 'utf8'))
   const yamlVersion = topManifest.devDependencies?.yaml
@@ -584,6 +647,8 @@ async function prepare() {
   }
   const graph = flattenProductionGraph(JSON.parse(listResult.stdout)[0])
   const graphEdges = new Set(graph.edges)
+  const bundleProvenance = await collectRuntimeBundleProvenance(outputDirectory)
+  const bundledPackageEvidence = await proveBundledPackages(bundleProvenance, graph.nodes, packageRecords, snapshots)
   const packageEvidence = []
 
   for (const runtimePackage of runtimePackages) {
@@ -664,7 +729,7 @@ async function prepare() {
   if (nodeVersion !== (await readFile(path.join(root, '.node-version'), 'utf8')).trim()) fail('active Node version does not match .node-version')
 
   const evidence = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     source: {
       commit: process.env.GITHUB_SHA ?? spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).stdout.trim(),
       runId: process.env.GITHUB_RUN_ID ?? null,
@@ -682,6 +747,10 @@ async function prepare() {
       fileCount: outputProof.fileCount,
       runtimeManifestSha256: sha256(await readFile(serverManifestPath)),
       packages: packageEvidence,
+      bundleProvenance: {
+        ...bundleProvenance,
+        packages: bundledPackageEvidence,
+      },
       graph: {
         entry: 'apps/web-console/.output/server/index.mjs',
         moduleCount: importGraph.moduleCount,
@@ -696,7 +765,7 @@ async function prepare() {
     },
   }
   await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`, { flag: 'w' })
-  console.log(`Prepared runtime evidence for .output (${packageEvidence.length} exact packages, ${importGraph.moduleCount} modules, ${importGraph.edges.length} package edges).`)
+  console.log(`Prepared runtime evidence for .output (${packageEvidence.length} physical packages, ${bundledPackageEvidence.length} bundled package contexts across ${bundleProvenance.moduleCount} modules, ${importGraph.edges.length} physical package edges).`)
   console.log(`Artifact SHA-256: ${outputProof.digest}`)
 }
 
