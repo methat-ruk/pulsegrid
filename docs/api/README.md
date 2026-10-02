@@ -10,10 +10,10 @@ acknowledgement merged as `b209861` (PR #21). Its review findings
 are addressed with response-admission synchronization, strict failure-code
 presence validation, real broker-outage expiry and forced shutdown-drain
 evidence; main CI passed on the merge commit. MVP-012's command-console plan
-is implemented on `feat/mvp-012-command-console`, its real-browser evidence
-passes, and PR #22's production artifact dependency-audit gate passes. The
-separate workspace audit still reports the `node-forge` advisory; it does not
-block the artifact-scoped gate. No command API contract change was needed.
+is complete and PR #22 merged as `1142eb7`; main CI passed on the merge commit.
+Its production artifact dependency-audit gate passes. The separate workspace
+audit still reports the `node-forge` advisory, which is outside the artifact-
+scoped gate. No command API contract change was needed.
 Production identity, production MQTT, and permanent high-volume storage remain
 deferred.
 
@@ -221,9 +221,9 @@ This remains an anonymous loopback development/test path and is not production
 device authentication or multi-replica coordination. The PR review comments
 were addressed before merge; main CI passed on `b209861`.
 
-The device-detail consumer is implemented under the accepted
-[MVP-012 plan](../roadmap/feature-plans/completed/MVP-012-command-console.md)
-and is tracked on the open, unmerged PR #22. It reuses create/detail/recent-history
+The device-detail consumer is implemented under the completed
+[MVP-012 plan](../roadmap/feature-plans/completed/MVP-012-command-console.md).
+PR #22 merged as `1142eb7`. The consumer reuses create/detail/recent-history
 operations and server-owned statuses; no API field, deadline or tenant-authority
 change is part of the implementation.
 

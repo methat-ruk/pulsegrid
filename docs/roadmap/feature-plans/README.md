@@ -107,9 +107,9 @@ platform foundation” is not an acceptable PR boundary.
 
 - [MVP-011 — MQTT command delivery and acknowledgement](completed/MVP-011-mqtt-command-delivery-acknowledgement.md) — merged as `b209861` (PR #21); main CI passed
 
-### MVP — Remote command console — completed by owner acceptance
+### MVP — Remote command console — completed
 
-- [MVP-012 — Command console](completed/MVP-012-command-console.md) — owner-accepted with all 14 required checks passing on `c289648`; PR #22 remains open and unmerged; workspace `node-forge` remains unresolved outside the runtime artifact gate
+- [MVP-012 — Command console](completed/MVP-012-command-console.md) — merged as `1142eb7` (PR #22); main CI passed; workspace `node-forge` remains unresolved outside the runtime artifact gate
 
 ### MVP acceptance
 

@@ -1,11 +1,10 @@
 # PulseGrid local development
 
 Status: Local repository workflow and merge-gate enforcement implemented;
-FND-004 readiness and MVP-003 through MVP-010 are merged. MVP-011 command
-delivery is implemented in open PR #21 on
-`feat/mvp-011-mqtt-command-delivery-acknowledgement`; review findings are
-covered by local unit and real broker/database integration evidence. The PR
-remains open and unmerged, subject to required CI checks.
+FND-004 readiness and MVP-003 through MVP-012 are merged. MVP-011 command
+delivery merged as `b209861` (PR #21), and MVP-012's console merged as
+`1142eb7` (PR #22); main CI passed for both. The production artifact audit gate
+passes while the separate workspace `node-forge` advisory remains unresolved.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local

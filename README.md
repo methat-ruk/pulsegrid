@@ -5,7 +5,7 @@
 Connect devices · Stream telemetry · Detect conditions · Deliver commands ·
 Operate fleets
 
-![Status](https://img.shields.io/badge/status-mvp--012--planned-yellow)
+![Status](https://img.shields.io/badge/status-mvp--012--complete-green)
 
 > [!IMPORTANT]
 > PulseGrid's documentation foundation, Go API foundation, Nuxt console
@@ -19,7 +19,9 @@ Operate fleets
 > merged in PR #20 as `9d78301`, with main CI passing on that commit.
 > MVP-011 command delivery, device acknowledgement/results, and automatic
 > timeout merged in PR #21 as `b209861`, with main CI passing. MVP-012's command
-> console implementation is in progress from its reviewed plan.
+> console merged in PR #22 as `1142eb7`; main CI passed on the merge commit.
+> M4 is complete. The workspace `node-forge` advisory remains unresolved and
+> visible; the production artifact gate does not claim to remediate it.
 > Production identity and production readiness remain deferred.
 
 ## What is PulseGrid?
@@ -108,7 +110,7 @@ The decision state and adoption trigger for each technology are maintained in
 
 ## Project status
 
-**Current phase: MVP-012 console accepted; production artifact audit passes and PR #22 is ready for review**
+**Current phase: MVP-012 command console complete; PR #22 merged as `1142eb7`**
 
 - Product intent and MVP boundary: documented.
 - Architecture and technology adoption rules: documented.
@@ -132,10 +134,9 @@ The decision state and adoption trigger for each technology are maintained in
   MVP-011's MQTT delivery, response ingestion, durable retry and automatic
   timeout merged as `b209861` (PR #21), with main CI passing. The
   [MVP-012 command-console plan](docs/roadmap/feature-plans/completed/MVP-012-command-console.md)
-  is Complete by explicit owner acceptance on the review-ready PR #22 candidate;
-  required CI passed on `c289648`. PR #22 remains open and unmerged, so M4 stays
-  in progress until integration to `main`. Its production artifact audit gate
-  passes; the workspace `node-forge` advisory remains unresolved and separate.
+  is complete and PR #22 merged as `1142eb7`; main CI passed on that commit.
+  M4 is complete. The production artifact audit gate passes; the workspace
+  `node-forge` advisory remains unresolved and separately reported.
   Production identity and production readiness remain deferred.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
   required checks include browser evidence for the real local API readiness
@@ -155,7 +156,7 @@ validation alone does not imply merge or production readiness.
 | Device registry | Tenant-scoped device provisioning, list, and detail | Complete |
 | Telemetry and current state | Simulator-to-console MQTT telemetry flow | Complete |
 | Rules and alerts | A threshold condition creates an investigable alert | Complete |
-| Remote command loop | Command delivery with acknowledgement, result, failure, and timeout | In progress |
+| Remote command loop | Command delivery with acknowledgement, result, failure, timeout, and console | Complete |
 | MVP acceptance | Repeatable end-to-end product loop | Planned |
 | Post-MVP evolution | Security hardening, event scale, specialized data, observability, orchestration, and fleet operations | Deferred |
 

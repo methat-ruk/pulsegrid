@@ -97,6 +97,7 @@ flowchart TD
     class MVP009 complete;
     class MVP010 complete;
     class MVP011 complete;
+    class MVP012 complete;
 ```
 
 FND-001 implementation establishes the backend runtime shell, FND-002
@@ -115,10 +116,10 @@ merged as `b209861` (PR #21), with main CI passing. MVP-012's command-console
 implementation and behavioral evidence are on PR #22. Its production runtime
 audit gate checks the exact built artifact, including bundled package
 provenance; the workspace `node-forge` advisory remains separately unresolved.
-After F1–F4 were fixed, all 14 required branch-protection contexts passed on
-`c289648`; the owner accepted MVP-012 with that evidence and the PR is ready for
-review but remains open and unmerged. Its plan is Complete by explicit owner
-acceptance. M4 remains in progress until the console is integrated into `main`.
+After F1–F4 were fixed, all 14 required branch-protection contexts passed. PR
+#22 merged into `main` as `1142eb7`, and main CI passed on the merge commit. The
+plan is Complete and M4 is complete. The workspace `node-forge` advisory stays
+visible and unresolved; the production artifact gate does not claim remediation.
 
 ## Milestones
 
@@ -202,7 +203,7 @@ Plans:
 
 ### M4 — Remote command loop
 
-Status: In progress
+Status: Complete
 
 Dependency: M1 and M2
 
@@ -213,7 +214,7 @@ Plans:
 
 - [MVP-010 — Command model and GraphQL API](feature-plans/completed/MVP-010-command-model-graphql-api.md) — merged as `9d78301` (PR #20); main CI passed
 - [MVP-011 — MQTT command delivery and acknowledgement](feature-plans/completed/MVP-011-mqtt-command-delivery-acknowledgement.md) — merged as `b209861` (PR #21); main CI passed
-- [MVP-012 — Command console](feature-plans/completed/MVP-012-command-console.md) — owner-accepted with required checks passing on `c289648`; PR #22 is open and unmerged; workspace `node-forge` remains unresolved outside the runtime artifact gate
+- [MVP-012 — Command console](feature-plans/completed/MVP-012-command-console.md) — merged as `1142eb7` (PR #22); main CI passed; workspace `node-forge` remains unresolved outside the runtime artifact gate
 
 ### M5 — MVP acceptance
 
