@@ -82,7 +82,7 @@ consumer or independently owned runtime requires one.
 ## Decisions intentionally left open
 
 - Production/fleet live-state transport. MVP-007 uses manual telemetry refresh;
-  MVP-012 plans bounded command-only polling without selecting a shared
+  MVP-012 implements bounded command-only polling without selecting a shared
   realtime transport.
 - Production identity provider and RBAC model.
 - Production MQTT broker topology, device identity/credential lifecycle, TLS,

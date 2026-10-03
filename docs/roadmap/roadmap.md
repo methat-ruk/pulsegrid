@@ -225,6 +225,11 @@ Dependency: M3 and M4
 Outcome: The complete device-to-operator-to-device product loop is repeatable,
 observable, and validated from a clean local checkout.
 
+MVP-013's plan was revised and challenged on 2026-10-03 against merged MVP-012
+and main CI at `619e1c7`. Its scenario, fixture-lifecycle and evidence boundaries
+are ready for implementation selection; acceptance has not run and M5 remains
+Planned.
+
 Plans:
 
 - [MVP-013 — End-to-end product loop](feature-plans/planned/MVP-013-end-to-end-product-loop.md)

@@ -317,9 +317,9 @@ corepack pnpm run mqtt:test:integration
 PR #18 merged into `main` as `fd0a383`; the commands above now exercise the
 MVP-008 API and transaction behavior from the current repository.
 
-### MVP-009 alert console candidate
+### MVP-009 alert console
 
-On `feat/mvp-009-alert-console`, the console adds an **Alerts** route for
+MVP-009 merged in PR #19 as `7e3c336`. The console provides an **Alerts** route for
 recent occurrences, a detail route for the immutable MVP-008 snapshot, and a
 device-scoped link from device detail. The API contract remains unchanged.
 After the local API and console are running, register a device, configure a
@@ -347,8 +347,10 @@ browser suite passed 32 tests. A Playwright Chromium check at 1440 × 900 and
 390 × 844 verified the detail identity, heading focus and Tab navigation,
 one-column reflow, no horizontal overflow, and no page or console errors.
 
-The project owner accepted this candidate for merge on its feature branch. PR
-#19 remains open and has not been merged into `main`.
+PR #19's evidence above records its accepted candidate. MVP-013 remains planned
+and will join provisioning, telemetry, alert investigation and command completion
+into one repeatable product-loop scenario; the separate journeys do not yet
+constitute that acceptance proof.
 
 ### Local PostgreSQL, seed, and development GraphQL
 
