@@ -478,3 +478,24 @@ journey in CI, so the workflow now isolates that evidence by ordering.
 PR #24 remains open and unmerged until the pushed candidate's 14 protected
 status checks pass. The plan stays in `planned/` with Ready for review status;
 move it to `completed/` and mark M5 Complete only after the outcome is accepted.
+
+### Latest PR #24 review follow-up — 2026-10-06
+
+The latest published review comment, [#6009823637](https://github.com/methat-ruk/pulsegrid/pull/24#issuecomment-6009823637), reviewed candidate
+`bec7149eab3c3428e8f0e2aa6b7956c60745b27b`. It confirmed F6–F8 and left G1/G3
+and the browser-smoke failure open. The current follow-up changes are:
+
+| Finding | Change and current evidence |
+| --- | --- |
+| F6 — timestamp string oracle | Canonicalize UTC RFC3339 fractional seconds to PostgreSQL microsecond precision and remove insignificant trailing zeroes. A browser regression covers `.921060789` → `.92106`, a sub-microsecond fraction → no fractional part, and a distinct microsecond remaining distinct. The latest CI failure reproduced the old string mismatch; the regression awaits hosted browser-smoke on the updated candidate. |
+| F7 — outer lifecycle cancellation | The wrapper now handles SIGINT/SIGTERM, forwards cancellation to owned detached process groups, escalates a repeated signal, tracks every identified Compose project, and attempts bounded final cleanup. Controlled wrapper tests prove both signals remove the simulated process, ports, and resources and permit a successful rerun. |
+| F8 — Docker bound and cleanup result | Owned Docker commands now have a 15-second timeout with SIGTERM/SIGKILL escalation, and nonzero `compose down` makes the wrapper fail. Controlled tests inject a hanging network inspection and final `compose down` exit 29; both fail closed and leave no simulated process or resource. |
+| Review performance note | A standalone lifecycle run builds API/Nuxt artifacts once for its four inner runs. The full `check` and hosted browser-smoke now run the complete browser suite first, then invoke `test:browser:lifecycle:reuse` to reuse the exact candidate artifacts. This keeps assertions, timeout, retries, and test scope unchanged. |
+| Local real-browser attempt | `corepack pnpm run test:browser:lifecycle` built the test artifacts, interrupted the first real Compose run, and removed its resources. The subsequent Chromium launch was blocked by macOS sandbox bootstrap denial (`EPERM`, Chromium `SIGTRAP`); a Docker check showed no remaining containers, networks, or volumes for the test project. This local attempt is not counted as a passing real-browser lifecycle proof. |
+
+On this candidate, `corepack pnpm run test:browser:runner` passed **14/14**
+controlled tests with no skips. Hosted validation and a fresh-checkout full
+check on the pushed candidate remain the authoritative open evidence for G1,
+G3, the added timestamp regression, and final merge readiness. This follow-up
+supersedes the earlier candidate's browser/lifecycle validation claims above;
+only exact-head results recorded after the final push close those gaps.

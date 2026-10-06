@@ -4,7 +4,9 @@ import net from 'node:net'
 
 const ports = { database: 15432, broker: 11883, api: 18080, web: 4173 }
 const projectName = `pulsegrid-browser-${process.pid}-${Date.now()}`
-const playwrightArguments = process.argv.slice(2).filter(argument => argument !== '--')
+const browserArguments = process.argv.slice(2).filter(argument => argument !== '--')
+const reuseTestArtifacts = browserArguments.includes('--reuse-test-artifacts')
+const playwrightArguments = browserArguments.filter(argument => argument !== '--reuse-test-artifacts')
 const externalDatabaseMode = process.env.CI === 'true'
   && process.env.PULSEGRID_BROWSER_TEST_DATABASE_MODE === 'external-ci-service'
 const ownsDatabase = !externalDatabaseMode
@@ -51,8 +53,8 @@ try {
         ], environment, 180_000)
         && await run('go', ['-C', 'apps/api', 'run', './cmd/db', 'migrate', 'up'], environment, 120_000)
         && await run('go', ['-C', 'apps/api', 'run', './cmd/db', 'seed'], environment, 120_000)
-        && await run('node', ['scripts/build-api-test.mjs'], environment, 180_000)
-        && await run('node', ['scripts/build-web.mjs', 'test'], environment, 180_000)
+        && (reuseTestArtifacts || await run('node', ['scripts/build-api-test.mjs'], environment, 180_000))
+        && (reuseTestArtifacts || await run('node', ['scripts/build-web.mjs', 'test'], environment, 180_000))
         && await startNuxtTestServer(environment)
         && await run('pnpm', ['exec', 'playwright', 'test', ...playwrightArguments], environment, 360_000)
       ) {

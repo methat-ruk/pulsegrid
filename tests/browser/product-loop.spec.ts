@@ -80,8 +80,18 @@ function uniqueKey(testInfo: TestInfo) {
 }
 
 function postgresMicrosecondTimestamp(timestamp: string) {
-  return timestamp.replace(/(\.\d{6})\d+(?=Z$)/u, '$1')
+  const match = timestamp.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z$/u)
+  if (!match) throw new Error(`expected a UTC RFC3339 timestamp, received ${timestamp}`)
+  const fraction = (match[2] ?? '').slice(0, 6).replace(/0+$/u, '')
+  return `${match[1]}${fraction ? `.${fraction}` : ''}Z`
 }
+
+test('canonicalizes UTC timestamps to PostgreSQL microsecond precision', () => {
+  expect(postgresMicrosecondTimestamp('2026-10-06T05:06:02.921060789Z')).toBe('2026-10-06T05:06:02.92106Z')
+  expect(postgresMicrosecondTimestamp('2026-10-06T05:06:02.000000789Z')).toBe('2026-10-06T05:06:02Z')
+  expect(postgresMicrosecondTimestamp('2026-10-06T05:06:02.921061789Z')).not.toBe('2026-10-06T05:06:02.92106Z')
+  expect(() => postgresMicrosecondTimestamp('not-a-utc-timestampZ')).toThrow('expected a UTC RFC3339 timestamp')
+})
 
 test.describe('MVP-013 complete product loop', () => {
   test('provisions, investigates simulator telemetry, and observes the stored PING result', async ({ page }, testInfo) => {

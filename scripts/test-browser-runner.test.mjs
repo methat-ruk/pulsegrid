@@ -124,7 +124,13 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
     let output = ''
     child.stdout.on('data', chunk => { output = `${output}${chunk.toString()}`.slice(-64 * 1024) })
     child.stderr.on('data', chunk => { output = `${output}${chunk.toString()}`.slice(-64 * 1024) })
-    await waitForMarker(fixture.readinessMarker, 'ready', 8_000)
+    try {
+      await waitForMarker(fixture.readinessMarker, 'ready', 8_000)
+    }
+    catch (error) {
+      child.kill('SIGKILL')
+      throw new Error(`${error.message}\n${output}`)
+    }
     const descendantPID = Number(await readFile(fixture.descendantPID, 'utf8'))
 
     child.kill(signal)

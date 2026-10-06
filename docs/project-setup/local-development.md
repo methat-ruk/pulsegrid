@@ -514,6 +514,13 @@ affect the suite's independent scenarios. Lifecycle Playwright output is kept
 under `test-results/lifecycle/`, preserving the full-suite screenshots and
 diagnostics for their CI upload.
 
+The standalone lifecycle command builds the API and Nuxt test artifacts once,
+then reuses them for the interrupted and recovery runs. After a successful
+`corepack pnpm run test:browser`, use
+`corepack pnpm run test:browser:lifecycle:reuse` to reuse those already-built
+artifacts. The full `check` and CI browser-smoke job use this order so the
+lifecycle proof does not rebuild the same candidate.
+
 ## Validation commands
 
 | Command | Feedback boundary |
@@ -536,6 +543,7 @@ diagnostics for their CI upload.
 | `corepack pnpm run mqtt:test:integration` | Isolated real-Mosquitto publish/subscribe, QoS 1, no-retain, restart, and cleanup evidence |
 | `corepack pnpm run test:browser:runner` | Browser-runner safety, descendant cleanup, and simulated SIGINT/SIGTERM reruns |
 | `corepack pnpm run test:browser:lifecycle` | Real Compose interruption cleanup, resource/port removal, and rerun after SIGINT and SIGTERM |
+| `corepack pnpm run test:browser:lifecycle:reuse` | The same real Compose lifecycle proof after a successful browser suite, reusing its API and Nuxt test artifacts |
 | `corepack pnpm run check` | Full pre-CI handoff, including race, build, OpenAPI, audits, database integration, runner lifecycle, and browser smoke |
 
 The pre-commit hook runs only staged Go formatting, staged frontend ESLint,
