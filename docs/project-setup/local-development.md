@@ -510,7 +510,9 @@ SIGTERM-to-SIGKILL cleanup; inspect and clean only its printed unique Compose
 project if an external failure prevents teardown. CI supplies its pinned
 PostgreSQL service through `PULSEGRID_DATABASE_URL` and runs the lifecycle
 proof after the full browser suite so its valid product-loop fixtures do not
-affect the suite's independent scenarios.
+affect the suite's independent scenarios. Lifecycle Playwright output is kept
+under `test-results/lifecycle/`, preserving the full-suite screenshots and
+diagnostics for their CI upload.
 
 ## Validation commands
 

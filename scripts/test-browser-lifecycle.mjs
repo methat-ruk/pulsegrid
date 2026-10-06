@@ -1,11 +1,15 @@
 import { spawn } from 'node:child_process'
 import net from 'node:net'
+import { join } from 'node:path'
 
 const ports = { database: 15432, broker: 11883, api: 18080, web: 4173 }
 const externalDatabaseMode = process.env.CI === 'true'
   && process.env.PULSEGRID_BROWSER_TEST_DATABASE_MODE === 'external-ci-service'
 const runnerArguments = [
-  'scripts/test-browser.mjs', '--', '--grep', 'MVP-013 complete product loop',
+  'scripts/test-browser.mjs',
+  '--',
+  '--output', join(process.cwd(), 'test-results', 'lifecycle'),
+  '--grep', 'MVP-013 complete product loop',
 ]
 const lifecycleTimeout = 360_000
 let activeRunner
