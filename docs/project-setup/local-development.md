@@ -36,8 +36,10 @@ From the repository root:
 corepack pnpm run setup
 ```
 
-This runs a frozen workspace install and downloads Go modules. It must work
-from a clean checkout without another lockfile or an ignored local file.
+This runs a frozen workspace install, prepares Nuxt's generated ESLint
+configuration under the ignored `apps/web-console/.nuxt/` directory, and
+downloads Go modules. It must work from a clean checkout without another
+lockfile or an ignored local file.
 
 Install the pinned local Chromium headless shell only when browser evidence is
 needed:

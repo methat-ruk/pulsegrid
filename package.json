@@ -9,7 +9,7 @@
   },
   "scripts": {
     "prepare": "husky",
-    "setup": "NUXT_TELEMETRY_DISABLED=1 pnpm install --frozen-lockfile && pnpm run prepare && go -C apps/api mod download",
+    "setup": "NUXT_TELEMETRY_DISABLED=1 pnpm install --frozen-lockfile && pnpm run prepare && NUXT_TELEMETRY_DISABLED=1 pnpm --filter @pulsegrid/web-console exec nuxt prepare && go -C apps/api mod download",
     "setup:browser": "pnpm exec playwright install --only-shell chromium",
     "dev:api": "PULSEGRID_ENV=development go -C apps/api run ./cmd/api",
     "dev:web": "pnpm --filter @pulsegrid/web-console dev",

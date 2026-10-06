@@ -455,16 +455,22 @@ the F1 lockfile resolution.
 | F5 — response fixture cleanup | Register pool close first so LIFO cleanup removes fixtures before closing the pool; register cleanup before inserts, track organizations as they are created, check DELETE/verification/commit errors, and support partial fixture creation. The tagged PostgreSQL suite passed with cleanup assertions active. |
 | G1 — interruption lifecycle | `corepack pnpm run test:browser:lifecycle` ran real Compose scenarios for SIGINT and SIGTERM after API/web readiness. For each signal it verified no owned container, network, volume, or port remained, then reran and passed the focused product-loop journey. The full `check` repeated both cases. |
 | G2 — registered-tenant telemetry | MQTT isolation snapshots cover observation keys, observations, current state, and alerts for protected A/B before and after both crossed deliveries; the crossed message ID is checked on the protected device. Live `pulsegrid-dev` GraphQL reads of B return null device/current state and empty history. Valid A and B follow-up messages persisted and A created its expected alert. All four MQTT suites passed. |
-| G3 — clean-local proof | A clean tracked checkout with no ignored env/build files must run setup, repository policy, `check:fast`, all four MQTT suites, API DB integration, runner tests, both-signal lifecycle, and browser smoke. The exact checkout SHA and results are recorded in the final PR #24 response comment. |
+| G3 — clean-local proof | The initial clean checkout at `be3596ee3e7c565bc011fa6d10c963004cae9e83` exposed an additional setup gap: `check` failed in web lint because setup had not generated `.nuxt/eslint.config.mjs`. The root setup command now runs `nuxt prepare`; the post-fix clean checkout SHA and full command results are recorded in the final PR #24 response comment. |
+| Additional — clean setup required validation | The clean-checkout failure was outside the published F1–F5/G1–G3 review scope but affected the required full check. Root setup now prepares the ignored Nuxt ESLint config, matching the existing CI setup step. No dependency or application contract changed. The post-fix exact-SHA clean run is reported in the final response comment. |
 
-**Full local validation:** `corepack pnpm run check` passed on 2026-10-06.
+**Contributor-worktree validation:** `corepack pnpm run check` passed on
+2026-10-06, including all suites below. That checkout already had generated
+Nuxt files; the first clean-checkout replay exposed the separate setup gap
+listed above. The exact post-fix clean-checkout result is recorded in the final
+PR response comment.
 This aggregate ran formatting/generated checks, static analysis, lint and
 typechecks, unit tests (80 web tests), Go race tests, Go/web builds, OpenAPI,
 the production and Go vulnerability audits, all four MQTT integration suites,
 tagged PostgreSQL integration, all nine browser-runner tests, the real
 two-signal lifecycle test, and all 36 Chromium cases. No required local check
-was skipped or unavailable. The workspace advisories above remain a known
-limitation; they are separate from the passed runtime artifact gate.
+was skipped or unavailable in that contributor-worktree run. The workspace
+advisories above remain a known limitation; they are separate from the passed
+runtime artifact gate.
 
 PR #24 remains open and unmerged until the pushed candidate's 14 protected
 status checks pass. The plan stays in `planned/` with Ready for review status;

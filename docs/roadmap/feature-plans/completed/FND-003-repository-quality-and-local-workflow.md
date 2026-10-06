@@ -409,7 +409,7 @@ Expose and document these repository-root entry points:
 
 | Command | Purpose |
 | --- | --- |
-| `corepack pnpm run setup` | Run the frozen workspace install and download Go modules while preserving native output |
+| `corepack pnpm run setup` | Run the frozen workspace install, install hooks, prepare Nuxt's generated ESLint configuration, and download Go modules |
 | `corepack pnpm run setup:browser` | Install the pinned local Chromium revision separately for contributors who need browser evidence |
 | `corepack pnpm run dev:api` | Run only the Go API in explicit development mode |
 | `corepack pnpm run dev:web` | Run only the Nuxt console with its existing development dotenv contract |
