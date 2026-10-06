@@ -84,6 +84,14 @@ func TestGraphQLThresholdRulesAndAlertsUseRealPostgres(t *testing.T) {
 	if len(createdRule.Errors) != 0 {
 		t.Fatalf("create rule GraphQL response = %+v", createdRule)
 	}
+	var createdRuleData struct {
+		CreateThresholdRule struct {
+			ID string `json:"id"`
+		} `json:"createThresholdRule"`
+	}
+	if err := json.Unmarshal(createdRule.Data, &createdRuleData); err != nil || createdRuleData.CreateThresholdRule.ID == "" {
+		t.Fatalf("decode tenant A rule: data=%s error=%v", createdRule.Data, err)
+	}
 
 	observedAt := time.Date(2026, 9, 24, 10, 0, 0, 123456789, time.UTC)
 	messageID := uuid.New()
@@ -209,5 +217,28 @@ func TestGraphQLThresholdRulesAndAlertsUseRealPostgres(t *testing.T) {
 	}
 	if len(isolated.ThresholdRules) != 0 || isolated.Alert != nil || len(isolated.Alerts.Edges) != 0 {
 		t.Fatalf("cross-tenant rule/alert data was visible: %+v", isolated)
+	}
+	handlerB, err := NewHandlerWithRules(registryRepository, projectionRepository, rulesRepository, organizationB, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatalf("create tenant B GraphQL handler: %v", err)
+	}
+	ownedData := doGraphQLForOrganization(t, handlerB, organizationB, `{ "query": "query { thresholdRules(deviceId: \"`+deviceB.ID.String()+`\") { id } alert(id: \"`+foreignAlertID.String()+`\") { id deviceId ruleId messageId } alerts(first: 10, deviceId: \"`+deviceB.ID.String()+`\") { edges { node { id } } } }" }`)
+	if len(ownedData.Errors) != 0 || !strings.Contains(string(ownedData.Data), foreignRule.ID.String()) || !strings.Contains(string(ownedData.Data), foreignAlertID.String()) {
+		t.Fatalf("tenant B owned rule/alert response = %+v", ownedData)
+	}
+	foreignData := doGraphQLForOrganization(t, handlerB, organizationB, `{ "query": "query { thresholdRules(deviceId: \"`+deviceA.ID.String()+`\") { id } alert(id: \"`+alert.ID+`\") { id } alerts(first: 10, deviceId: \"`+deviceA.ID.String()+`\") { edges { node { id } } } }" }`)
+	if len(foreignData.Errors) != 0 || strings.Contains(string(foreignData.Data), alert.ID) || strings.Contains(string(foreignData.Data), createdRuleData.CreateThresholdRule.ID) {
+		t.Fatalf("tenant B cross-tenant rule/alert response = %+v", foreignData)
+	}
+	reverseCreate := doGraphQLForOrganization(t, handlerB, organizationB, `{ "query": "mutation { createThresholdRule(input: { deviceId: \"`+deviceA.ID.String()+`\", comparator: GT, thresholdCelsius: 35 }) { id } }" }`)
+	assertErrorCode(t, reverseCreate, errorCodeBadUserInput)
+	reverseUpdate := doGraphQLForOrganization(t, handlerB, organizationB, `{ "query": "mutation { updateThresholdRule(input: { id: \"`+createdRuleData.CreateThresholdRule.ID+`\", expectedRevision: 1, comparator: GT, thresholdCelsius: 35, enabled: true }) { id } }" }`)
+	assertErrorCode(t, reverseUpdate, errorCodeBadUserInput)
+	var reverseWriteCount int
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM threshold_rules r JOIN devices d ON d.id = r.device_id WHERE d.organization_id = $1 AND r.device_id = $2", organizationB, deviceA.ID).Scan(&reverseWriteCount); err != nil {
+		t.Fatalf("verify tenant B denied mutation: %v", err)
+	}
+	if reverseWriteCount != 0 {
+		t.Fatalf("tenant B mutation wrote %d rules onto tenant A device, want zero", reverseWriteCount)
 	}
 }

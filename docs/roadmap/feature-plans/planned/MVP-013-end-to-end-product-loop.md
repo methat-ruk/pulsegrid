@@ -1,6 +1,6 @@
 # MVP-013 — End-to-End Product Loop
 
-Status: Planned
+Status: In progress
 
 Branch: `test/mvp-013-end-to-end-product-loop`
 
@@ -10,9 +10,9 @@ Milestone: M5 — MVP acceptance
 
 Plan review date: 2026-10-03
 
-Implementation authorization: Not granted by this planning-only review. The
-existing Planned direction is retained; execution requires selection/approval
-of this revised scope. No implementation or acceptance run has started.
+Implementation authorization: User authorized execution of this revised scope
+on 2026-10-06. Implementation and targeted evidence are underway; M5 acceptance
+is not complete.
 
 ## Goal
 
@@ -137,12 +137,18 @@ generalize their configuration for a test:
    the existing raw Mosquitto test publisher and prove B persistence. P1 still
    uses the standalone simulator.
 3. Publish A-slug/B-device and B-slug/A-device telemetry: neither may change
-   protected state. Publish B-slug/B-device with an A command ID: B registry
-   resolution succeeds, command binding rejects it, and A remains unchanged.
-   Subsequent valid same-scope input must still work.
+   protected state. Subsequent valid same-scope input must still work.
 4. Live A GraphQL cannot read B device/current/history. Paired handler tests
    prove the other B rule/alert/command read/mutation denials, without claiming
    a second browser tenant session.
+5. The command-response runtime subscribes only to the selected
+   `pulsegrid-dev` tenant filter. Do not claim a second tenant's broker response
+   reaches that runtime. Exercise the response service processor with a valid
+   B-device envelope and persisted A command using the real registry resolver
+   and PostgreSQL repository; assert it leaves A unchanged and accepts a valid
+   B response. Keep the transport subscription filter covered by its existing
+   test. This proves the downstream binding invariant, not multi-tenant broker
+   subscription or production identity.
 
 This is data-scoping/binding proof, not device authentication or production
 authorization. Anonymous local MQTT peers remain outside that claim.
@@ -156,12 +162,13 @@ authorization. Anonymous local MQTT peers remain outside that claim.
 2. Add `tests/browser/product-loop.spec.ts`. Extend `tests/browser/fixtures.ts`
    only for needed shared helpers, explicit simulator mode, bounded output/waits
    and failure-safe cleanup; keep scenario assertions in the spec.
-3. Extend `scripts/mqtt-integration.mjs` and relevant tagged GraphQL/Fiber tests
-   for missing D1/D2/T1/T2 oracles. Reuse covered outage/shutdown/expiry/recovery.
-4. Harden `scripts/test-browser.mjs` target/resource lifecycle where needed and
-   verify changed refusal/cleanup behavior. Reuse build/start scripts; no new
-   root command. CI workflow changes are limited to necessary evidence upload
-   or measured timeout needs; existing gates stay mandatory.
+3. Extend `scripts/mqtt-integration.mjs`, tagged GraphQL/Fiber tests, and the
+   response-service integration test for D1/D2/T1/T2/T3 gaps. Reuse covered
+   outage/shutdown/expiry/recovery.
+4. Harden `scripts/test-browser.mjs` and cover target/cleanup behavior with
+   `test:browser:runner`. This adds a runner-test command only; the product loop
+   uses the existing `test:browser` command. CI keeps the new test inside the
+   existing `browser-smoke` status context.
 5. Reconcile actual diff/assertions with the plan, author-review/fix, run final
    checks, record acceptance evidence here, then update canonical docs/status.
 
@@ -204,8 +211,9 @@ UUIDs/timestamps vary; values, relationships, counts and outcomes are determinis
   MQTT `11883`, API `18080`, Nuxt `4173`. Refuse collisions; never reuse/kill an
   unrelated service. Local suites run sequentially; CI jobs use separate runners.
 - Validate targets before migrations/dependency mutation. Local acceptance owns
-  its DB and rejects an inherited DB override. The existing CI browser-service
-  override is allowed only in explicit externally owned mode with the strict
+  its DB and rejects an inherited DB override. The CI browser job opts into
+  external ownership explicitly; the existing browser-service override is
+  required in that mode (no generated-URL fallback) and must match the strict
   test DSN: `127.0.0.1`, `15432`, `pulsegrid_test`, user `pulsegrid`, explicit
   non-placeholder password, `sslmode=disable`, no fragment/extra URL parameters.
   Never print credentials/DSNs.
@@ -250,7 +258,8 @@ final candidate. Test names and baseline CI alone cannot close it.
 | D4 timeout/late result | ACK remains intermediate; ACK-only/silent reach server `TIMED_OUT` at unchanged deadline across restart; late completion cannot change timeout; UI shows stored result | Existing browser expiry, MQTT `deadlines`, command DB tests; browser/MQTT/DB gates |
 | D5 lost HTTP response | Commit through real backend, drop only response, reload and recover same device/type/key: one row and unchanged command ID | Existing browser recovery/GraphQL replay; browser/DB gates |
 | T1 two-tenant API/data | Own reads succeed; foreign device/state/history/rule/alert/command reads null/empty or contract denial, scoped cursors rejected, foreign mutations write nothing; A→B and B→A | Real-DB GraphQL/Fiber tests; `api-db-integration` |
-| T2 MQTT binding | Valid A/B telemetry persists separately; crossed tenant/device telemetry and B-device/A-command response cause scoped rejection/no protected-state changes; valid follow-up works | Extend MQTT `core`; `mqtt-integration` |
+| T2 registered-tenant telemetry | Valid A/B telemetry persists separately; crossed tenant/device telemetry causes scoped rejection/no writes; valid follow-up works | Extend MQTT `core`; `mqtt-integration` |
+| T3 command-response binding | Inject a valid B-device/A-command envelope at the response-service boundary with registered B and persisted A/B commands; A remains unchanged and matching B response completes B. Retain selected-tenant transport filter proof | New tagged PostgreSQL response-service integration case plus existing transport test; `api-db-integration` |
 | E1 environment separation | External/development test targets refused before writes; test values explicit/private; existing production identity/MQTT rejection/disable and Nuxt adapter restrictions remain proven | Config/transport tests, harness refusal evidence, repository policy, artifact audit; applicable API/web gates |
 | L1 clean setup/cleanup | Fresh tracked checkout without ignored dotenv/prebuilt output runs documented commands; cleanup passes on success/failure/interruption; rerun independent | Existing wrappers/focused lifecycle evidence; CI plus recorded clean-local run |
 
@@ -272,10 +281,11 @@ corepack pnpm run check
 ```
 
 `check` covers fast/static/generated-contract checks, unit/component/race tests,
-builds, OpenAPI/AsyncAPI, audits, MQTT, DB integration and browser evidence. Use
-focused existing commands during iteration; final checks apply to the reconciled
-candidate. Use a disposable verification checkout for clean-local proof; never
-remove the contributor's `.env` or data to simulate cleanliness.
+builds, OpenAPI/AsyncAPI, audits, MQTT, DB integration, browser-runner lifecycle
+tests and browser evidence. Use focused existing commands during iteration;
+final checks apply to the reconciled candidate. Use a disposable verification
+checkout for clean-local proof; never remove the contributor's `.env` or data
+to simulate cleanliness.
 
 Keep all 14 protected contexts: `repository-policy`, `api-static`, `api-test`,
 `api-race`, `api-vulnerabilities`, `web-lint`, `web-typecheck`, `web-test`,
@@ -301,7 +311,7 @@ risk is explicitly accepted; missing evidence never becomes a pass.
 
 | Owner | Bounded cleanup/change |
 | --- | --- |
-| This plan | Own scenarios/decisions/review/evidence; retain Planned until execution starts |
+| This plan | Own scenarios/decisions/review/evidence; remain In progress until the acceptance and delivery gates pass |
 | `docs/project-setup/local-development.md` | Fix stale MVP-009 candidate/open-PR prose now; after acceptance add one runnable joined workflow, expected outcomes, failure commands, cleanup and limits |
 | `docs/architecture/system-architecture.md` | Fix stale MVP-012 in-progress summary now; after acceptance describe verified loop without changing module/data authority |
 | `docs/architecture/technology-decisions.md` | Correct planned command-polling wording now; preserve conditional/deferred technologies |
@@ -320,16 +330,21 @@ evidence references only.
 - Runtime cost/flakiness: reuse existing two-minute expiry evidence, bounded
   polling and isolated namespaces. Measure budget pressure; do not shorten the
   product deadline or silently skip a scenario.
-- False isolation proof: T1/T2 require two registered tenants and positive/negative
+- False isolation proof: T1/T2/T3 require two registered tenants and positive/negative
   oracles. They do not prove authenticated MQTT peers or production RBAC.
 - Lost telemetry: PUBACK is not durable processing/replay. Retain transactional
   rollback and explicit republish recovery evidence; do not promise automatic replay.
 - Data/resource leakage: inherited DSNs, fixed ports, hangs and partial startup
   are covered by E1/L1, not optional cleanup.
-- Workspace `node-forge` remains unresolved. Keep exact production artifact
-  gate green and report workspace exposure separately; remediation is other work.
-- Source/gate mapping is verified; new P1/assertions and lifecycle safeguards
-  are unexecuted. No new product/architecture choice remains open in this scope.
+- The workspace still reports `node-forge`; the latest full local check on
+  2026-10-06 also failed the exact production-artifact gate on
+  `source-map-js@1.2.1` (GHSA-68fv-2mgg-jv7q). That package was already in the
+  base lockfile and this change edits no dependency manifest. Dependency
+  remediation/gate policy is outside this plan, so this is a blocking delivery
+  risk for an accepted artifact; do not claim artifact audit pass.
+- Most targeted evidence now passes; the final full browser suite, clean
+  tracked-checkout setup proof, and branch CI have not all passed on one
+  immutable candidate. M5 is not complete.
 
 Recovery: stop the failed owned run, retain minimal diagnostics, remove only its
 disposable resources, correct within authorized scope and rerun affected evidence.
@@ -344,9 +359,8 @@ work with their existing triggers.
 
 ## Plan Review / Challenge
 
-Author plan review, not independent implementation review. The cross-boundary
-acceptance decision uses Material Change (Tier 2) reasoning; the current edits
-are reversible documentation changes.
+This records author plan review, not independent implementation review. The
+cross-boundary acceptance decision uses Material Change (Tier 2) reasoning.
 
 | Original finding | Disposition |
 | --- | --- |
@@ -354,14 +368,19 @@ are reversible documentation changes.
 | Major: two tenants implied an absent live selector | T1/T2 use trusted handler scope and registered-tenant MQTT without new selectors |
 | Major: failure paths lacked no-write/recovery assertions | D1–D5 lock persisted oracles, completion barriers and evidence owners |
 | Major: setup/safety lacked target/teardown ownership | E1/L1 lock strict preflight, external CI DB ownership, interruption and rerun proof |
+| Material boundary: command response subscription is scoped to `pulsegrid-dev` | Do not widen the broker subscription. T3 injects at the service boundary and records that no second-tenant transport claim is made |
 | Major: evidence lacked candidate/gate linkage | Matrix maps to existing contexts and distinguishes baseline from final acceptance |
 | Minor: current docs contradicted merged MVP-009/MVP-012 | Canonical prose corrected in this planning pass; completion updates remain conditional |
 | Scope challenge: new monolithic runner/duplicate expiry tests | Rejected; reuse harnesses and add one joined browser spec |
 
-Final challenge: no unresolved design blocker within the stated MVP proof
-boundary. Confidence is high in source/gate mapping and moderate in runtime
-feasibility until execution. Next decision: authorize this revised implementation
-scope. Future required evidence is not counted as passed; broader fixes re-plan.
+Final plan challenge: the user's 2026-10-06 start request selected the revised
+scope. A verified singleton response-subscription filter changed the test
+method, not the product contract: T3 proves downstream tenant/device binding
+with real PostgreSQL and explicitly disclaims cross-tenant broker delivery.
+Implementation is in progress; final delivery remains blocked by the production
+artifact audit failure, clean-checkout proof and branch CI. Future evidence is
+not counted as passed; dependency/gate changes require a separate decision and
+re-plan.
 
 ## Done Criteria
 
@@ -377,5 +396,28 @@ scope. Future required evidence is not counted as passed; broader fixes re-plan.
 - Satisfy independent review only if required by an applicable current authority;
   otherwise it is an optional recommendation, not an invented gate.
 
-Planning closeout: implementation and acceptance runs above are not run.
-This revision is implementation-ready for review/selection, not MVP-accepted.
+Implementation progress on 2026-10-06: see the evidence disposition below.
+This branch remains In progress and MVP-013/M5 is not accepted.
+
+### Implementation Evidence Disposition — 2026-10-06
+
+Candidate is the working tree on `test/mvp-013-end-to-end-product-loop`, based
+on local HEAD `e076e47` / merged `main` `619e1c7`; implementation changes are
+uncommitted and no current branch-protection run exists.
+
+| Plan items | Evidence observed | Current state |
+| --- | --- | --- |
+| P1 joined UI journey | Final `corepack pnpm run test:browser` included the real Chromium scenario against runner-owned PostgreSQL/Mosquitto: UI-created device, correlated telemetry/alert/command, detail/history and reload. Focused P1 also passed from a disposable clean checkout | Passed; 36 browser cases passed with final P1 assertions |
+| D1/D2 and T2 telemetry | `corepack pnpm run mqtt:test:integration`: malformed no-write, replay after restart, conflicting ID no-partial-write and registered-tenant MQTT behavior | Passed; all 4 suites passed |
+| T1 and T3 | `corepack pnpm run api:test:integration`: real-PostgreSQL symmetric GraphQL/Fiber tenant scope and response-service command/device binding | Passed; all tagged API DB tests passed |
+| D3/D4/D5 and browser regression | Full browser suite exercised device-reported failure, 2-minute expiry, lost-response recovery and the joined loop | Passed; 36 Chromium cases passed |
+| E1 runner safeguards | `corepack pnpm run test:browser:runner`: unsafe DSN refusal, local rejection of CI-only mode, missing CI DSN refusal, occupied port, partial Compose startup cleanup and SIGTERM cleanup | Passed; 6 node tests passed |
+| L1 clean setup | Disposable clone started without ignored env files or build output; `corepack pnpm run setup`, repository policy, `check:fast`, runner safeguards and focused P1 all passed there | Passed for setup and targeted behavior; root full `check` remains blocked by the artifact advisory |
+| Static, unit and contract checks | `corepack pnpm run check:fast` and `corepack pnpm run api:vuln` | Passed; Go vuln tool found 0 called vulnerabilities and 3 findings in required modules outside scanned code paths |
+| Full local gate | `corepack pnpm run check` passed through `check:fast`, race, build and OpenAPI; `node:audit` stopped on affected `source-map-js@1.2.1` in the exact production artifact | **Failed; blocking for artifact acceptance.** Later checks in the aggregate command did not run on that attempt |
+
+The targeted browser and clean-checkout evidence now pass. Branch CI remains
+outstanding, and the full local `check` remains blocked at the artifact advisory.
+Independently run any useful checks after disposition; none can override that
+gate. Do not resolve the advisory by editing dependencies, filtering reports,
+or weakening controls inside MVP-013.

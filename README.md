@@ -24,6 +24,15 @@ Operate fleets
 > visible; the production artifact gate does not claim to remediate it.
 > Production identity and production readiness remain deferred.
 
+> [!WARNING]
+> The merged MVP-012 artifact gate result above is historical. The full local
+> validation run for the MVP-013 candidate on 2026-10-06 failed the production
+> artifact gate because it found `source-map-js@1.2.1`
+> ([GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q))
+> in the runtime artifact. This version is already in the base lockfile; the
+> MVP-013 changes do not alter dependencies. Artifact acceptance remains
+> blocked pending the applicable dependency decision and a passing gate.
+
 ## What is PulseGrid?
 
 PulseGrid is a multi-tenant IoT operations platform for teams that manage
@@ -110,7 +119,7 @@ The decision state and adoption trigger for each technology are maintained in
 
 ## Project status
 
-**Current phase: MVP-012 command console complete; PR #22 merged as `1142eb7`**
+**MVP-012 command console complete (PR #22, `1142eb7`); MVP-013 acceptance implementation in progress**
 
 - Product intent and MVP boundary: documented.
 - Architecture and technology adoption rules: documented.
@@ -135,8 +144,10 @@ The decision state and adoption trigger for each technology are maintained in
   timeout merged as `b209861` (PR #21), with main CI passing. The
   [MVP-012 command-console plan](docs/roadmap/feature-plans/completed/MVP-012-command-console.md)
   is complete and PR #22 merged as `1142eb7`; main CI passed on that commit.
-  M4 is complete. The production artifact audit gate passes; the workspace
-  `node-forge` advisory remains unresolved and separately reported.
+  M4 is complete. Its main CI artifact audit passed at merge. The latest local
+  MVP-013 candidate audit fails on the pre-existing lockfile's
+  `source-map-js@1.2.1`; the workspace `node-forge` advisory remains unresolved
+  and separately reported.
   Production identity and production readiness remain deferred.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
   required checks include browser evidence for the real local API readiness

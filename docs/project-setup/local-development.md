@@ -1,10 +1,14 @@
 # PulseGrid local development
 
 Status: Local repository workflow and merge-gate enforcement implemented;
-FND-004 readiness and MVP-003 through MVP-012 are merged. MVP-011 command
+FND-004 readiness and MVP-003 through MVP-012 are merged; MVP-013 acceptance
+implementation is in progress. MVP-011 command
 delivery merged as `b209861` (PR #21), and MVP-012's console merged as
-`1142eb7` (PR #22); main CI passed for both. The production artifact audit gate
-passes while the separate workspace `node-forge` advisory remains unresolved.
+`1142eb7` (PR #22); main CI passed for both at merge. The MVP-012 production
+artifact gate passed at that candidate. A full local check of the MVP-013
+candidate on 2026-10-06 failed the artifact gate on `source-map-js@1.2.1`
+(GHSA-68fv-2mgg-jv7q); the unchanged workspace lockfile already contains that
+version. The workspace `node-forge` advisory also remains unresolved.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
@@ -347,7 +351,7 @@ browser suite passed 32 tests. A Playwright Chromium check at 1440 × 900 and
 390 × 844 verified the detail identity, heading focus and Tab navigation,
 one-column reflow, no horizontal overflow, and no page or console errors.
 
-PR #19's evidence above records its accepted candidate. MVP-013 remains planned
+PR #19's evidence above records its accepted candidate. MVP-013 is in progress
 and will join provisioning, telemetry, alert investigation and command completion
 into one repeatable product-loop scenario; the separate journeys do not yet
 constitute that acceptance proof.

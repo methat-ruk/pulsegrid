@@ -98,6 +98,7 @@ flowchart TD
     class MVP010 complete;
     class MVP011 complete;
     class MVP012 complete;
+    class MVP013 progress;
 ```
 
 FND-001 implementation establishes the backend runtime shell, FND-002
@@ -218,7 +219,7 @@ Plans:
 
 ### M5 — MVP acceptance
 
-Status: Planned
+Status: In progress
 
 Dependency: M3 and M4
 
@@ -226,9 +227,8 @@ Outcome: The complete device-to-operator-to-device product loop is repeatable,
 observable, and validated from a clean local checkout.
 
 MVP-013's plan was revised and challenged on 2026-10-03 against merged MVP-012
-and main CI at `619e1c7`. Its scenario, fixture-lifecycle and evidence boundaries
-are ready for implementation selection; acceptance has not run and M5 remains
-Planned.
+and main CI at `619e1c7`. Implementation began on 2026-10-06 against the reviewed
+scope; the joined journey and acceptance evidence remain in progress.
 
 Plans:
 

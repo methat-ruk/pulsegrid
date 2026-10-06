@@ -63,6 +63,7 @@
     "repository-policy": "node scripts/check-repository-policy.mjs",
     "node:audit": "node scripts/node-audit.mjs",
     "test:browser": "node scripts/test-browser.mjs",
+    "test:browser:runner": "node --test scripts/test-browser-runner.test.mjs",
     "format": "pnpm run api:format && pnpm run web:lint:fix",
     "format:check": "pnpm run api:format:check && pnpm run web:lint",
     "lint": "pnpm run api:lint && pnpm run web:lint && pnpm run openapi:lint && pnpm run asyncapi:lint",
@@ -72,7 +73,7 @@
     "build": "pnpm run api:build && pnpm run web:build",
     "audit": "pnpm run node:audit && pnpm run api:vuln",
     "check:fast": "pnpm run api:format:check && pnpm run api:generate:check && pnpm run api:modernize && pnpm run api:staticcheck && pnpm run lint && pnpm run typecheck && pnpm run browser:typecheck && pnpm run test",
-    "check": "pnpm run check:fast && pnpm run test:race && pnpm run build && pnpm run openapi && pnpm run audit && pnpm run mqtt:test:integration && pnpm run api:test:integration && pnpm run test:browser"
+    "check": "pnpm run check:fast && pnpm run test:race && pnpm run build && pnpm run openapi && pnpm run audit && pnpm run mqtt:test:integration && pnpm run api:test:integration && pnpm run test:browser:runner && pnpm run test:browser"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
