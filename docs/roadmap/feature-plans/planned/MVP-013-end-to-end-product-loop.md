@@ -49,8 +49,10 @@ platform layer or a production-readiness claim.
   alert acknowledgement/resolution, and other new product capability.
 - New schema/migrations, public GraphQL/MQTT contracts, dependencies, generic
   orchestration, service extraction, application images, Kafka or Kubernetes.
-- Workspace `node-forge` remediation or weakening the artifact gate. Keep the
-  advisory separately visible; new production-artifact exposure is a blocker.
+- Workspace dependency remediation, including `node-forge` and other findings
+  from the broader workspace audit, or weakening the artifact gate. Keep
+  workspace findings separately visible; new production-artifact exposure is
+  a blocker.
 
 ## Dependencies
 
@@ -336,8 +338,9 @@ evidence references only.
   rollback and explicit republish recovery evidence; do not promise automatic replay.
 - Data/resource leakage: inherited DSNs, fixed ports, hangs and partial startup
   are covered by E1/L1, not optional cleanup.
-- The workspace still reports `node-forge`; the latest full local check on
-  2026-10-06 also failed the exact production-artifact gate on
+- The workspace audit reports `node-forge` and additional findings such as
+  `braces` and `simple-git`. The latest full local check on 2026-10-06 also
+  failed the exact production-artifact gate on
   `source-map-js@1.2.1` (GHSA-68fv-2mgg-jv7q). That package was already in the
   base lockfile and this change edits no dependency manifest. Dependency
   remediation/gate policy is outside this plan, so this is a blocking delivery

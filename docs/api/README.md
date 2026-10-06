@@ -15,7 +15,9 @@ Its production artifact dependency-audit gate passed on the merged candidate.
 The 2026-10-06 MVP-013 local artifact gate now fails on
 `source-map-js@1.2.1` (GHSA-68fv-2mgg-jv7q), present in the unchanged base
 lockfile. The separate workspace audit also reports the `node-forge` advisory.
-No command API contract change was needed.
+The latest workspace scan reports additional findings such as `braces` and
+`simple-git`; these remain separate workspace advisories and are not fixed by
+MVP-013. No command API contract change was needed.
 Production identity, production MQTT, and permanent high-volume storage remain
 deferred.
 

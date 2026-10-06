@@ -32,6 +32,8 @@ Operate fleets
 > in the runtime artifact. This version is already in the base lockfile; the
 > MVP-013 changes do not alter dependencies. Artifact acceptance remains
 > blocked pending the applicable dependency decision and a passing gate.
+> The broader workspace scan also reports separate advisories, including
+> `node-forge`, `braces`, and `simple-git`; this work does not claim to fix them.
 
 ## What is PulseGrid?
 

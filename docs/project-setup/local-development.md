@@ -9,6 +9,8 @@ artifact gate passed at that candidate. A full local check of the MVP-013
 candidate on 2026-10-06 failed the artifact gate on `source-map-js@1.2.1`
 (GHSA-68fv-2mgg-jv7q); the unchanged workspace lockfile already contains that
 version. The workspace `node-forge` advisory also remains unresolved.
+The latest workspace scan also reports separate findings including `braces`
+and `simple-git`; MVP-013 does not remediate workspace advisories.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
