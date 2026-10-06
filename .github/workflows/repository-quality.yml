@@ -39,7 +39,7 @@ jobs:
         shell: bash
         run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
       - name: Restore pnpm store
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -181,7 +181,7 @@ jobs:
         shell: bash
         run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
       - name: Restore pnpm store
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -215,7 +215,7 @@ jobs:
         shell: bash
         run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
       - name: Restore pnpm store
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -249,7 +249,7 @@ jobs:
         shell: bash
         run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
       - name: Restore pnpm store
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -285,7 +285,7 @@ jobs:
         shell: bash
         run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
       - name: Restore pnpm store
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -298,7 +298,7 @@ jobs:
           NUXT_APP_ENV: production
         run: corepack pnpm run web:build
       - name: Upload the proven production runtime artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: web-runtime-output-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -332,7 +332,7 @@ jobs:
       - name: Download the same-run production runtime artifact
         id: download-runtime-output
         continue-on-error: true
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: web-runtime-output-${{ github.run_id }}-${{ github.run_attempt }}
           path: .
@@ -342,7 +342,7 @@ jobs:
         run: corepack pnpm run node:audit
       - name: Upload workspace and runtime audit evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: node-dependency-audit-${{ github.run_id }}-${{ github.run_attempt }}
           path: runtime-audit-report.json
@@ -410,7 +410,7 @@ jobs:
         shell: bash
         run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
       - name: Restore pnpm store
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -424,7 +424,7 @@ jobs:
         run: corepack pnpm run asyncapi:lint
       - name: Upload OpenAPI review artifacts
         if: success()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: openapi-review-${{ github.sha }}
           path: .openapi/
@@ -501,7 +501,7 @@ jobs:
         shell: bash
         run: echo "path=$(corepack pnpm store path --silent)" >> "$GITHUB_OUTPUT"
       - name: Restore pnpm store
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.pnpm-store.outputs.path }}
           key: ${{ runner.os }}-node-${{ hashFiles('.node-version') }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
@@ -522,7 +522,7 @@ jobs:
         run: corepack pnpm run test:browser:lifecycle:reuse
       - name: Upload command-console visual QA evidence
         if: success() && matrix.suite == 'fast'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: command-console-visual-${{ github.run_id }}-${{ github.run_attempt }}
           path: test-results/device-commands-*/mvp012-command-console-*.png
@@ -530,7 +530,7 @@ jobs:
           retention-days: 30
       - name: Upload Playwright diagnostics
         if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: playwright-diagnostics-${{ github.sha }}-${{ matrix.suite }}
           path: |
