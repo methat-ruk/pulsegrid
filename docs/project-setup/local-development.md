@@ -514,6 +514,11 @@ affect the suite's independent scenarios. Lifecycle Playwright output is kept
 under `test-results/lifecycle/`, preserving the full-suite screenshots and
 diagnostics for their CI upload.
 
+CI runs `test:browser:runner` in a separate job without PostgreSQL because its
+fake lifecycle fixtures probe the reserved test ports. The required
+`browser-smoke` result aggregates that safeguards job with the browser E2E job,
+so either failure blocks the same protected context.
+
 The standalone lifecycle command builds the API and Nuxt test artifacts once,
 then reuses them for the interrupted and recovery runs. After a successful
 `corepack pnpm run test:browser`, use

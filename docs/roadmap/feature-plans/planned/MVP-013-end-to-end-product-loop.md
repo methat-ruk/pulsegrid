@@ -172,9 +172,9 @@ authorization. Anonymous local MQTT peers remain outside that claim.
    response-service integration test for D1/D2/T1/T2/T3 gaps. Reuse covered
    outage/shutdown/expiry/recovery.
 4. Harden `scripts/test-browser.mjs` and cover target/cleanup behavior with
-   `test:browser:runner`. This adds a runner-test command only; the product loop
-   uses the existing `test:browser` command. CI keeps the new test inside the
-   existing `browser-smoke` status context.
+   `test:browser:runner`. Run safeguards in a service-free CI job parallel to
+   browser E2E; the required `browser-smoke` aggregate passes only when both
+   jobs succeed. The product loop continues to use `test:browser`.
 5. Reconcile actual diff/assertions with the plan, author-review/fix, run final
    checks, record acceptance evidence here, then update canonical docs/status.
 
@@ -511,3 +511,29 @@ with Ready for review status until the outcome is accepted, then move it to
 `completed/` and mark M5 Complete. The broader workspace advisories and three
 Go module advisories outside reachable code remain known limitations; the
 production artifact audit and Go called-vulnerability scan pass.
+
+### Latest PR #24 review follow-up — CI safeguard skips
+
+Review comment [#6010847819](https://github.com/methat-ruk/pulsegrid/pull/24#issuecomment-6010847819)
+found that CI run [37423262221](https://github.com/methat-ruk/pulsegrid/actions/runs/37423262221)
+reported **14 tests, 9 passed, 5 skipped** in the browser-runner test step.
+Those five wrapper tests probed port `15432`, which the same job reserves for
+its PostgreSQL service, even though the fake wrapper fixtures do not use that
+database. The earlier `14/14` claim referred to local execution, not hosted CI;
+this section corrects that evidence record.
+
+The safeguards now run in a separate `browser-runner-safeguards` job without
+services, in parallel with `browser-e2e`. The existing required `browser-smoke`
+context is retained as an aggregate that fails unless both jobs succeed. This
+preserves the runner's full owned-port collision checks, keeps the 14 test
+cases, and prevents a PostgreSQL service from turning them into skips. The
+local `corepack pnpm run test:browser:runner` run passed **14/14 with no skips**;
+repository policy, workflow YAML parsing, and `git diff --check` also passed.
+The pushed candidate's CI result must confirm hosted **14/14, zero skipped**
+before this finding is closed.
+
+The review's separate runtime-reduction suggestions (splitting the real expiry
+case from browser E2E and transferring built artifacts across jobs) are
+non-blocking follow-ups. This change preserves real expiry, all assertions,
+timeouts, retries, and fail-on-flaky behavior; the recommendations remain
+unimplemented and no new runtime target is claimed.

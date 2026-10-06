@@ -432,8 +432,27 @@ jobs:
           include-hidden-files: true
           retention-days: 3
 
-  browser-smoke:
-    name: browser-smoke
+  browser-runner-safeguards:
+    name: browser-runner-safeguards
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Enable pnpm
+        run: corepack enable
+      - name: Check pnpm version
+        run: test "$(corepack pnpm --version)" = "12.3.4"
+      - name: Run browser-runner target and cleanup safeguards
+        run: corepack pnpm run test:browser:runner
+
+  browser-e2e:
+    name: browser-e2e
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     services:
@@ -483,8 +502,6 @@ jobs:
         run: corepack pnpm install --frozen-lockfile
       - name: Install Chromium headless shell and Linux dependencies
         run: corepack pnpm exec playwright install --with-deps --only-shell chromium
-      - name: Test browser-runner target and cleanup safeguards
-        run: corepack pnpm run test:browser:runner
       - name: Run browser smoke
         env:
           CI: 'true'
@@ -517,3 +534,22 @@ jobs:
             playwright-report/
           if-no-files-found: warn
           retention-days: 3
+
+  browser-smoke:
+    name: browser-smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    needs: [browser-runner-safeguards, browser-e2e]
+    if: always()
+    steps:
+      - name: Require browser smoke and runner safeguards
+        env:
+          BROWSER_E2E_RESULT: ${{ needs.browser-e2e.result }}
+          RUNNER_SAFEGUARDS_RESULT: ${{ needs.browser-runner-safeguards.result }}
+        run: |
+          if [[ "$BROWSER_E2E_RESULT" == "success" && "$RUNNER_SAFEGUARDS_RESULT" == "success" ]]; then
+            echo "browser E2E and runner safeguards passed"
+          else
+            echo "browser-e2e=$BROWSER_E2E_RESULT; browser-runner-safeguards=$RUNNER_SAFEGUARDS_RESULT"
+            exit 1
+          fi
