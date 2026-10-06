@@ -25,15 +25,13 @@ Operate fleets
 > Production identity and production readiness remain deferred.
 
 > [!WARNING]
-> The merged MVP-012 artifact gate result above is historical. The full local
-> validation run for the MVP-013 candidate on 2026-10-06 failed the production
-> artifact gate because it found `source-map-js@1.2.1`
-> ([GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q))
-> in the runtime artifact. This version is already in the base lockfile; the
-> MVP-013 changes do not alter dependencies. Artifact acceptance remains
-> blocked pending the applicable dependency decision and a passing gate.
-> The broader workspace scan also reports separate advisories, including
-> `node-forge`, `braces`, and `simple-git`; this work does not claim to fix them.
+> The initial MVP-013 review candidate failed the production artifact gate on
+> `source-map-js@1.2.1`
+> ([GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q)).
+> PR #24 now resolves that package to patched `1.2.2` in the lockfile only; the
+> rebuilt production artifact passed the required gate on 2026-10-06. Separate
+> workspace findings (`node-forge`, `braces`, and `simple-git`) remain visible
+> and unresolved.
 
 ## What is PulseGrid?
 
@@ -121,7 +119,7 @@ The decision state and adoption trigger for each technology are maintained in
 
 ## Project status
 
-**MVP-012 command console complete (PR #22, `1142eb7`); MVP-013 acceptance implementation in progress**
+**MVP-012 command console complete (PR #22, `1142eb7`); MVP-013 implementation and local acceptance checks complete (PR #24 open, not merged)**
 
 - Product intent and MVP boundary: documented.
 - Architecture and technology adoption rules: documented.
@@ -146,10 +144,11 @@ The decision state and adoption trigger for each technology are maintained in
   timeout merged as `b209861` (PR #21), with main CI passing. The
   [MVP-012 command-console plan](docs/roadmap/feature-plans/completed/MVP-012-command-console.md)
   is complete and PR #22 merged as `1142eb7`; main CI passed on that commit.
-  M4 is complete. Its main CI artifact audit passed at merge. The latest local
-  MVP-013 candidate audit fails on the pre-existing lockfile's
-  `source-map-js@1.2.1`; the workspace `node-forge` advisory remains unresolved
-  and separately reported.
+  M4 is complete. Its main CI artifact audit passed at merge. PR #24 addresses
+  its review findings; the 2026-10-06 full local `check` passed, including the
+  production artifact audit after the lockfile-only `source-map-js@1.2.2`
+  resolution. The workspace `node-forge`, `braces`, and `simple-git` advisories
+  remain separately reported and unresolved. PR #24 is not merged.
   Production identity and production readiness remain deferred.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
   required checks include browser evidence for the real local API readiness
@@ -158,7 +157,8 @@ The decision state and adoption trigger for each technology are maintained in
 
 Claims in this README should change from candidate/in progress to complete only
 after the corresponding behavior has been reviewed and accepted; local
-validation alone does not imply merge or production readiness.
+validation alone does not imply merge or production readiness. MVP-013 remains
+unmerged until PR #24's protected checks pass and its outcome is accepted.
 
 ## High-level roadmap
 
@@ -170,7 +170,7 @@ validation alone does not imply merge or production readiness.
 | Telemetry and current state | Simulator-to-console MQTT telemetry flow | Complete |
 | Rules and alerts | A threshold condition creates an investigable alert | Complete |
 | Remote command loop | Command delivery with acknowledgement, result, failure, timeout, and console | Complete |
-| MVP acceptance | Repeatable end-to-end product loop | Planned |
+| MVP acceptance | Repeatable end-to-end product loop | Ready for review (PR #24 open; not merged) |
 | Post-MVP evolution | Security hardening, event scale, specialized data, observability, orchestration, and fleet operations | Deferred |
 
 See the [roadmap](docs/roadmap/roadmap.md) for dependencies, outcomes, status,

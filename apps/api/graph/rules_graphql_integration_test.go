@@ -170,6 +170,22 @@ func TestGraphQLThresholdRulesAndAlertsUseRealPostgres(t *testing.T) {
 	if alertDetailData.Alert == nil || alertDetailData.Alert.ID != alert.ID || alertDetailData.Alert.DeviceID != deviceA.ID.String() || alertDetailData.Alert.RuleID != alert.RuleID || alertDetailData.Alert.MessageID != messageID.String() || alertDetailData.Alert.TemperatureCelsius != 31 || alertDetailData.Alert.Metric != rules.MetricTemperatureCelsius || alertDetailData.Alert.Comparator != string(rules.GreaterThan) || alertDetailData.Alert.ThresholdCelsius != 25 {
 		t.Fatalf("alert detail after history pruning = %+v", alertDetailData.Alert)
 	}
+	snapshotRuleState := func(organizationID, deviceID uuid.UUID) string {
+		t.Helper()
+		var snapshot string
+		if err := pool.QueryRow(ctx, `
+			SELECT coalesce(string_agg(
+				concat_ws('|', r.id::text, d.organization_id::text, r.device_id::text, r.metric,
+					r.comparator, r.threshold_celsius::text, r.enabled::text, r.revision::text,
+					r.created_at::text, r.updated_at::text), E'\n' ORDER BY r.id), '')
+			FROM threshold_rules AS r
+			JOIN devices AS d ON d.id = r.device_id
+			WHERE d.organization_id = $1 AND r.device_id = $2
+		`, organizationID, deviceID).Scan(&snapshot); err != nil {
+			t.Fatalf("snapshot rules for organization %s device %s: %v", organizationID, deviceID, err)
+		}
+		return snapshot
+	}
 
 	foreignRule, err := rulesRepository.CreateRule(ctx, organizationB, rules.CreateRuleInput{
 		DeviceID: deviceB.ID, Comparator: rules.GreaterThan, ThresholdCelsius: 20, Enabled: true,
@@ -177,10 +193,18 @@ func TestGraphQLThresholdRulesAndAlertsUseRealPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create foreign rule: %v", err)
 	}
+	protectedTenantBBeforeCreate := snapshotRuleState(organizationB, deviceB.ID)
 	foreignRuleCreate := doGraphQLForOrganization(t, handler, organizationA, `{ "query": "mutation { createThresholdRule(input: { deviceId: \"`+deviceB.ID.String()+`\", comparator: GT, thresholdCelsius: 25 }) { id } }" }`)
 	assertErrorCode(t, foreignRuleCreate, errorCodeBadUserInput)
+	if after := snapshotRuleState(organizationB, deviceB.ID); after != protectedTenantBBeforeCreate {
+		t.Fatalf("tenant A denied create changed tenant B rule state: before=%q after=%q", protectedTenantBBeforeCreate, after)
+	}
+	protectedTenantBBeforeUpdate := snapshotRuleState(organizationB, deviceB.ID)
 	foreignRuleUpdate := doGraphQLForOrganization(t, handler, organizationA, `{ "query": "mutation { updateThresholdRule(input: { id: \"`+foreignRule.ID.String()+`\", expectedRevision: 1, comparator: GT, thresholdCelsius: 25, enabled: true }) { id } }" }`)
 	assertErrorCode(t, foreignRuleUpdate, errorCodeBadUserInput)
+	if after := snapshotRuleState(organizationB, deviceB.ID); after != protectedTenantBBeforeUpdate {
+		t.Fatalf("tenant A denied update changed tenant B rule state: before=%q after=%q", protectedTenantBBeforeUpdate, after)
+	}
 	foreignMessageID := uuid.New()
 	if err := projectionRepository.Consume(ctx, ingestion.AcceptedTelemetry{
 		IngestionID: uuid.New(), MessageID: foreignMessageID, OrganizationID: organizationB,
@@ -230,15 +254,16 @@ func TestGraphQLThresholdRulesAndAlertsUseRealPostgres(t *testing.T) {
 	if len(foreignData.Errors) != 0 || strings.Contains(string(foreignData.Data), alert.ID) || strings.Contains(string(foreignData.Data), createdRuleData.CreateThresholdRule.ID) {
 		t.Fatalf("tenant B cross-tenant rule/alert response = %+v", foreignData)
 	}
+	protectedTenantABeforeCreate := snapshotRuleState(organizationA, deviceA.ID)
 	reverseCreate := doGraphQLForOrganization(t, handlerB, organizationB, `{ "query": "mutation { createThresholdRule(input: { deviceId: \"`+deviceA.ID.String()+`\", comparator: GT, thresholdCelsius: 35 }) { id } }" }`)
 	assertErrorCode(t, reverseCreate, errorCodeBadUserInput)
+	if after := snapshotRuleState(organizationA, deviceA.ID); after != protectedTenantABeforeCreate {
+		t.Fatalf("tenant B denied create changed tenant A rule state: before=%q after=%q", protectedTenantABeforeCreate, after)
+	}
+	protectedTenantABeforeUpdate := snapshotRuleState(organizationA, deviceA.ID)
 	reverseUpdate := doGraphQLForOrganization(t, handlerB, organizationB, `{ "query": "mutation { updateThresholdRule(input: { id: \"`+createdRuleData.CreateThresholdRule.ID+`\", expectedRevision: 1, comparator: GT, thresholdCelsius: 35, enabled: true }) { id } }" }`)
 	assertErrorCode(t, reverseUpdate, errorCodeBadUserInput)
-	var reverseWriteCount int
-	if err := pool.QueryRow(ctx, "SELECT count(*) FROM threshold_rules r JOIN devices d ON d.id = r.device_id WHERE d.organization_id = $1 AND r.device_id = $2", organizationB, deviceA.ID).Scan(&reverseWriteCount); err != nil {
-		t.Fatalf("verify tenant B denied mutation: %v", err)
-	}
-	if reverseWriteCount != 0 {
-		t.Fatalf("tenant B mutation wrote %d rules onto tenant A device, want zero", reverseWriteCount)
+	if after := snapshotRuleState(organizationA, deviceA.ID); after != protectedTenantABeforeUpdate {
+		t.Fatalf("tenant B denied update changed tenant A rule state: before=%q after=%q", protectedTenantABeforeUpdate, after)
 	}
 }

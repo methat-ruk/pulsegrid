@@ -30,7 +30,7 @@ export default defineConfig({
   webServer: {
     command: 'node scripts/start-nuxt-test-server.mjs',
     url: 'http://127.0.0.1:4173/',
-    reuseExistingServer: false,
+    reuseExistingServer: process.env.PULSEGRID_BROWSER_RUNNER_OWNS_WEB_SERVER === 'true',
     timeout: 30_000,
     stdout: 'pipe',
     stderr: 'pipe',

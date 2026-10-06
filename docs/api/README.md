@@ -12,12 +12,12 @@ presence validation, real broker-outage expiry and forced shutdown-drain
 evidence; main CI passed on the merge commit. MVP-012's command-console plan
 is complete and PR #22 merged as `1142eb7`; main CI passed on the merge commit.
 Its production artifact dependency-audit gate passed on the merged candidate.
-The 2026-10-06 MVP-013 local artifact gate now fails on
-`source-map-js@1.2.1` (GHSA-68fv-2mgg-jv7q), present in the unchanged base
-lockfile. The separate workspace audit also reports the `node-forge` advisory.
-The latest workspace scan reports additional findings such as `braces` and
-`simple-git`; these remain separate workspace advisories and are not fixed by
-MVP-013. No command API contract change was needed.
+The initial MVP-013 review candidate failed the production artifact gate on
+`source-map-js@1.2.1` (GHSA-68fv-2mgg-jv7q). PR #24 updates only its lockfile
+resolution to patched `1.2.2`; the rebuilt artifact passed the full local gate
+on 2026-10-06. Separate workspace findings for `node-forge`, `braces`, and
+`simple-git` remain visible and unresolved. No command API contract change was
+needed.
 Production identity, production MQTT, and permanent high-volume storage remain
 deferred.
 

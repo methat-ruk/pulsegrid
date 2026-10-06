@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import net from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -86,9 +86,69 @@ test('cleans the unique Compose project after startup partially fails', async (t
 
   assert.notEqual(result.code, 0)
   assert.deepEqual((await readDockerCalls(fixture.marker)).trim().split('\n'), ['up', 'down'])
+  assert.deepEqual(await readOwnedResources(fixture), [])
 })
 
+test('cleans descendants when the Compose leader exits before its process group', async (t) => {
+  if (process.platform === 'win32') return t.skip('process-group signals require POSIX')
+  const fixture = await createDockerFixture(t)
+  const result = await runBrowserRunner(fixture, {
+    CI: 'true',
+    PULSEGRID_DATABASE_URL: externalTestDatabase,
+    PULSEGRID_BROWSER_TEST_DATABASE_MODE: 'external-ci-service',
+    MVP013_BROWSER_FAKE_DOCKER_MODE: 'leader-exits-with-descendant',
+  })
+
+  assert.equal(result.code, 0, result.output)
+  assert.match(result.output, /owned descendant process remained; cleaning up its process group/iu)
+  const descendantPID = Number(await readFile(fixture.descendantPID, 'utf8'))
+  await waitForProcessExit(descendantPID, 5_000)
+  assert.deepEqual((await readDockerCalls(fixture.marker)).trim().split('\n'), ['up', 'down'])
+  assert.deepEqual(await readOwnedResources(fixture), [])
+})
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  test(`cleans owned resources and permits a rerun after ${signal} at browser readiness`, async (t) => {
+    if (process.platform === 'win32') return t.skip('process-group signals require POSIX')
+    const fixture = await createDockerFixture(t)
+    const child = spawn(process.execPath, [runnerPath], {
+      cwd: process.cwd(),
+      env: runnerEnvironment(fixture, {
+        CI: 'true',
+        PULSEGRID_DATABASE_URL: externalTestDatabase,
+        PULSEGRID_BROWSER_TEST_DATABASE_MODE: 'external-ci-service',
+        MVP013_BROWSER_FAKE_PNPM_MODE: 'hold-after-readiness',
+      }),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    let output = ''
+    child.stdout.on('data', chunk => { output = `${output}${chunk.toString()}`.slice(-64 * 1024) })
+    child.stderr.on('data', chunk => { output = `${output}${chunk.toString()}`.slice(-64 * 1024) })
+    await waitForMarker(fixture.readinessMarker, 'ready', 8_000)
+    const descendantPID = Number(await readFile(fixture.descendantPID, 'utf8'))
+
+    child.kill(signal)
+    const [code, receivedSignal] = await waitForChildClose(child, 12_000, () => output)
+    assert.equal(code, signal === 'SIGINT' ? 130 : 143)
+    assert.equal(receivedSignal, null)
+    await waitForProcessExit(descendantPID, 5_000)
+    assert.deepEqual((await readDockerCalls(fixture.marker)).trim().split('\n'), ['up', 'down'])
+    assert.deepEqual(await readOwnedResources(fixture), [])
+
+    const rerun = await runBrowserRunner(fixture, {
+      CI: 'true',
+      PULSEGRID_DATABASE_URL: externalTestDatabase,
+      PULSEGRID_BROWSER_TEST_DATABASE_MODE: 'external-ci-service',
+      MVP013_BROWSER_FAKE_PNPM_MODE: 'complete',
+    })
+    assert.equal(rerun.code, 0, rerun.output)
+    assert.deepEqual((await readDockerCalls(fixture.marker)).trim().split('\n'), ['up', 'down', 'up', 'down'])
+    assert.deepEqual(await readOwnedResources(fixture), [])
+  })
+}
+
 test('reaps an interrupted Compose startup before exiting', async (t) => {
+  if (process.platform === 'win32') return t.skip('process-group signals require POSIX')
   const fixture = await createDockerFixture(t)
   const child = spawn(process.execPath, [runnerPath], {
     cwd: process.cwd(),
@@ -111,6 +171,7 @@ test('reaps an interrupted Compose startup before exiting', async (t) => {
   assert.equal(code, 143)
   assert.equal(signal, null)
   assert.deepEqual((await readDockerCalls(fixture.marker)).trim().split('\n'), ['up', 'down'])
+  assert.deepEqual(await readOwnedResources(fixture), [])
 })
 
 async function createDockerFixture(t) {
@@ -118,16 +179,32 @@ async function createDockerFixture(t) {
   t.after(() => rm(directory, { recursive: true, force: true }))
   const marker = join(directory, 'docker-calls.txt')
   const dockerPath = join(directory, 'docker')
-  const fakeDocker = `#!/usr/bin/env node
-import { appendFileSync } from 'node:fs'
+  const descendantPID = join(directory, 'descendant-pid.txt')
+  const readinessMarker = join(directory, 'browser-readiness.txt')
+  const fakeDocker = `#!${process.execPath}
+import { appendFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { spawn } from 'node:child_process'
 const args = process.argv.slice(2)
+const projectIndex = args.indexOf('-p')
+const projectName = projectIndex >= 0 ? args[projectIndex + 1] : 'missing-project'
+const resourcePath = join(dirname(process.env.MVP013_BROWSER_FAKE_DOCKER_LOG), projectName + '.resource')
 if (args.includes('up')) {
   appendFileSync(process.env.MVP013_BROWSER_FAKE_DOCKER_LOG, 'up\\n')
+  writeFileSync(resourcePath, 'owned')
   if (process.env.MVP013_BROWSER_FAKE_DOCKER_MODE === 'wait-up') setInterval(() => {}, 1000)
+  if (process.env.MVP013_BROWSER_FAKE_DOCKER_MODE === 'leader-exits-with-descendant') {
+    const descendant = spawn(process.execPath, ['-e', 'process.on("SIGTERM", () => {}); setInterval(() => {}, 1000)'], { stdio: 'ignore' })
+    descendant.unref()
+    writeFileSync(process.env.MVP013_BROWSER_FAKE_DOCKER_DESCENDANT_PID, String(descendant.pid))
+    process.exit(0)
+  }
   process.exitCode = process.env.MVP013_BROWSER_FAKE_DOCKER_MODE === 'fail-up' ? 29 : 0
 }
 else if (args.includes('down')) {
   appendFileSync(process.env.MVP013_BROWSER_FAKE_DOCKER_LOG, 'down\\n')
+  try { unlinkSync(resourcePath) }
+  catch (error) { if (error.code !== 'ENOENT') throw error }
 }
 else {
   process.exitCode = 31
@@ -135,15 +212,47 @@ else {
 `
   await writeFile(dockerPath, fakeDocker, 'utf8')
   await chmod(dockerPath, 0o755)
-  return { directory, marker }
+  const fakeGoPath = join(directory, 'go')
+  await writeFile(fakeGoPath, `#!${process.execPath}\nprocess.exitCode = 0\n`, 'utf8')
+  await chmod(fakeGoPath, 0o755)
+  const fakeNodePath = join(directory, 'node')
+  const fakeNode = `#!${process.execPath}
+import net from 'node:net'
+if (process.argv[2] === 'scripts/start-nuxt-test-server.mjs') {
+  net.createServer().listen(4173, '127.0.0.1')
+  setInterval(() => {}, 1000)
+}
+`
+  await writeFile(fakeNodePath, fakeNode, 'utf8')
+  await chmod(fakeNodePath, 0o755)
+  const fakePnpmPath = join(directory, 'pnpm')
+  const fakePnpm = `#!${process.execPath}
+import { spawn } from 'node:child_process'
+import { writeFileSync } from 'node:fs'
+if (process.env.MVP013_BROWSER_FAKE_PNPM_MODE === 'hold-after-readiness') {
+  const descendant = spawn(process.execPath, ['-e', 'process.on("SIGTERM", () => {}); setInterval(() => {}, 1000)'], { stdio: 'ignore' })
+  descendant.unref()
+  writeFileSync(process.env.MVP013_BROWSER_FAKE_DOCKER_DESCENDANT_PID, String(descendant.pid))
+  writeFileSync(process.env.MVP013_BROWSER_FAKE_DOCKER_READY, 'ready')
+  setInterval(() => {}, 1000)
+}
+else {
+  process.stdout.write('1 passed (simulated browser-runner test)\\n')
+}
+`
+  await writeFile(fakePnpmPath, fakePnpm, 'utf8')
+  await chmod(fakePnpmPath, 0o755)
+  return { directory, marker, descendantPID, readinessMarker }
 }
 
 function runnerEnvironment(fixture, values) {
   return {
     ...process.env,
     ...values,
-    PATH: `${fixture.directory}:${process.env.PATH}`,
+    PATH: `${fixture.directory}${process.platform === 'win32' ? ';' : ':'}${process.env.PATH}`,
     MVP013_BROWSER_FAKE_DOCKER_LOG: fixture.marker,
+    MVP013_BROWSER_FAKE_DOCKER_DESCENDANT_PID: fixture.descendantPID,
+    MVP013_BROWSER_FAKE_DOCKER_READY: fixture.readinessMarker,
   }
 }
 
@@ -188,6 +297,26 @@ async function readDockerCalls(marker) {
     if (error.code === 'ENOENT') return ''
     throw error
   }
+}
+
+async function readOwnedResources(fixture) {
+  const entries = await readdir(fixture.directory)
+  return entries.filter(entry => entry.endsWith('.resource')).sort()
+}
+
+async function waitForProcessExit(pid, timeoutMilliseconds) {
+  const deadline = Date.now() + timeoutMilliseconds
+  while (Date.now() < deadline) {
+    try {
+      process.kill(pid, 0)
+    }
+    catch (error) {
+      if (error.code === 'ESRCH') return
+      throw error
+    }
+    await new Promise(resolve => setTimeout(resolve, 25))
+  }
+  throw new Error(`descendant process ${pid} remained alive after ${timeoutMilliseconds}ms`)
 }
 
 async function waitForMarker(marker, expected, timeoutMilliseconds) {

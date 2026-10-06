@@ -15,7 +15,8 @@ const databaseUrl = externalDatabaseMode
 const environment = testEnvironment(databaseUrl, password)
 let resourcesMayExist = false
 let interruptedSignal
-let activeChild
+const activeProcessGroups = new Set()
+let managedWebServerGroup
 let exitCode = 1
 
 process.on('SIGINT', () => requestStop('SIGINT'))
@@ -52,6 +53,7 @@ try {
         && await run('go', ['-C', 'apps/api', 'run', './cmd/db', 'seed'], environment, 120_000)
         && await run('node', ['scripts/build-api-test.mjs'], environment, 180_000)
         && await run('node', ['scripts/build-web.mjs', 'test'], environment, 180_000)
+        && await startNuxtTestServer(environment)
         && await run('pnpm', ['exec', 'playwright', 'test', ...playwrightArguments], environment, 360_000)
       ) {
         exitCode = 0
@@ -64,6 +66,11 @@ catch (error) {
   exitCode = 1
 }
 finally {
+  if (managedWebServerGroup) {
+    const stopped = await stopProcessGroup(managedWebServerGroup, 'Nuxt test server')
+    managedWebServerGroup = undefined
+    if (!stopped) exitCode = 1
+  }
   if (resourcesMayExist) {
     const cleanupSucceeded = await run(
       'docker', ['compose', '-p', projectName, '--profile', 'test', 'down', '-v', '--remove-orphans'],
@@ -114,6 +121,7 @@ function testEnvironment(testDatabaseUrl, testPassword) {
     PULSEGRID_POSTGRES_PASSWORD: testPassword,
     PULSEGRID_HTTP_HOST: '127.0.0.1',
     PULSEGRID_HTTP_PORT: String(ports.api),
+    PULSEGRID_BROWSER_RUNNER_OWNS_WEB_SERVER: 'true',
     PULSEGRID_MQTT_BROKER_URL: `mqtt://127.0.0.1:${ports.broker}`,
     PULSEGRID_LOG_LEVEL: 'error',
     PULSEGRID_SHUTDOWN_TIMEOUT: '1s',
@@ -125,54 +133,188 @@ function testEnvironment(testDatabaseUrl, testPassword) {
 
 function requestStop(signal) {
   if (interruptedSignal) {
-    if (activeChild) signalProcessGroup(activeChild, 'SIGKILL')
+    for (const processGroup of activeProcessGroups) forceProcessGroupTermination(processGroup)
     return
   }
   interruptedSignal = signal
-  if (activeChild) signalProcessGroup(activeChild, signal)
+  for (const processGroup of activeProcessGroups) beginProcessGroupTermination(processGroup)
 }
 
 async function run(command, args, env, timeoutMilliseconds, cleanup = false) {
   if (interruptedSignal && !cleanup) return false
-  return await new Promise((resolve) => {
-    let timedOut = false
-    let escalationTimer
-    const child = spawn(command, args, {
-      cwd: process.cwd(),
-      env,
-      detached: true,
-      stdio: 'inherit',
-    })
-    activeChild = child
-    const timeout = setTimeout(() => {
-      timedOut = true
-      signalProcessGroup(child, 'SIGTERM')
-      escalationTimer = setTimeout(() => signalProcessGroup(child, 'SIGKILL'), 2_000)
-    }, timeoutMilliseconds)
-    child.once('error', (error) => {
-      clearTimeout(timeout)
-      if (escalationTimer) clearTimeout(escalationTimer)
-      if (activeChild === child) activeChild = undefined
-      console.error(`unable to run ${command}: ${error.message}`)
-      resolve(false)
-    })
-    child.once('close', (status, signal) => {
-      clearTimeout(timeout)
-      if (escalationTimer) clearTimeout(escalationTimer)
-      if (activeChild === child) activeChild = undefined
-      resolve(status === 0 && signal === null && !timedOut)
-    })
-  })
+  const processGroup = spawnOwnedProcess(command, args, env, 'inherit')
+  let timedOut = false
+  const timeout = setTimeout(() => {
+    timedOut = true
+    beginProcessGroupTermination(processGroup)
+  }, timeoutMilliseconds)
+  const result = await processGroup.closed
+  clearTimeout(timeout)
+  const stopped = await finishProcessGroup(processGroup, command)
+  return result.status === 0 && result.signal === null && !timedOut && !processGroup.spawnError && (!interruptedSignal || cleanup) && stopped.processGroupExited && !processGroup.killError
 }
 
-function signalProcessGroup(child, signal) {
-  if (!child.pid) return
+async function startNuxtTestServer(env) {
+  const processGroup = spawnOwnedProcess('node', ['scripts/start-nuxt-test-server.mjs'], env, 'inherit')
+  managedWebServerGroup = processGroup
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline && !interruptedSignal) {
+    if (processGroup.closeResult) {
+      console.error(`Nuxt test server exited before readiness: ${processGroup.closeResult.status ?? processGroup.closeResult.signal}`)
+      await finishProcessGroup(processGroup, 'Nuxt test server')
+      managedWebServerGroup = undefined
+      return false
+    }
+    if (await isPortOpen(ports.web)) return true
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+
+  if (!processGroup.closeResult) beginProcessGroupTermination(processGroup)
+  const stopped = await finishProcessGroup(processGroup, 'Nuxt test server')
+  managedWebServerGroup = undefined
+  if (!stopped.processGroupExited || processGroup.killError) return false
+  if (interruptedSignal) return false
+  console.error('Nuxt test server did not become ready within 30 seconds')
+  return false
+}
+
+function spawnOwnedProcess(command, args, env, stdio) {
+  const child = spawn(command, args, {
+    cwd: process.cwd(),
+    env,
+    detached: true,
+    stdio,
+  })
+  const processGroup = {
+    child,
+    pid: child.pid,
+    terminationRequested: false,
+    forceKillRequested: false,
+    escalationTimer: undefined,
+    killError: undefined,
+    closeResult: undefined,
+    spawnError: undefined,
+  }
+  activeProcessGroups.add(processGroup)
+  processGroup.closed = new Promise((resolve) => {
+    child.once('error', (error) => {
+      processGroup.spawnError = error
+      console.error(`unable to run ${command}: ${error.message}`)
+    })
+    child.once('spawn', () => {
+      processGroup.pid = child.pid
+      if (processGroup.forceKillRequested) forceProcessGroupTermination(processGroup)
+      else if (processGroup.terminationRequested) beginProcessGroupTermination(processGroup)
+    })
+    child.once('close', (status, signal) => {
+      processGroup.closeResult = { status, signal }
+      resolve(processGroup.closeResult)
+    })
+  })
+  return processGroup
+}
+
+async function stopProcessGroup(processGroup, label) {
+  if (!processGroup.closeResult) beginProcessGroupTermination(processGroup)
+  const stopped = await finishProcessGroup(processGroup, label)
+  return Boolean(stopped.closeResult && stopped.processGroupExited && !processGroup.killError)
+}
+
+async function finishProcessGroup(processGroup, label) {
+  let closeResult = processGroup.closeResult
+  if (!closeResult) closeResult = await waitForProcessClose(processGroup, 5_000)
+  if (!closeResult) {
+    console.error(`${label} leader did not exit after SIGTERM; sending SIGKILL`)
+    forceProcessGroupTermination(processGroup)
+    closeResult = await waitForProcessClose(processGroup, 2_000)
+  }
+
+  const unexpectedDescendants = Boolean(closeResult && isProcessGroupRunning(processGroup.pid) && !processGroup.terminationRequested)
+  if (closeResult && isProcessGroupRunning(processGroup.pid)) {
+    if (unexpectedDescendants) console.error(`${label} exited while an owned descendant process remained; cleaning up its process group`)
+    beginProcessGroupTermination(processGroup)
+  }
+  let processGroupExited = await waitForProcessGroupExit(processGroup, 5_000)
+  if (!processGroupExited) {
+    console.error(`${label} process group did not exit after SIGTERM; sending SIGKILL`)
+    forceProcessGroupTermination(processGroup)
+    processGroupExited = await waitForProcessGroupExit(processGroup, 2_000)
+  }
+  if (processGroup.escalationTimer) clearTimeout(processGroup.escalationTimer)
+  if (!processGroupExited) console.error(`${label} process group is still alive after bounded termination`)
+  if (processGroup.killError) console.error(`unable to fully signal ${label} process group: ${processGroup.killError.message}`)
+  activeProcessGroups.delete(processGroup)
+  return { closeResult, processGroupExited, unexpectedDescendants }
+}
+
+async function waitForProcessClose(processGroup, timeoutMilliseconds) {
+  if (processGroup.closeResult) return processGroup.closeResult
+  let timer
+  const timeout = new Promise(resolve => {
+    timer = setTimeout(() => resolve(undefined), timeoutMilliseconds)
+  })
   try {
-    process.kill(-child.pid, signal)
+    return await Promise.race([processGroup.closed, timeout])
   }
-  catch {
-    child.kill(signal)
+  finally {
+    clearTimeout(timer)
   }
+}
+
+function beginProcessGroupTermination(processGroup) {
+  processGroup.terminationRequested = true
+  if (!processGroup.pid) return
+  signalProcessGroup(processGroup, 'SIGTERM')
+  if (!processGroup.escalationTimer) {
+    processGroup.escalationTimer = setTimeout(() => signalProcessGroup(processGroup, 'SIGKILL'), 2_000)
+    processGroup.escalationTimer.unref?.()
+  }
+}
+
+function forceProcessGroupTermination(processGroup) {
+  processGroup.forceKillRequested = true
+  if (processGroup.escalationTimer) {
+    clearTimeout(processGroup.escalationTimer)
+    processGroup.escalationTimer = undefined
+  }
+  signalProcessGroup(processGroup, 'SIGKILL')
+}
+
+function signalProcessGroup(processGroup, signal) {
+  if (!processGroup.pid) return
+  try {
+    process.kill(-processGroup.pid, signal)
+  }
+  catch (error) {
+    if (error.code === 'ESRCH') return
+    processGroup.killError = error
+    try {
+      processGroup.child.kill(signal)
+    }
+    catch (fallbackError) {
+      processGroup.killError = fallbackError
+    }
+  }
+}
+
+function isProcessGroupRunning(processGroupID) {
+  if (!processGroupID) return false
+  try {
+    process.kill(-processGroupID, 0)
+    return true
+  }
+  catch (error) {
+    return error.code !== 'ESRCH'
+  }
+}
+
+async function waitForProcessGroupExit(processGroup, timeoutMilliseconds) {
+  const deadline = Date.now() + timeoutMilliseconds
+  while (Date.now() < deadline) {
+    if (!isProcessGroupRunning(processGroup.pid)) return true
+    await new Promise(resolve => setTimeout(resolve, 25))
+  }
+  return !isProcessGroupRunning(processGroup.pid)
 }
 
 function isPortOpen(port) {

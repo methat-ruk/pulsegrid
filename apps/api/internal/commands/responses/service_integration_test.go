@@ -34,7 +34,7 @@ func TestProcessBindsCommandResponseToRegisteredTenantAndDevice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open integration database: %v", err)
 	}
-	defer pool.Close()
+	t.Cleanup(pool.Close)
 	registryRepository, err := registry.NewRepository(pool)
 	if err != nil {
 		t.Fatalf("create registry repository: %v", err)
@@ -44,16 +44,59 @@ func TestProcessBindsCommandResponseToRegisteredTenantAndDevice(t *testing.T) {
 		t.Fatalf("create command repository: %v", err)
 	}
 
+	organizationIDs := make([]uuid.UUID, 0, 2)
+	t.Cleanup(func() {
+		if len(organizationIDs) == 0 {
+			return
+		}
+		cleanupContext, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cleanupCancel()
+		transaction, err := pool.Begin(cleanupContext)
+		if err != nil {
+			t.Errorf("begin response-service fixture cleanup: %v", err)
+			return
+		}
+		defer transaction.Rollback(cleanupContext)
+		for _, statement := range []string{
+			`DELETE FROM commands WHERE organization_id = ANY($1)`,
+			`DELETE FROM devices WHERE organization_id = ANY($1)`,
+			`DELETE FROM organizations WHERE id = ANY($1)`,
+		} {
+			if _, err := transaction.Exec(cleanupContext, statement, organizationIDs); err != nil {
+				t.Errorf("delete response-service fixtures: %v", err)
+				return
+			}
+		}
+		var remaining int64
+		if err := transaction.QueryRow(cleanupContext, `
+			SELECT
+				(SELECT count(*) FROM commands WHERE organization_id = ANY($1)) +
+				(SELECT count(*) FROM devices WHERE organization_id = ANY($1)) +
+				(SELECT count(*) FROM organizations WHERE id = ANY($1))
+		`, organizationIDs).Scan(&remaining); err != nil {
+			t.Errorf("verify response-service fixture cleanup: %v", err)
+			return
+		}
+		if remaining != 0 {
+			t.Errorf("response-service fixture cleanup left %d rows", remaining)
+			return
+		}
+		if err := transaction.Commit(cleanupContext); err != nil {
+			t.Errorf("commit response-service fixture cleanup: %v", err)
+		}
+	})
 	tenantA := "response-a-" + strings.ReplaceAll(uuid.NewString(), "-", "")
 	tenantB := "response-b-" + strings.ReplaceAll(uuid.NewString(), "-", "")
 	organizationA, err := registryRepository.CreateOrganization(ctx, tenantA, "Response tenant A")
 	if err != nil {
 		t.Fatalf("create organization A: %v", err)
 	}
+	organizationIDs = append(organizationIDs, organizationA)
 	organizationB, err := registryRepository.CreateOrganization(ctx, tenantB, "Response tenant B")
 	if err != nil {
 		t.Fatalf("create organization B: %v", err)
 	}
+	organizationIDs = append(organizationIDs, organizationB)
 	deviceA, err := registryRepository.CreateDevice(ctx, organizationA, registry.CreateDeviceInput{DeviceKey: "response-device-a", DisplayName: "Response device A"})
 	if err != nil {
 		t.Fatalf("create device A: %v", err)
@@ -62,14 +105,6 @@ func TestProcessBindsCommandResponseToRegisteredTenantAndDevice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create device B: %v", err)
 	}
-	t.Cleanup(func() {
-		cleanupContext, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cleanupCancel()
-		_, _ = pool.Exec(cleanupContext, `DELETE FROM commands WHERE organization_id = ANY($1)`, []uuid.UUID{organizationA, organizationB})
-		_, _ = pool.Exec(cleanupContext, `DELETE FROM devices WHERE id = ANY($1)`, []uuid.UUID{deviceA.ID, deviceB.ID})
-		_, _ = pool.Exec(cleanupContext, `DELETE FROM organizations WHERE id = ANY($1)`, []uuid.UUID{organizationA, organizationB})
-	})
-
 	commandA, err := commandRepository.Create(ctx, organizationA, commands.CreateInput{
 		DeviceID: deviceA.ID, Type: commands.TypePing, IdempotencyKey: uuid.New(),
 	})

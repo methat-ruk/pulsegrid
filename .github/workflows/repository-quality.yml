@@ -485,6 +485,13 @@ jobs:
         run: corepack pnpm exec playwright install --with-deps --only-shell chromium
       - name: Test browser-runner target and cleanup safeguards
         run: node --test scripts/test-browser-runner.test.mjs
+      - name: Verify browser-runner interruption cleanup and rerun
+        env:
+          CI: 'true'
+          NUXT_APP_ENV: test
+          PULSEGRID_BROWSER_TEST_DATABASE_MODE: external-ci-service
+          PULSEGRID_DATABASE_URL: postgres://pulsegrid:pulsegrid-browser-ci@127.0.0.1:15432/pulsegrid_test?sslmode=disable
+        run: corepack pnpm run test:browser:lifecycle
       - name: Run browser smoke
         env:
           CI: 'true'

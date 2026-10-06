@@ -744,17 +744,63 @@ async function testRegisteredTenantMQTTIsolation(deviceIDA, tenantB) {
   const tenantBRows = await runPSQL(`SELECT count(*) FROM telemetry_observations WHERE device_id = '${tenantB.deviceID}'::uuid AND message_id = '${messageB.messageId}'::uuid AND temperature_celsius = 18.25;`)
   if (tenantBRows.status !== 0 || tenantBRows.stdout.trim() !== '1') throw new Error(`tenant B telemetry persistence = ${tenantBRows.stdout}${tenantBRows.stderr}`)
 
-  for (const [label, crossedTopic] of [
-    ['A slug with B device', topicA.replace(`/devices/${deviceIDA}/`, `/devices/${tenantB.deviceID}/`)],
-    ['B slug with A device', topicB.replace(`/devices/${tenantB.deviceID}/`, `/devices/${deviceIDA}/`)],
+  const liveTenantBRead = await queryDeviceAndTelemetry(tenantB.deviceID)
+  if (liveTenantBRead.device !== null || liveTenantBRead.deviceCurrentState !== null || liveTenantBRead.deviceTelemetry.edges.length !== 0) {
+    throw new Error(`live pulsegrid-dev GraphQL read exposed registered tenant B data: ${JSON.stringify(liveTenantBRead)}`)
+  }
+
+  for (const { label, crossedTopic, protectedDeviceID } of [
+    {
+      label: 'A slug with B device',
+      crossedTopic: topicA.replace(`/devices/${deviceIDA}/`, `/devices/${tenantB.deviceID}/`),
+      protectedDeviceID: tenantB.deviceID,
+    },
+    {
+      label: 'B slug with A device',
+      crossedTopic: topicB.replace(`/devices/${tenantB.deviceID}/`, `/devices/${deviceIDA}/`),
+      protectedDeviceID: deviceIDA,
+    },
   ]) {
     const crossed = JSON.parse(validPayload(19.25))
+    const beforeA = await readFullTelemetryStateSnapshot(deviceIDA)
+    const beforeB = await readFullTelemetryStateSnapshot(tenantB.deviceID)
     const offset = apiOutput.length
     if ((await publishRaw(crossedTopic, JSON.stringify(crossed), false)).status !== 0) throw new Error(`${label} publish failed`)
     await waitForLogLineFieldsSince(offset, ['reason_code=telemetry_device_not_registered_for_tenant'], 10_000, label)
-    const rowCount = await runPSQL(`SELECT count(*) FROM telemetry_observation_keys WHERE message_id = '${crossed.messageId}'::uuid;`)
-    if (rowCount.status !== 0 || rowCount.stdout.trim() !== '0') throw new Error(`${label} wrote telemetry: ${rowCount.stdout}${rowCount.stderr}`)
+    const afterA = await readFullTelemetryStateSnapshot(deviceIDA)
+    const afterB = await readFullTelemetryStateSnapshot(tenantB.deviceID)
+    if (afterA !== beforeA || afterB !== beforeB) {
+      throw new Error(`${label} changed protected telemetry state: A before=${beforeA} after=${afterA}; B before=${beforeB} after=${afterB}`)
+    }
+    const rowCount = await runPSQL(`SELECT count(*) FROM telemetry_observation_keys WHERE device_id = '${protectedDeviceID}'::uuid AND message_id = '${crossed.messageId}'::uuid;`)
+    if (rowCount.status !== 0 || rowCount.stdout.trim() !== '0') throw new Error(`${label} wrote the crossed observation: ${rowCount.stdout}${rowCount.stderr}`)
   }
+
+  const messageA = JSON.parse(validPayload(22.25))
+  logOffset = apiOutput.length
+  if ((await publishRaw(topicA, JSON.stringify(messageA), false)).status !== 0) throw new Error('valid tenant A follow-up publish failed')
+  await waitForLogLineFieldsSince(logOffset, ['reason_code=telemetry_accepted', `message_id=${messageA.messageId}`, `device_id=${deviceIDA}`], 10_000, 'valid tenant A follow-up after crossed deliveries')
+  await assertPersistedObservation(deviceIDA, messageA.messageId, 22.25, 1)
+  await assertAlertForMessage(deviceIDA, messageA.messageId, 22.25, 20)
+
+  const followUpB = JSON.parse(validPayload(17.25))
+  logOffset = apiOutput.length
+  if ((await publishRaw(topicB, JSON.stringify(followUpB), false)).status !== 0) throw new Error('valid tenant B follow-up publish failed')
+  await waitForLogLineFieldsSince(logOffset, ['reason_code=telemetry_accepted', `message_id=${followUpB.messageId}`, `device_id=${tenantB.deviceID}`, `organization_id=${tenantB.organizationID}`], 10_000, 'valid tenant B follow-up after crossed deliveries')
+  const followUpBRows = await runPSQL(`SELECT count(*) FROM telemetry_observations WHERE device_id = '${tenantB.deviceID}'::uuid AND message_id = '${followUpB.messageId}'::uuid AND temperature_celsius = 17.25;`)
+  if (followUpBRows.status !== 0 || followUpBRows.stdout.trim() !== '1') throw new Error(`tenant B follow-up persistence = ${followUpBRows.stdout}${followUpBRows.stderr}`)
+}
+
+async function readFullTelemetryStateSnapshot(deviceID) {
+  const result = await runPSQL(`
+    SELECT
+      coalesce((SELECT json_agg(json_build_array(message_id, first_ingestion_id, observed_at, temperature_celsius) ORDER BY message_id)::text FROM telemetry_observation_keys WHERE device_id = '${deviceID}'::uuid), '[]') || ':' ||
+      coalesce((SELECT json_agg(json_build_array(storage_sequence, ingestion_id, message_id, observed_at, received_at, temperature_celsius, mqtt_duplicate) ORDER BY storage_sequence)::text FROM telemetry_observations WHERE device_id = '${deviceID}'::uuid), '[]') || ':' ||
+      coalesce((SELECT json_build_array(observation_sequence, message_id, observed_at, received_at, temperature_celsius, last_seen_at)::text FROM device_current_state WHERE device_id = '${deviceID}'::uuid), 'null') || ':' ||
+      coalesce((SELECT json_agg(json_build_array(id, rule_id, message_id, observed_at, received_at, temperature_celsius, metric, comparator, threshold_celsius, created_at) ORDER BY id)::text FROM threshold_alerts WHERE device_id = '${deviceID}'::uuid), '[]');
+  `)
+  if (result.status !== 0) throw new Error(`could not inspect full telemetry state for ${deviceID}: ${result.stderr}`)
+  return result.stdout.trim()
 }
 
 async function testPersistenceProjection(deviceID, simulatorTelemetry) {
@@ -789,6 +835,26 @@ async function queryTelemetry(deviceID) {
   const body = await response.json()
   if (response.status !== 200 || body.errors || !body.data) {
     throw new Error(`telemetry GraphQL query failed: ${JSON.stringify(body)}`)
+  }
+  return body.data
+}
+
+async function queryDeviceAndTelemetry(deviceID) {
+  const response = await fetch(`http://127.0.0.1:${apiPort}/graphql`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      query: `query RegisteredTenantIsolation($deviceID: ID!) {
+        device(id: $deviceID) { id }
+        deviceCurrentState(deviceId: $deviceID) { messageId }
+        deviceTelemetry(deviceId: $deviceID, first: 10) { edges { node { messageId } } pageInfo { hasNextPage } }
+      }`,
+      variables: { deviceID },
+    }),
+  })
+  const body = await response.json()
+  if (response.status !== 200 || body.errors || !body.data) {
+    throw new Error(`tenant-scoped device/telemetry GraphQL query failed: ${JSON.stringify(body)}`)
   }
   return body.data
 }

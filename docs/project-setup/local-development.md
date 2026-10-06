@@ -1,16 +1,12 @@
 # PulseGrid local development
 
 Status: Local repository workflow and merge-gate enforcement implemented;
-FND-004 readiness and MVP-003 through MVP-012 are merged; MVP-013 acceptance
-implementation is in progress. MVP-011 command
-delivery merged as `b209861` (PR #21), and MVP-012's console merged as
-`1142eb7` (PR #22); main CI passed for both at merge. The MVP-012 production
-artifact gate passed at that candidate. A full local check of the MVP-013
-candidate on 2026-10-06 failed the artifact gate on `source-map-js@1.2.1`
-(GHSA-68fv-2mgg-jv7q); the unchanged workspace lockfile already contains that
-version. The workspace `node-forge` advisory also remains unresolved.
-The latest workspace scan also reports separate findings including `braces`
-and `simple-git`; MVP-013 does not remediate workspace advisories.
+FND-004 readiness and MVP-003 through MVP-012 are merged. MVP-013 implementation
+and local acceptance checks are complete in open, unmerged PR #24. Its 2026-10-06
+full local `check` passed, including the production artifact audit after a
+lockfile-only update to `source-map-js@1.2.2` (GHSA-68fv-2mgg-jv7q). The broader
+workspace audit still reports unresolved `node-forge`, `braces`, and
+`simple-git` findings; the PR does not claim to remediate them.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
@@ -353,10 +349,11 @@ browser suite passed 32 tests. A Playwright Chromium check at 1440 × 900 and
 390 × 844 verified the detail identity, heading focus and Tab navigation,
 one-column reflow, no horizontal overflow, and no page or console errors.
 
-PR #19's evidence above records its accepted candidate. MVP-013 is in progress
-and will join provisioning, telemetry, alert investigation and command completion
-into one repeatable product-loop scenario; the separate journeys do not yet
-constitute that acceptance proof.
+PR #19's evidence above records its accepted candidate. PR #24 adds the joined
+MVP-013 journey: provision one device, persist its simulator telemetry, inspect
+the resulting alert, send PING, and verify the stored terminal result after
+reload. The PR remains open and unmerged; its protected branch checks remain the
+delivery gate.
 
 ### Local PostgreSQL, seed, and development GraphQL
 
@@ -477,9 +474,9 @@ test command. Restart the Go language server after changing this setting.
 ### Isolated browser smoke
 
 The browser command builds the console with `NUXT_APP_ENV=test`, starts that
-fresh build on `127.0.0.1:4173`, and owns server teardown. It refuses to reuse
-an existing process, so stop anything already listening on that port before
-running it:
+fresh build on `127.0.0.1:4173` in a runner-owned process group, and owns server
+teardown. It refuses to reuse an existing process, so stop anything already
+listening on that port before running it:
 
 ```sh
 corepack pnpm run test:browser
@@ -487,15 +484,30 @@ corepack pnpm run test:browser
 
 This smoke owns an isolated PostgreSQL Compose project when
 `PULSEGRID_DATABASE_URL` is not supplied, runs test migrations and the fixed
-`pulsegrid-dev` seed, then builds the API test binary and Nuxt test artifact.
-It starts both in an isolated process lifecycle and covers the device registry
-through the real browser → Nuxt `/api/graphql` adapter → Go GraphQL →
-PostgreSQL boundary: loading/empty and paginated list, create/detail,
-duplicate conflict, malformed IDs, readiness success/unavailable/recovery,
-responsive reflow including 320px, horizontal-overflow absence, keyboard and
-mobile-menu focus behavior, page errors, and browser console errors. CI
-provides its own pinned PostgreSQL service through `PULSEGRID_DATABASE_URL`,
-while the local runner cleans up only the Compose project it created.
+`pulsegrid-dev` seed, then covers the device registry and complete product loop
+through the real browser → Nuxt `/api/graphql` adapter → Go GraphQL → PostgreSQL
+boundary. It exercises telemetry history/current state, alert investigation,
+PING completion, reload recovery, paging, duplicate conflict, malformed IDs,
+readiness recovery, responsive layout, keyboard behavior, and browser errors.
+The runner manages the Nuxt server and its process group and removes only the
+uniquely named Compose resources it created.
+
+Run the lifecycle proof separately when changing runner ownership or teardown:
+
+```sh
+corepack pnpm run test:browser:runner
+corepack pnpm run test:browser:lifecycle
+```
+
+The runner tests cover target refusal, partial startup, orphaned descendants,
+and SIGINT/SIGTERM at readiness. The real Compose lifecycle command interrupts
+both SIGINT and SIGTERM after readiness, verifies owned containers, networks,
+volumes, and ports are gone, and reruns the focused product-loop journey after
+each interruption. A failed runner reports nonzero and attempts bounded
+SIGTERM-to-SIGKILL cleanup; inspect and clean only its printed unique Compose
+project if an external failure prevents teardown. CI supplies its pinned
+PostgreSQL service through `PULSEGRID_DATABASE_URL` and runs the same lifecycle
+proof before the full browser suite.
 
 ## Validation commands
 
@@ -517,7 +529,9 @@ while the local runner cleans up only the Compose project it created.
 | `corepack pnpm run check:fast` | Fast pre-CI handoff: formatting, generated-contract drift, Go modernization/static analysis, lint, typecheck, and ordinary tests |
 | `corepack pnpm run api:test:integration` | Isolated real-PostgreSQL migration, repository, constraint, and tenant-scope evidence |
 | `corepack pnpm run mqtt:test:integration` | Isolated real-Mosquitto publish/subscribe, QoS 1, no-retain, restart, and cleanup evidence |
-| `corepack pnpm run check` | Full pre-CI handoff, including race, build, OpenAPI, audits, database integration, and browser smoke |
+| `corepack pnpm run test:browser:runner` | Browser-runner safety, descendant cleanup, and simulated SIGINT/SIGTERM reruns |
+| `corepack pnpm run test:browser:lifecycle` | Real Compose interruption cleanup, resource/port removal, and rerun after SIGINT and SIGTERM |
+| `corepack pnpm run check` | Full pre-CI handoff, including race, build, OpenAPI, audits, database integration, runner lifecycle, and browser smoke |
 
 The pre-commit hook runs only staged Go formatting, staged frontend ESLint,
 staged OpenAPI lint, and the tracked environment-filename policy. Hooks are

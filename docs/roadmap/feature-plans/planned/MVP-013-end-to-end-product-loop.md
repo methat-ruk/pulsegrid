@@ -1,6 +1,6 @@
 # MVP-013 — End-to-End Product Loop
 
-Status: In progress
+Status: Ready for review (PR #24 open; not merged)
 
 Branch: `test/mvp-013-end-to-end-product-loop`
 
@@ -11,8 +11,9 @@ Milestone: M5 — MVP acceptance
 Plan review date: 2026-10-03
 
 Implementation authorization: User authorized execution of this revised scope
-on 2026-10-06. Implementation and targeted evidence are underway; M5 acceptance
-is not complete.
+on 2026-10-06 and later authorized remediation of PR #24 review findings. The
+implementation and author review are complete. The PR remains open and
+unmerged; M5 is not complete until the candidate is accepted.
 
 ## Goal
 
@@ -47,12 +48,15 @@ platform layer or a production-readiness claim.
   and multi-replica command execution.
 - Tenant switching in console/simulator, rule-editor UI, effectful commands,
   alert acknowledgement/resolution, and other new product capability.
-- New schema/migrations, public GraphQL/MQTT contracts, dependencies, generic
-  orchestration, service extraction, application images, Kafka or Kubernetes.
-- Workspace dependency remediation, including `node-forge` and other findings
-  from the broader workspace audit, or weakening the artifact gate. Keep
-  workspace findings separately visible; new production-artifact exposure is
-  a blocker.
+- New schema/migrations, public GraphQL/MQTT contracts, unrelated dependency
+  changes, generic orchestration, service extraction, application images,
+  Kafka or Kubernetes. F1 review remediation is limited to the compatible
+  lockfile-only `source-map-js` resolution update from `1.2.1` to `1.2.2`; it
+  adds no manifest entry or override and does not change the audit gate.
+- General workspace dependency remediation, including `node-forge` and other
+  findings from the broader workspace audit, or weakening the artifact gate.
+  Keep workspace findings separately visible; new production-artifact exposure
+  remains a blocker.
 
 ## Dependencies
 
@@ -68,9 +72,9 @@ platform layer or a production-readiness claim.
   passed on `619e1c7`, including all four MQTT suites. This is baseline evidence,
   not MVP-013 acceptance evidence.
 - Recheck base/dependencies and branch protection before execution/handoff.
-  At review, 14 status contexts are required; approving-review count is zero.
-  Author review and CI remain required. This snapshot neither creates nor
-  satisfies an independent review requirement.
+  On 2026-10-06, 14 status contexts remained required and the approving-review
+  count was zero. Author review and CI remain required. This snapshot neither
+  creates nor satisfies an independent review requirement.
 
 ### Existing evidence and remaining gaps
 
@@ -300,8 +304,8 @@ Automated browser controls/navigation/state assertions are required. No visual
 redesign is planned. Add interactive inspection only for a material UI gap
 exposed during execution, using available Browser capabilities. If unavailable,
 name the gap and obtain authorization for a concrete localhost browser-automation
-or computer-use fallback before invocation. No browser session runs in this
-planning pass.
+or computer-use fallback before invocation. The implemented acceptance uses
+automated Playwright journeys; no additional interactive inspection was needed.
 
 Record final source SHA, commands/cases, actual boundaries, CI URLs, sanitized
 artifacts, durations, passed/failed/skipped/unavailable/not-run results and risk
@@ -313,19 +317,20 @@ risk is explicitly accepted; missing evidence never becomes a pass.
 
 | Owner | Bounded cleanup/change |
 | --- | --- |
-| This plan | Own scenarios/decisions/review/evidence; remain In progress until the acceptance and delivery gates pass |
-| `docs/project-setup/local-development.md` | Fix stale MVP-009 candidate/open-PR prose now; after acceptance add one runnable joined workflow, expected outcomes, failure commands, cleanup and limits |
-| `docs/architecture/system-architecture.md` | Fix stale MVP-012 in-progress summary now; after acceptance describe verified loop without changing module/data authority |
-| `docs/architecture/technology-decisions.md` | Correct planned command-polling wording now; preserve conditional/deferred technologies |
+| This plan | Own scenarios/decisions/review/evidence; Ready for review while PR #24 remains open and unmerged |
+| `docs/project-setup/local-development.md` | Describe the joined browser workflow, lifecycle commands, expected outcomes, cleanup behavior and limits |
+| `docs/architecture/system-architecture.md` | Describe the validated product-loop candidate without changing module/data authority |
+| `docs/architecture/technology-decisions.md` | Preserve existing conditional/deferred technology decisions; no change was needed |
 | Product scope/API index/app READMEs/environment guide | Preserve canonical ownership; correct only affected contract/command/example drift; no new endpoint/schema/env key planned |
-| Root README/roadmap/plan index | Link reviewed scope where useful; mark M5/capability complete only after required evidence and accepted delivery |
+| Root README/roadmap/plan index | Link reviewed scope and mark Ready for review; keep M5 incomplete until accepted delivery |
 
 Use lowercase `docs/` paths (the current filesystem also resolves `Docs/`).
-Preserve useful historical completed-plan evidence; remove contradictory current
-claims instead of rewriting past results or duplicating canonical guidance.
-At completion, move this plan to `completed/` and update all inbound links in
-the same change. Generated artifacts stay ignored; commit concise sanitized
-evidence references only.
+Preserve useful historical completed-plan evidence; label superseded candidate
+results and remove contradictory current claims instead of rewriting past
+results or duplicating canonical guidance. Move this plan to `completed/` only
+after the outcome is accepted, then update every inbound link in that same
+change. Generated artifacts stay ignored; commit concise sanitized evidence
+references only.
 
 ## Risks / Open Decisions
 
@@ -338,16 +343,16 @@ evidence references only.
   rollback and explicit republish recovery evidence; do not promise automatic replay.
 - Data/resource leakage: inherited DSNs, fixed ports, hangs and partial startup
   are covered by E1/L1, not optional cleanup.
-- The workspace audit reports `node-forge` and additional findings such as
-  `braces` and `simple-git`. The latest full local check on 2026-10-06 also
-  failed the exact production-artifact gate on
-  `source-map-js@1.2.1` (GHSA-68fv-2mgg-jv7q). That package was already in the
-  base lockfile and this change edits no dependency manifest. Dependency
-  remediation/gate policy is outside this plan, so this is a blocking delivery
-  risk for an accepted artifact; do not claim artifact audit pass.
-- Most targeted evidence now passes; the final full browser suite, clean
-  tracked-checkout setup proof, and branch CI have not all passed on one
-  immutable candidate. M5 is not complete.
+- The review-directed lockfile-only `source-map-js@1.2.2` resolution passed the
+  rebuilt production artifact gate on local artifact SHA-256
+  `17f2abf01a7e91b29f3e35b1a9b356c760c3bbe9eab0266665210546341dd9ca`. This
+  closes the required artifact finding for that candidate. Exploit reachability
+  was not established and is not needed to satisfy the fail-closed gate.
+- The workspace audit still reports `node-forge`, `braces`, and `simple-git`;
+  these remain visible and unresolved. The result does not claim their
+  remediation or production readiness.
+- Full local validation passed on 2026-10-06. Protected branch CI must still
+  pass on the pushed candidate; M5 remains incomplete while PR #24 is unmerged.
 
 Recovery: stop the failed owned run, retain minimal diagnostics, remove only its
 disposable resources, correct within authorized scope and rerun affected evidence.
@@ -380,10 +385,10 @@ Final plan challenge: the user's 2026-10-06 start request selected the revised
 scope. A verified singleton response-subscription filter changed the test
 method, not the product contract: T3 proves downstream tenant/device binding
 with real PostgreSQL and explicitly disclaims cross-tenant broker delivery.
-Implementation is in progress; final delivery remains blocked by the production
-artifact audit failure, clean-checkout proof and branch CI. Future evidence is
-not counted as passed; dependency/gate changes require a separate decision and
-re-plan.
+The PR #24 remediation is bounded to the findings and gaps below. The full local
+check now passes, including the required runtime artifact gate; protected CI on
+the pushed revision remains the final delivery gate. No production contract,
+tenant selector, broker subscription, or gate policy was widened.
 
 ## Done Criteria
 
@@ -399,8 +404,8 @@ re-plan.
 - Satisfy independent review only if required by an applicable current authority;
   otherwise it is an optional recommendation, not an invented gate.
 
-Implementation progress on 2026-10-06: see the evidence disposition below.
-This branch remains In progress and MVP-013/M5 is not accepted.
+The following initial implementation record is retained as history and is
+superseded by the PR #24 review-response evidence below.
 
 ### Implementation Evidence Disposition — 2026-10-06
 
@@ -427,8 +432,40 @@ corrected code. The artifact-gate failure remains unresolved by design.
 | Static, unit and contract checks | `corepack pnpm run check:fast`, `corepack pnpm run api:vuln`, and corrected-head CI run 37406312056 | Passed; Go vuln tool found 0 called vulnerabilities and 3 findings in required modules outside scanned code paths |
 | Full local / branch gates | Local `corepack pnpm run check` passed through `check:fast`, race, build and OpenAPI, then failed at `node:audit`. Corrected-head CI run 37406312056 passed every context except `node-dependency-audit` | **Artifact audit remains blocking.** It found `source-map-js@1.2.1` in the exact production artifact; later local aggregate checks did not run on that attempt |
 
-The corrected candidate's required branch contexts passed except the artifact
-audit, which remains blocking. The full local `check` and CI artifact gate are
-blocked by the production dependency advisory. Independently run checks after
-that disposition; none can override the gate. Do not resolve the advisory by
-editing dependencies, filtering reports, or weakening controls inside MVP-013.
+The prior artifact failure and CI result above are historical. The review
+response below records the lockfile remediation, corrected test oracles, new
+lifecycle proof, and full validation of the updated candidate.
+
+### PR #24 Review Response — 2026-10-06
+
+The published review comment reviewed head
+`08ac70d505424f17c5c7af068b01e49db06997d4` against base
+`619e1c73fc850e510b6656b74e75c3d0fd719fe2`. It requested changes for F1–F5 and
+identified evidence gaps G1–G3. This section records the author's remediation;
+it is not an independent review or merge approval. No schema, public API, MQTT
+contract, or audit policy changed; the runtime dependency patch is limited to
+the F1 lockfile resolution.
+
+| Finding | Resolution and proof |
+| --- | --- |
+| F1 — production artifact audit | Updated only the frozen `source-map-js` resolution to `1.2.2`, which is compatible with its existing parent ranges. The rebuilt production artifact passed `corepack pnpm run node:audit`; artifact SHA-256 `17f2abf01a7e91b29f3e35b1a9b356c760c3bbe9eab0266665210546341dd9ca`, 21 physical packages and 54 bundled package contexts across 19 chunks. The separate workspace report still lists `node-forge`, `braces`, and `simple-git`; they are not claimed fixed. |
+| F2 — browser descendants | The runner owns the Nuxt server and each command as a process group, starts bounded SIGTERM→SIGKILL escalation on the first interruption, and drains descendants even when a leader exits first. Regression coverage proves a stubborn descendant is removed. The full browser suite passed 36/36 and runner exit remained zero after process-group and Compose cleanup. |
+| F3 — telemetry GraphQL isolation oracle | Both A→B and B→A responses are decoded and independently assert `deviceCurrentState == null` and empty telemetry history. `corepack pnpm run api:test:integration` passed the tagged real-PostgreSQL suite. |
+| F4 — rule mutation no-write oracle | Snapshot protected rule identity, ownership, metric, comparator, threshold, enabled state, revision, and timestamps before and after each denied cross-tenant create/update. Assertions cover both tenant directions. The tagged PostgreSQL integration suite passed. |
+| F5 — response fixture cleanup | Register pool close first so LIFO cleanup removes fixtures before closing the pool; register cleanup before inserts, track organizations as they are created, check DELETE/verification/commit errors, and support partial fixture creation. The tagged PostgreSQL suite passed with cleanup assertions active. |
+| G1 — interruption lifecycle | `corepack pnpm run test:browser:lifecycle` ran real Compose scenarios for SIGINT and SIGTERM after API/web readiness. For each signal it verified no owned container, network, volume, or port remained, then reran and passed the focused product-loop journey. The full `check` repeated both cases. |
+| G2 — registered-tenant telemetry | MQTT isolation snapshots cover observation keys, observations, current state, and alerts for protected A/B before and after both crossed deliveries; the crossed message ID is checked on the protected device. Live `pulsegrid-dev` GraphQL reads of B return null device/current state and empty history. Valid A and B follow-up messages persisted and A created its expected alert. All four MQTT suites passed. |
+| G3 — clean-local proof | A clean tracked checkout with no ignored env/build files must run setup, repository policy, `check:fast`, all four MQTT suites, API DB integration, runner tests, both-signal lifecycle, and browser smoke. The exact checkout SHA and results are recorded in the final PR #24 response comment. |
+
+**Full local validation:** `corepack pnpm run check` passed on 2026-10-06.
+This aggregate ran formatting/generated checks, static analysis, lint and
+typechecks, unit tests (80 web tests), Go race tests, Go/web builds, OpenAPI,
+the production and Go vulnerability audits, all four MQTT integration suites,
+tagged PostgreSQL integration, all nine browser-runner tests, the real
+two-signal lifecycle test, and all 36 Chromium cases. No required local check
+was skipped or unavailable. The workspace advisories above remain a known
+limitation; they are separate from the passed runtime artifact gate.
+
+PR #24 remains open and unmerged until the pushed candidate's 14 protected
+status checks pass. The plan stays in `planned/` with Ready for review status;
+move it to `completed/` and mark M5 Complete only after the outcome is accepted.
