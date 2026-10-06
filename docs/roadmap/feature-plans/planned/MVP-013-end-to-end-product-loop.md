@@ -524,13 +524,23 @@ this section corrects that evidence record.
 
 The safeguards now run in a separate `browser-runner-safeguards` job without
 services, in parallel with `browser-e2e`. The existing required `browser-smoke`
-context is retained as an aggregate that fails unless both jobs succeed. This
-preserves the runner's full owned-port collision checks, keeps the 14 test
-cases, and prevents a PostgreSQL service from turning them into skips. The
-local `corepack pnpm run test:browser:runner` run passed **14/14 with no skips**;
-repository policy, workflow YAML parsing, and `git diff --check` also passed.
-The pushed candidate's CI result must confirm hosted **14/14, zero skipped**
-before this finding is closed.
+context remains an aggregate that fails unless both jobs succeed. This
+preserves the runner's full owned-port collision checks and prevents a
+PostgreSQL service from turning cases into skips. Local safeguards passed
+**14/14**; repository policy, workflow YAML parsing, and `git diff --check`
+passed.
+
+Hosted validation on exact head `127334671c4a7bbe13139db9c9cc288de71ce1bb`
+passed: run [37425948915](https://github.com/methat-ruk/pulsegrid/actions/runs/37425948915)
+reports **14 tests, 14 passed, 0 failed, 0 skipped** in the service-free job.
+The same run passed browser E2E **37/37**, real SIGINT/SIGTERM cleanup and
+reruns, and the required `browser-smoke` aggregate. All 14 branch-protected
+contexts passed; three command-console screenshots are in [artifact 11394923904](https://github.com/methat-ruk/pulsegrid/actions/runs/37425948915/artifacts/11394923904).
+
+**Correction to the earlier author response:** its `14/14` hosted-safeguards
+claim used the local result. Run 37423262221 actually had **9 passed and 5
+skipped** in CI. The new hosted result above closes that regression-protection
+gap; the separate final response records both runs and the correction.
 
 The review's separate runtime-reduction suggestions (splitting the real expiry
 case from browser E2E and transferring built artifacts across jobs) are
