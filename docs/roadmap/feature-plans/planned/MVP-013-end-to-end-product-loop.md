@@ -457,6 +457,7 @@ the F1 lockfile resolution.
 | G2 — registered-tenant telemetry | MQTT isolation snapshots cover observation keys, observations, current state, and alerts for protected A/B before and after both crossed deliveries; the crossed message ID is checked on the protected device. Live `pulsegrid-dev` GraphQL reads of B return null device/current state and empty history. Valid A and B follow-up messages persisted and A created its expected alert. All four MQTT suites passed. |
 | G3 — clean-local proof | The initial clean checkout at `be3596ee3e7c565bc011fa6d10c963004cae9e83` exposed an additional setup gap: `check` failed in web lint because setup had not generated `.nuxt/eslint.config.mjs`. The root setup command now runs `nuxt prepare`; the post-fix clean checkout SHA and full command results are recorded in the final PR #24 response comment. |
 | Additional — clean setup required validation | The clean-checkout failure was outside the published F1–F5/G1–G3 review scope but affected the required full check. Root setup now prepares the ignored Nuxt ESLint config, matching the existing CI setup step. No dependency or application contract changed. The post-fix exact-SHA clean run is reported in the final response comment. |
+| Additional — CI lifecycle fixture isolation | CI run [37414795819](https://github.com/methat-ruk/pulsegrid/actions/runs/37414795819) showed that the real lifecycle proof ran first against browser-smoke's shared external PostgreSQL database and left valid alert fixtures. The alert journey then failed a strict locator because three rows matched (35/36 browser cases passed). The workflow now runs lifecycle cleanup after browser-smoke so those fixtures cannot affect the suite; the next hosted run must verify it. |
 
 **Contributor-worktree validation:** `corepack pnpm run check` passed on
 2026-10-06, including all suites below. That checkout already had generated
@@ -470,7 +471,9 @@ tagged PostgreSQL integration, all nine browser-runner tests, the real
 two-signal lifecycle test, and all 36 Chromium cases. No required local check
 was skipped or unavailable in that contributor-worktree run. The workspace
 advisories above remain a known limitation; they are separate from the passed
-runtime artifact gate.
+runtime artifact gate. The lifecycle step is intentionally last in the shared
+external-DB browser job; running the focused fixture first polluted the alert
+journey in CI, so the workflow now isolates that evidence by ordering.
 
 PR #24 remains open and unmerged until the pushed candidate's 14 protected
 status checks pass. The plan stays in `planned/` with Ready for review status;

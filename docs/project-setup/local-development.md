@@ -508,8 +508,9 @@ volumes, and ports are gone, and reruns the focused product-loop journey after
 each interruption. A failed runner reports nonzero and attempts bounded
 SIGTERM-to-SIGKILL cleanup; inspect and clean only its printed unique Compose
 project if an external failure prevents teardown. CI supplies its pinned
-PostgreSQL service through `PULSEGRID_DATABASE_URL` and runs the same lifecycle
-proof before the full browser suite.
+PostgreSQL service through `PULSEGRID_DATABASE_URL` and runs the lifecycle
+proof after the full browser suite so its valid product-loop fixtures do not
+affect the suite's independent scenarios.
 
 ## Validation commands
 
