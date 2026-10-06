@@ -191,6 +191,44 @@ func TestGraphQLCommandsRealPostgresContractAndTenantScope(t *testing.T) {
 	if deniedRows != 0 {
 		t.Fatalf("foreign create stored %d command rows, want none", deniedRows)
 	}
+	handlerB, err := NewHandlerWithCommands(
+		registryRepository, nil, nil, commandRepository, organizationB,
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+	)
+	if err != nil {
+		t.Fatalf("create tenant B command GraphQL handler: %v", err)
+	}
+	keyB := uuid.New()
+	createBodyB := `{ "query": "mutation { createCommand(input: { deviceId: \"` + deviceB.ID.String() + `\", type: PING, idempotencyKey: \"` + keyB.String() + `\" }) { id deviceId type status } }" }`
+	createdB := doGraphQLForOrganization(t, handlerB, organizationB, createBodyB)
+	if len(createdB.Errors) != 0 || !strings.Contains(string(createdB.Data), deviceB.ID.String()) {
+		t.Fatalf("tenant B create command response = %+v", createdB)
+	}
+	var createdBData struct {
+		CreateCommand struct {
+			ID string `json:"id"`
+		} `json:"createCommand"`
+	}
+	if err := json.Unmarshal(createdB.Data, &createdBData); err != nil || createdBData.CreateCommand.ID == "" {
+		t.Fatalf("decode tenant B command: data=%s error=%v", createdB.Data, err)
+	}
+	ownedRead := doGraphQLForOrganization(t, handlerB, organizationB, `{ "query": "query { command(id: \"`+createdBData.CreateCommand.ID+`\") { id deviceId } deviceCommands(deviceId: \"`+deviceB.ID.String()+`\") { edges { node { id } } } }" }`)
+	if len(ownedRead.Errors) != 0 || !strings.Contains(string(ownedRead.Data), createdBData.CreateCommand.ID) {
+		t.Fatalf("tenant B owned command read = %+v", ownedRead)
+	}
+	reverseRead := doGraphQLForOrganization(t, handlerB, organizationB, `{ "query": "query { command(id: \"`+createdData.CreateCommand.ID+`\") { id } deviceCommands(deviceId: \"`+deviceA.ID.String()+`\") { edges { node { id } } } }" }`)
+	if len(reverseRead.Errors) != 0 || !strings.Contains(string(reverseRead.Data), `"command":null`) || !strings.Contains(string(reverseRead.Data), `"edges":[]`) {
+		t.Fatalf("tenant B cross-tenant command read = %+v", reverseRead)
+	}
+	reverseKey := uuid.New()
+	reverseCreate := doGraphQLForOrganization(t, handlerB, organizationB, `{ "query": "mutation { createCommand(input: { deviceId: \"`+deviceA.ID.String()+`\", type: PING, idempotencyKey: \"`+reverseKey.String()+`\" }) { id } }" }`)
+	assertErrorCode(t, reverseCreate, errorCodeBadUserInput)
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM commands WHERE organization_id = $1 AND idempotency_key = $2`, organizationB, reverseKey).Scan(&deniedRows); err != nil {
+		t.Fatalf("verify tenant B denied create had no stored effect: %v", err)
+	}
+	if deniedRows != 0 {
+		t.Fatalf("tenant B cross-tenant create stored %d command rows, want none", deniedRows)
+	}
 
 	badCursor := encodeForOtherScope(t, organizationA, deviceB.ID)
 	wrongCursor := doGraphQLForOrganization(t, handler, organizationA, `{ "query": "query { deviceCommands(deviceId: \"`+deviceA.ID.String()+`\", after: \"`+badCursor+`\") { edges { node { id } } } }" }`)

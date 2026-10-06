@@ -30,8 +30,10 @@ response validation, and automatic expiry. PR #21 review findings now have
 implementation and real PostgreSQL/Mosquitto evidence, including synchronized
 response admission at shutdown, expiry while the broker is down, and a forced
 response-drain deadline with an in-flight database lock. Main CI passed on
-the merge commit. MVP-012's command-console plan is reviewed; implementation
-is in progress. Production identity, deployment
+the merge commit. MVP-012's command console merged as `1142eb7` in PR #22,
+with main CI passing. PR #24 supplies the MVP-013 joined product-loop
+acceptance candidate; its full local validation passed and it remains open and
+unmerged pending the protected branch checks. Production identity, deployment
 exposure, durable broker replay, and later event contracts remain
 unimplemented.
 

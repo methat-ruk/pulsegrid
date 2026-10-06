@@ -84,6 +84,14 @@ func TestGraphQLTelemetryUsesRealPostgresAndTenantScope(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("persist telemetry A: %v", err)
 	}
+	messageIDB := uuid.MustParse("66666666-6666-4666-8666-666666666666")
+	if err := projectionRepository.Consume(ctx, ingestion.AcceptedTelemetry{
+		IngestionID: uuid.New(), MessageID: messageIDB, OrganizationID: organizationB,
+		DeviceID: deviceB.ID, ObservedAt: observedAt.Add(time.Minute),
+		ReceivedAt: observedAt.Add(time.Minute + time.Second), TemperatureCelsius: 18.25,
+	}); err != nil {
+		t.Fatalf("persist telemetry B: %v", err)
+	}
 
 	handler, err := NewHandlerWithTelemetry(registryRepository, projectionRepository, organizationA, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
@@ -93,10 +101,48 @@ func TestGraphQLTelemetryUsesRealPostgresAndTenantScope(t *testing.T) {
 	if len(response.Errors) != 0 || !strings.Contains(string(response.Data), "29.75") {
 		t.Fatalf("tenant A telemetry response = %+v", response)
 	}
+	type scopedTelemetry struct {
+		DeviceCurrentState *struct {
+			MessageID string `json:"messageId"`
+		} `json:"deviceCurrentState"`
+		DeviceTelemetry struct {
+			Edges []struct {
+				Node struct {
+					MessageID string `json:"messageId"`
+				} `json:"node"`
+			} `json:"edges"`
+		} `json:"deviceTelemetry"`
+	}
 
 	crossTenant := doGraphQLForOrganization(t, handler, organizationA, `{ "query": "query { deviceCurrentState(deviceId: \"`+deviceB.ID.String()+`\") { messageId } deviceTelemetry(deviceId: \"`+deviceB.ID.String()+`\") { edges { node { messageId } } } }" }`)
-	if len(crossTenant.Errors) != 0 || strings.Contains(string(crossTenant.Data), "55555555-5555-4555-8555-555555555555") {
-		t.Fatalf("cross-tenant telemetry response = %+v", crossTenant)
+	if len(crossTenant.Errors) != 0 {
+		t.Fatalf("cross-tenant telemetry response has errors: %+v", crossTenant.Errors)
+	}
+	var isolatedTelemetry scopedTelemetry
+	if err := json.Unmarshal(crossTenant.Data, &isolatedTelemetry); err != nil {
+		t.Fatalf("decode A-to-B telemetry response: %v", err)
+	}
+	if isolatedTelemetry.DeviceCurrentState != nil || len(isolatedTelemetry.DeviceTelemetry.Edges) != 0 {
+		t.Fatalf("tenant A received tenant B telemetry: %+v", isolatedTelemetry)
+	}
+	handlerB, err := NewHandlerWithTelemetry(registryRepository, projectionRepository, organizationB, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatalf("create tenant B GraphQL handler: %v", err)
+	}
+	ownedTelemetry := doGraphQLForOrganization(t, handlerB, organizationB, `{ "query": "query { deviceCurrentState(deviceId: \"`+deviceB.ID.String()+`\") { messageId temperatureCelsius } deviceTelemetry(deviceId: \"`+deviceB.ID.String()+`\") { edges { node { messageId temperatureCelsius } } pageInfo { hasNextPage } } }" }`)
+	if len(ownedTelemetry.Errors) != 0 || !strings.Contains(string(ownedTelemetry.Data), messageIDB.String()) || !strings.Contains(string(ownedTelemetry.Data), "18.25") {
+		t.Fatalf("tenant B telemetry response = %+v", ownedTelemetry)
+	}
+	foreignTelemetry := doGraphQLForOrganization(t, handlerB, organizationB, `{ "query": "query { deviceCurrentState(deviceId: \"`+deviceA.ID.String()+`\") { messageId } deviceTelemetry(deviceId: \"`+deviceA.ID.String()+`\") { edges { node { messageId } } } }" }`)
+	if len(foreignTelemetry.Errors) != 0 {
+		t.Fatalf("tenant B cross-tenant telemetry response has errors: %+v", foreignTelemetry.Errors)
+	}
+	var reverseIsolatedTelemetry scopedTelemetry
+	if err := json.Unmarshal(foreignTelemetry.Data, &reverseIsolatedTelemetry); err != nil {
+		t.Fatalf("decode B-to-A telemetry response: %v", err)
+	}
+	if reverseIsolatedTelemetry.DeviceCurrentState != nil || len(reverseIsolatedTelemetry.DeviceTelemetry.Edges) != 0 {
+		t.Fatalf("tenant B received tenant A telemetry: %+v", reverseIsolatedTelemetry)
 	}
 }
 

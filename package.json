@@ -9,7 +9,7 @@
   },
   "scripts": {
     "prepare": "husky",
-    "setup": "NUXT_TELEMETRY_DISABLED=1 pnpm install --frozen-lockfile && pnpm run prepare && go -C apps/api mod download",
+    "setup": "NUXT_TELEMETRY_DISABLED=1 pnpm install --frozen-lockfile && pnpm run prepare && NUXT_TELEMETRY_DISABLED=1 pnpm --filter @pulsegrid/web-console exec nuxt prepare && go -C apps/api mod download",
     "setup:browser": "pnpm exec playwright install --only-shell chromium",
     "dev:api": "PULSEGRID_ENV=development go -C apps/api run ./cmd/api",
     "dev:web": "pnpm --filter @pulsegrid/web-console dev",
@@ -63,6 +63,9 @@
     "repository-policy": "node scripts/check-repository-policy.mjs",
     "node:audit": "node scripts/node-audit.mjs",
     "test:browser": "node scripts/test-browser.mjs",
+    "test:browser:runner": "node --test --test-concurrency=1 scripts/test-browser-runner.test.mjs scripts/test-browser-lifecycle-wrapper.test.mjs",
+    "test:browser:lifecycle": "node scripts/test-browser-lifecycle.mjs",
+    "test:browser:lifecycle:reuse": "node scripts/test-browser-lifecycle.mjs --reuse-test-artifacts",
     "format": "pnpm run api:format && pnpm run web:lint:fix",
     "format:check": "pnpm run api:format:check && pnpm run web:lint",
     "lint": "pnpm run api:lint && pnpm run web:lint && pnpm run openapi:lint && pnpm run asyncapi:lint",
@@ -72,7 +75,7 @@
     "build": "pnpm run api:build && pnpm run web:build",
     "audit": "pnpm run node:audit && pnpm run api:vuln",
     "check:fast": "pnpm run api:format:check && pnpm run api:generate:check && pnpm run api:modernize && pnpm run api:staticcheck && pnpm run lint && pnpm run typecheck && pnpm run browser:typecheck && pnpm run test",
-    "check": "pnpm run check:fast && pnpm run test:race && pnpm run build && pnpm run openapi && pnpm run audit && pnpm run mqtt:test:integration && pnpm run api:test:integration && pnpm run test:browser"
+    "check": "pnpm run check:fast && pnpm run test:race && pnpm run build && pnpm run openapi && pnpm run audit && pnpm run mqtt:test:integration && pnpm run api:test:integration && pnpm run test:browser:runner && pnpm run test:browser && pnpm run test:browser:lifecycle:reuse"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

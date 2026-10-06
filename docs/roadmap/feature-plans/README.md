@@ -113,7 +113,7 @@ platform foundation” is not an acceptable PR boundary.
 
 ### MVP acceptance
 
-- [MVP-013 — End-to-end product loop](planned/MVP-013-end-to-end-product-loop.md)
+- [MVP-013 — End-to-end product loop](planned/MVP-013-end-to-end-product-loop.md) — ready for review in open PR #24; unmerged
 
 ### Deferred packaging
 

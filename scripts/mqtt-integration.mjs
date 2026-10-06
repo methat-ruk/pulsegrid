@@ -91,16 +91,21 @@ async function runCoreSuite() {
   await startApi()
   await waitForReady()
   const deviceID = await createDevice()
+  const tenantB = await createRegisteredTenantFixture()
   await timed('telemetry-regression', async () => {
     await createThresholdRule(deviceID)
+    await testMalformedTelemetryNoWrite(deviceID)
     const simulatorTelemetry = await publishSimulator(deviceID)
-    const duplicateMessageID = await publishInvalidCases(deviceID)
+    const replayCase = await publishInvalidCases(deviceID)
+    const duplicateMessageID = replayCase.messageID
     await assertPersistedObservation(deviceID, simulatorTelemetry.messageID, 23.5, 1)
     await assertPersistedObservation(deviceID, duplicateMessageID, 24.5, 1)
     await assertAlertForMessage(deviceID, simulatorTelemetry.messageID, 23.5, 20)
     await assertAlertForMessage(deviceID, duplicateMessageID, 24.5, 20)
+    await testTelemetryReplayAndConflictAfterRestart(deviceID, replayCase.payload, duplicateMessageID)
     await testAlertPersistenceFailure(deviceID)
     const projectionTelemetry = await testPersistenceProjection(deviceID, simulatorTelemetry)
+    await testRegisteredTenantMQTTIsolation(deviceID, tenantB)
     await testBrokerPayloadCap(deviceID)
     assertNoRawTelemetryInLogs()
     await testRetainedMessage(deviceID)
@@ -365,6 +370,29 @@ async function createDevice() {
     throw new Error(`device registration failed: ${JSON.stringify(body)}`)
   }
   return deviceID
+}
+
+async function createRegisteredTenantFixture() {
+  const organizationID = randomUUID()
+  const deviceID = randomUUID()
+  const tenantSlug = `mvp013-${randomUUID().replaceAll('-', '')}`
+  const deviceKey = `mvp013-device-${randomUUID()}`
+  const inserted = await runPSQL(`
+    WITH new_organization AS (
+      INSERT INTO organizations (id, slug, display_name)
+      VALUES ('${organizationID}'::uuid, '${tenantSlug}', 'MVP-013 isolation fixture')
+      RETURNING id
+    ), new_device AS (
+      INSERT INTO devices (id, organization_id, device_key, display_name)
+      SELECT '${deviceID}'::uuid, id, '${deviceKey}', 'MVP-013 isolation device'
+      FROM new_organization
+      RETURNING id
+    ) SELECT id FROM new_device;
+  `)
+  if (inserted.status !== 0 || inserted.stdout.trim() !== deviceID) {
+    throw new Error(`could not create registered tenant isolation fixture: ${inserted.stderr}`)
+  }
+  return { organizationID, tenantSlug, deviceID }
 }
 
 async function createThresholdRule(deviceID) {
@@ -643,7 +671,136 @@ async function publishInvalidCases(deviceID) {
   await publishRaw(topic, duplicatePayload, false)
   await publishRaw(topic, duplicatePayload, false)
   await waitForLogCountFields(['reason_code=telemetry_accepted', `message_id=${duplicateMessageID}`], 2, 10_000, 'duplicate logical message acceptance')
-  return duplicateMessageID
+  return { messageID: duplicateMessageID, payload: duplicatePayload }
+}
+
+async function testMalformedTelemetryNoWrite(deviceID) {
+  const before = await readTelemetryPersistenceSnapshot(deviceID, null)
+  const logOffset = apiOutput.length
+  const topic = `pulsegrid/v1/tenants/pulsegrid-dev/devices/${deviceID}/telemetry`
+  const result = await publishRaw(topic, '{', false)
+  if (result.status !== 0) throw new Error(`malformed telemetry publish failed: ${result.stderr}`)
+  await waitForLogLineFieldsSince(logOffset, ['reason_code=telemetry_payload_malformed', 'payload_bytes=1'], 10_000, 'malformed telemetry rejection')
+  const after = await readTelemetryPersistenceSnapshot(deviceID, null)
+  if (after !== before || after !== '0:0:0:0:null:null:null') {
+    throw new Error(`malformed telemetry changed persisted state: before=${before} after=${after}`)
+  }
+}
+
+async function testTelemetryReplayAndConflictAfterRestart(deviceID, originalPayload, messageID) {
+  const before = await readTelemetryPersistenceSnapshot(deviceID, messageID)
+  if (!before.startsWith('1:1:1:1:')) throw new Error(`exact replay fixture state = ${before}, want one identity/history/state/alert row`)
+
+  await restartApi()
+  let logOffset = apiOutput.length
+  const topic = `pulsegrid/v1/tenants/pulsegrid-dev/devices/${deviceID}/telemetry`
+  const replay = await publishRaw(topic, originalPayload, false)
+  if (replay.status !== 0) throw new Error(`post-restart exact replay publish failed: ${replay.stderr}`)
+  await waitForLogLineFieldsSince(logOffset, ['reason_code=telemetry_accepted', `message_id=${messageID}`], 10_000, 'post-restart exact replay')
+  const afterReplay = await readTelemetryPersistenceSnapshot(deviceID, messageID)
+  if (afterReplay !== before) throw new Error(`exact replay changed durable state: before=${before} after=${afterReplay}`)
+
+  const conflict = JSON.parse(originalPayload)
+  conflict.temperatureCelsius += 1
+  logOffset = apiOutput.length
+  const conflictingPublish = await publishRaw(topic, JSON.stringify(conflict), false)
+  if (conflictingPublish.status !== 0) throw new Error(`conflicting telemetry publish failed: ${conflictingPublish.stderr}`)
+  await waitForLogLineFieldsSince(logOffset, ['reason_code=telemetry_message_id_conflict'], 10_000, 'conflicting message ID reuse')
+  const afterConflict = await readTelemetryPersistenceSnapshot(deviceID, messageID)
+  if (afterConflict !== before) throw new Error(`conflicting replay changed durable state: before=${before} after=${afterConflict}`)
+}
+
+async function readTelemetryPersistenceSnapshot(deviceID, messageID) {
+  const messagePredicate = messageID === null ? '' : ` AND message_id = '${messageID}'::uuid`
+  const query = `
+    SELECT
+      (SELECT count(*) FROM telemetry_observation_keys WHERE device_id = '${deviceID}'::uuid${messagePredicate}) || ':' ||
+      (SELECT count(*) FROM telemetry_observations WHERE device_id = '${deviceID}'::uuid${messagePredicate}) || ':' ||
+      (SELECT count(*) FROM device_current_state WHERE device_id = '${deviceID}'::uuid) || ':' ||
+      (SELECT count(*) FROM threshold_alerts WHERE device_id = '${deviceID}'::uuid${messagePredicate}) || ':' ||
+      coalesce((SELECT message_id::text FROM device_current_state WHERE device_id = '${deviceID}'::uuid), 'null') || ':' ||
+      coalesce((SELECT temperature_celsius::text FROM device_current_state WHERE device_id = '${deviceID}'::uuid), 'null') || ':' ||
+      coalesce((SELECT last_seen_at::text FROM device_current_state WHERE device_id = '${deviceID}'::uuid), 'null');
+  `
+  const result = await runPSQL(query)
+  if (result.status !== 0) throw new Error(`could not inspect telemetry persistence state: ${result.stderr}`)
+  return result.stdout.trim()
+}
+
+async function testRegisteredTenantMQTTIsolation(deviceIDA, tenantB) {
+  const validPayload = (temperatureCelsius) => JSON.stringify({
+    schemaVersion: 1,
+    messageId: randomUUID(),
+    observedAt: pastObservedAt(),
+    temperatureCelsius,
+  })
+  const topicA = `pulsegrid/v1/tenants/pulsegrid-dev/devices/${deviceIDA}/telemetry`
+  const topicB = `pulsegrid/v1/tenants/${tenantB.tenantSlug}/devices/${tenantB.deviceID}/telemetry`
+
+  const messageB = JSON.parse(validPayload(18.25))
+  let logOffset = apiOutput.length
+  if ((await publishRaw(topicB, JSON.stringify(messageB), false)).status !== 0) throw new Error('registered tenant B telemetry publish failed')
+  await waitForLogLineFieldsSince(logOffset, ['reason_code=telemetry_accepted', `message_id=${messageB.messageId}`, `device_id=${tenantB.deviceID}`, `organization_id=${tenantB.organizationID}`], 10_000, 'registered tenant B telemetry acceptance')
+  const tenantBRows = await runPSQL(`SELECT count(*) FROM telemetry_observations WHERE device_id = '${tenantB.deviceID}'::uuid AND message_id = '${messageB.messageId}'::uuid AND temperature_celsius = 18.25;`)
+  if (tenantBRows.status !== 0 || tenantBRows.stdout.trim() !== '1') throw new Error(`tenant B telemetry persistence = ${tenantBRows.stdout}${tenantBRows.stderr}`)
+
+  const liveTenantBRead = await queryDeviceAndTelemetry(tenantB.deviceID)
+  if (liveTenantBRead.device !== null || liveTenantBRead.deviceCurrentState !== null || liveTenantBRead.deviceTelemetry.edges.length !== 0) {
+    throw new Error(`live pulsegrid-dev GraphQL read exposed registered tenant B data: ${JSON.stringify(liveTenantBRead)}`)
+  }
+
+  for (const { label, crossedTopic, protectedDeviceID } of [
+    {
+      label: 'A slug with B device',
+      crossedTopic: topicA.replace(`/devices/${deviceIDA}/`, `/devices/${tenantB.deviceID}/`),
+      protectedDeviceID: tenantB.deviceID,
+    },
+    {
+      label: 'B slug with A device',
+      crossedTopic: topicB.replace(`/devices/${tenantB.deviceID}/`, `/devices/${deviceIDA}/`),
+      protectedDeviceID: deviceIDA,
+    },
+  ]) {
+    const crossed = JSON.parse(validPayload(19.25))
+    const beforeA = await readFullTelemetryStateSnapshot(deviceIDA)
+    const beforeB = await readFullTelemetryStateSnapshot(tenantB.deviceID)
+    const offset = apiOutput.length
+    if ((await publishRaw(crossedTopic, JSON.stringify(crossed), false)).status !== 0) throw new Error(`${label} publish failed`)
+    await waitForLogLineFieldsSince(offset, ['reason_code=telemetry_device_not_registered_for_tenant'], 10_000, label)
+    const afterA = await readFullTelemetryStateSnapshot(deviceIDA)
+    const afterB = await readFullTelemetryStateSnapshot(tenantB.deviceID)
+    if (afterA !== beforeA || afterB !== beforeB) {
+      throw new Error(`${label} changed protected telemetry state: A before=${beforeA} after=${afterA}; B before=${beforeB} after=${afterB}`)
+    }
+    const rowCount = await runPSQL(`SELECT count(*) FROM telemetry_observation_keys WHERE device_id = '${protectedDeviceID}'::uuid AND message_id = '${crossed.messageId}'::uuid;`)
+    if (rowCount.status !== 0 || rowCount.stdout.trim() !== '0') throw new Error(`${label} wrote the crossed observation: ${rowCount.stdout}${rowCount.stderr}`)
+  }
+
+  const messageA = JSON.parse(validPayload(22.25))
+  logOffset = apiOutput.length
+  if ((await publishRaw(topicA, JSON.stringify(messageA), false)).status !== 0) throw new Error('valid tenant A follow-up publish failed')
+  await waitForLogLineFieldsSince(logOffset, ['reason_code=telemetry_accepted', `message_id=${messageA.messageId}`, `device_id=${deviceIDA}`], 10_000, 'valid tenant A follow-up after crossed deliveries')
+  await assertPersistedObservation(deviceIDA, messageA.messageId, 22.25, 1)
+  await assertAlertForMessage(deviceIDA, messageA.messageId, 22.25, 20)
+
+  const followUpB = JSON.parse(validPayload(17.25))
+  logOffset = apiOutput.length
+  if ((await publishRaw(topicB, JSON.stringify(followUpB), false)).status !== 0) throw new Error('valid tenant B follow-up publish failed')
+  await waitForLogLineFieldsSince(logOffset, ['reason_code=telemetry_accepted', `message_id=${followUpB.messageId}`, `device_id=${tenantB.deviceID}`, `organization_id=${tenantB.organizationID}`], 10_000, 'valid tenant B follow-up after crossed deliveries')
+  const followUpBRows = await runPSQL(`SELECT count(*) FROM telemetry_observations WHERE device_id = '${tenantB.deviceID}'::uuid AND message_id = '${followUpB.messageId}'::uuid AND temperature_celsius = 17.25;`)
+  if (followUpBRows.status !== 0 || followUpBRows.stdout.trim() !== '1') throw new Error(`tenant B follow-up persistence = ${followUpBRows.stdout}${followUpBRows.stderr}`)
+}
+
+async function readFullTelemetryStateSnapshot(deviceID) {
+  const result = await runPSQL(`
+    SELECT
+      coalesce((SELECT json_agg(json_build_array(message_id, first_ingestion_id, observed_at, temperature_celsius) ORDER BY message_id)::text FROM telemetry_observation_keys WHERE device_id = '${deviceID}'::uuid), '[]') || ':' ||
+      coalesce((SELECT json_agg(json_build_array(storage_sequence, ingestion_id, message_id, observed_at, received_at, temperature_celsius, mqtt_duplicate) ORDER BY storage_sequence)::text FROM telemetry_observations WHERE device_id = '${deviceID}'::uuid), '[]') || ':' ||
+      coalesce((SELECT json_build_array(observation_sequence, message_id, observed_at, received_at, temperature_celsius, last_seen_at)::text FROM device_current_state WHERE device_id = '${deviceID}'::uuid), 'null') || ':' ||
+      coalesce((SELECT json_agg(json_build_array(id, rule_id, message_id, observed_at, received_at, temperature_celsius, metric, comparator, threshold_celsius, created_at) ORDER BY id)::text FROM threshold_alerts WHERE device_id = '${deviceID}'::uuid), '[]');
+  `)
+  if (result.status !== 0) throw new Error(`could not inspect full telemetry state for ${deviceID}: ${result.stderr}`)
+  return result.stdout.trim()
 }
 
 async function testPersistenceProjection(deviceID, simulatorTelemetry) {
@@ -678,6 +835,26 @@ async function queryTelemetry(deviceID) {
   const body = await response.json()
   if (response.status !== 200 || body.errors || !body.data) {
     throw new Error(`telemetry GraphQL query failed: ${JSON.stringify(body)}`)
+  }
+  return body.data
+}
+
+async function queryDeviceAndTelemetry(deviceID) {
+  const response = await fetch(`http://127.0.0.1:${apiPort}/graphql`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      query: `query RegisteredTenantIsolation($deviceID: ID!) {
+        device(id: $deviceID) { id }
+        deviceCurrentState(deviceId: $deviceID) { messageId }
+        deviceTelemetry(deviceId: $deviceID, first: 10) { edges { node { messageId } } pageInfo { hasNextPage } }
+      }`,
+      variables: { deviceID },
+    }),
+  })
+  const body = await response.json()
+  if (response.status !== 200 || body.errors || !body.data) {
+    throw new Error(`tenant-scoped device/telemetry GraphQL query failed: ${JSON.stringify(body)}`)
   }
   return body.data
 }
@@ -901,6 +1078,16 @@ async function waitForLogSince(offset, text, timeout, label) {
     await delay(100)
   }
   throw new Error(`${label} was not found in new API output: ${text}\nAPI output:\n${apiOutput.slice(offset)}`)
+}
+
+async function waitForLogLineFieldsSince(offset, fields, timeout, label) {
+  const deadline = Date.now() + timeout
+  while (Date.now() < deadline && !stopRequested) {
+    const lines = apiOutput.slice(offset).split('\n')
+    if (lines.some(line => fields.every(field => line.includes(field)))) return
+    await delay(100)
+  }
+  throw new Error(`${label} did not produce one log line with ${fields.join(', ')}\nAPI output:\n${apiOutput.slice(offset)}`)
 }
 
 async function waitForLogFields(fields, timeout, label) {

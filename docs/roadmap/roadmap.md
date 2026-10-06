@@ -16,6 +16,8 @@ treated as Foundation or MVP requirements by default.
 - **Proposed**: under review and not yet approved for execution.
 - **Planned**: approved direction but implementation has not started.
 - **In progress**: at least one required plan is actively being delivered.
+- **Ready for review**: implementation and author review are complete; required
+  PR checks or acceptance may still be pending. The milestone is not complete.
 - **Complete**: milestone outcome and required validation are complete.
 - **Blocked**: progress requires a named decision or external change.
 - **Deferred**: outside the current delivery horizon or waiting for an adoption
@@ -81,6 +83,7 @@ flowchart TD
 
     classDef complete fill:#DCFCE7,stroke:#15803D,color:#14532D;
     classDef progress fill:#FEF3C7,stroke:#B45309,color:#78350F;
+    classDef review fill:#DBEAFE,stroke:#1D4ED8,color:#1E3A8A;
     class DOC001 complete;
     class FND001 complete;
     class FND002 complete;
@@ -98,6 +101,7 @@ flowchart TD
     class MVP010 complete;
     class MVP011 complete;
     class MVP012 complete;
+    class MVP013 review;
 ```
 
 FND-001 implementation establishes the backend runtime shell, FND-002
@@ -218,16 +222,21 @@ Plans:
 
 ### M5 — MVP acceptance
 
-Status: Planned
+Status: Ready for review (PR #24 open; not merged)
 
 Dependency: M3 and M4
 
 Outcome: The complete device-to-operator-to-device product loop is repeatable,
 observable, and validated from a clean local checkout.
 
+MVP-013's plan was revised and challenged on 2026-10-03 against merged MVP-012
+and main CI at `619e1c7`. PR #24 addresses its review findings and the full local
+check passed on 2026-10-06. The branch remains unmerged; required hosted checks
+on the pushed candidate remain the delivery gate.
+
 Plans:
 
-- [MVP-013 — End-to-end product loop](feature-plans/planned/MVP-013-end-to-end-product-loop.md)
+- [MVP-013 — End-to-end product loop](feature-plans/planned/MVP-013-end-to-end-product-loop.md) — ready for review in open PR #24; not merged
 
 ## Post-MVP milestones
 

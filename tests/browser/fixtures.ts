@@ -11,6 +11,7 @@ const apiPort = 18080
 const apiURL = `http://${apiHost}:${apiPort}/health/ready`
 const apiBinary = join(process.cwd(), '.output', 'api-test')
 const simulatorBinary = join(process.cwd(), '.output', 'device-simulator-test')
+const maxChildOutputBytes = 64 * 1024
 
 export type ApiProcess = {
   start: () => Promise<void>
@@ -154,9 +155,7 @@ export async function startCommandSimulator(
     }),
   }
   commandSimulators.set(deviceID, simulator)
-  const append = (chunk: Buffer) => {
-    simulator.output = `${simulator.output}${chunk.toString()}`.slice(-64 * 1024)
-  }
+  const append = (chunk: Buffer) => { simulator.output = appendBounded(simulator.output, chunk) }
   child.stdout?.on('data', append)
   child.stderr?.on('data', append)
 
@@ -208,7 +207,7 @@ test.afterEach(async () => {
   await stopAllCommandSimulators()
 })
 
-export async function publishSimulatorTelemetry(deviceID: string, temperatureCelsius: number): Promise<{ messageID: string }> {
+export async function publishSimulatorTelemetry(deviceID: string, temperatureCelsius: number): Promise<{ messageID: string, observedAt: string }> {
   await access(simulatorBinary)
   const child = spawn(simulatorBinary, [], {
     env: {
@@ -223,16 +222,41 @@ export async function publishSimulatorTelemetry(deviceID: string, temperatureCel
   })
   let stdout = ''
   let stderr = ''
-  child.stdout?.on('data', chunk => { stdout += chunk.toString() })
-  child.stderr?.on('data', chunk => { stderr += chunk.toString() })
-  const exit = await new Promise<{ status: number | null, signal: NodeJS.Signals | null }>((resolve, reject) => {
-    child.once('error', reject)
-    child.once('close', (status, signal) => resolve({ status, signal }))
-  })
-  if (exit.status !== 0) throw new Error(`simulator publish failed (${exit.status ?? exit.signal}): ${stderr}`)
+  child.stdout?.on('data', chunk => { stdout = appendBounded(stdout, chunk) })
+  child.stderr?.on('data', chunk => { stderr = appendBounded(stderr, chunk) })
+  const exit = await waitForChild(child, 15_000, 'telemetry simulator publish')
+  if (exit.status !== 0) throw new Error(`simulator publish failed (${exit.status ?? exit.signal}): ${stderr.slice(-1000)}`)
   const messageMatch = stdout.match(/message_id=([0-9a-f-]{36})/u)
   if (!messageMatch) throw new Error(`simulator output did not contain message ID: ${stdout}`)
-  return { messageID: messageMatch[1] }
+  const observedAtMatch = stdout.match(/observed_at=([^ ]+)/u)
+  if (!observedAtMatch) throw new Error(`simulator output did not contain observed time: ${stdout}`)
+  return { messageID: messageMatch[1], observedAt: observedAtMatch[1] }
+}
+
+function appendBounded(current: string, chunk: Buffer): string {
+  return `${current}${chunk.toString()}`.slice(-maxChildOutputBytes)
+}
+
+async function waitForChild(child: ChildProcess, timeoutMs: number, label: string): Promise<{ status: number | null, signal: NodeJS.Signals | null }> {
+  let timedOut = false
+  let escalationTimer: ReturnType<typeof setTimeout> | undefined
+  const timeout = setTimeout(() => {
+    timedOut = true
+    child.kill('SIGTERM')
+    escalationTimer = setTimeout(() => child.kill('SIGKILL'), 2_000)
+  }, timeoutMs)
+  try {
+    const exit = await new Promise<{ status: number | null, signal: NodeJS.Signals | null }>((resolve, reject) => {
+      child.once('error', reject)
+      child.once('close', (status, signal) => resolve({ status, signal }))
+    })
+    if (timedOut) throw new Error(`${label} exceeded its ${timeoutMs}ms bound`)
+    return exit
+  }
+  finally {
+    clearTimeout(timeout)
+    if (escalationTimer !== undefined) clearTimeout(escalationTimer)
+  }
 }
 
 export async function seedAlertDevice(page: import('@playwright/test').Page, deviceKey: string) {
@@ -264,7 +288,12 @@ export async function createTemperatureRule(page: import('@playwright/test').Pag
   if (response.status() !== 200) throw new Error(`rule creation returned ${response.status()}`)
   const payload = await response.json()
   if (payload.errors !== undefined) throw new Error('rule creation returned GraphQL errors')
-  return payload.data.createThresholdRule as { id: string, enabled: boolean }
+  return payload.data.createThresholdRule as {
+    id: string
+    enabled: boolean
+    comparator: string
+    thresholdCelsius: number
+  }
 }
 
 export async function readAlerts(page: import('@playwright/test').Page, deviceID?: string) {

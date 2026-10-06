@@ -185,4 +185,68 @@ func TestGraphQLFiberCompositionUsesRealTenantScopedRepository(t *testing.T) {
 	if !foundCreated {
 		t.Fatalf("list did not include organization A device %s: %+v", createdID, list.Data.Devices.Edges)
 	}
+
+	graphqlHandlerB, err := graph.NewHandler(repository, organizationB, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatalf("create tenant B GraphQL handler: %v", err)
+	}
+	serverB := New(config.Config{Environment: config.Test, HTTPHost: "127.0.0.1", HTTPPort: 0}, slog.New(slog.NewTextHandler(io.Discard, nil)), Options{
+		GraphQLHandler:  graphqlHandlerB,
+		ContextEnricher: graph.NewDevelopmentContextEnricher(organizationB),
+	})
+	requestBody, err = json.Marshal(map[string]string{
+		"query": "query { device(id: \"" + deviceB.ID.String() + "\") { id } }",
+	})
+	if err != nil {
+		t.Fatalf("encode tenant B query: %v", err)
+	}
+	request = httptest.NewRequest(http.MethodPost, "http://example.test"+GraphQLPath, strings.NewReader(string(requestBody)))
+	request.Header.Set("Content-Type", "application/json")
+	response, err = serverB.app.Test(request)
+	if err != nil {
+		t.Fatalf("Fiber tenant B request returned error: %v", err)
+	}
+	defer response.Body.Close()
+	var tenantB struct {
+		Data struct {
+			Device *struct {
+				ID string `json:"id"`
+			} `json:"device"`
+		} `json:"data"`
+		Errors []any `json:"errors"`
+	}
+	if response.StatusCode != http.StatusOK || json.NewDecoder(response.Body).Decode(&tenantB) != nil || len(tenantB.Errors) != 0 || tenantB.Data.Device == nil || tenantB.Data.Device.ID != deviceB.ID.String() {
+		t.Fatalf("Fiber tenant B owned response = status %d, payload %+v", response.StatusCode, tenantB)
+	}
+
+	requestBody, err = json.Marshal(map[string]string{
+		"query": "query { device(id: \"" + createdID.String() + "\") { id } }",
+	})
+	if err != nil {
+		t.Fatalf("encode tenant B foreign query: %v", err)
+	}
+	request = httptest.NewRequest(http.MethodPost, "http://example.test"+GraphQLPath, strings.NewReader(string(requestBody)))
+	request.Header.Set("Content-Type", "application/json")
+	response, err = serverB.app.Test(request)
+	if err != nil {
+		t.Fatalf("Fiber tenant B foreign request returned error: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("Fiber tenant B foreign status = %d", response.StatusCode)
+	}
+	var tenantBForeign struct {
+		Data struct {
+			Device *struct {
+				ID string `json:"id"`
+			} `json:"device"`
+		} `json:"data"`
+		Errors []any `json:"errors"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&tenantBForeign); err != nil {
+		t.Fatalf("decode Fiber tenant B foreign response: %v", err)
+	}
+	if len(tenantBForeign.Errors) != 0 || tenantBForeign.Data.Device != nil {
+		t.Fatalf("Fiber tenant B cross-tenant response = %+v, want null without error", tenantBForeign)
+	}
 }
