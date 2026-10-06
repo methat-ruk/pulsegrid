@@ -542,8 +542,22 @@ claim used the local result. Run 37423262221 actually had **9 passed and 5
 skipped** in CI. The new hosted result above closes that regression-protection
 gap; the separate final response records both runs and the correction.
 
-The review's separate runtime-reduction suggestions (splitting the real expiry
-case from browser E2E and transferring built artifacts across jobs) are
-non-blocking follow-ups. This change preserves real expiry, all assertions,
-timeouts, retries, and fail-on-flaky behavior; the recommendations remain
-unimplemented and no new runtime target is claimed.
+The follow-up timing review [#6011307790](https://github.com/methat-ruk/pulsegrid/pull/24#issuecomment-6011307790)
+measured **5:18** versus the previous **5:25**, a seven-second difference too
+small to attribute. Its recommended expiry split is implemented in CI:
+
+- `browser-e2e (fast)` runs the 36 non-expiry browser cases and then the real
+  lifecycle proof.
+- `browser-e2e (expiry)` runs only the two-minute ACK-expiry case with its own
+  runner and PostgreSQL service.
+- `browser-runner-safeguards` runs the 14 port/process tests without services;
+  the required `browser-smoke` aggregate fails unless all three legs pass.
+
+Separate Playwright `--list` checks confirm the selections partition the
+current suite into **36 + 1 = 37** tests without overlap. Both E2E matrix legs
+retain one worker, isolated ports and databases, the two-minute expiry, all
+assertions, retries, and fail-on-flaky behavior. The estimated four-minute
+target remains an estimate until the hosted run is measured. A cross-job
+artifact producer remains deferred because transfer and consumer setup could
+offset its savings; the expiry split is measured before reconsidering that
+cost.

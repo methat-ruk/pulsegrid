@@ -452,9 +452,18 @@ jobs:
         run: corepack pnpm run test:browser:runner
 
   browser-e2e:
-    name: browser-e2e
+    name: browser-e2e (${{ matrix.suite }})
     runs-on: ubuntu-24.04
     timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [fast, expiry]
+    env:
+      CI: 'true'
+      NUXT_APP_ENV: test
+      PULSEGRID_BROWSER_TEST_DATABASE_MODE: external-ci-service
+      PULSEGRID_DATABASE_URL: postgres://pulsegrid:pulsegrid-browser-ci@127.0.0.1:15432/pulsegrid_test?sslmode=disable
     services:
       postgres:
         image: postgres:18.6@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
@@ -502,22 +511,17 @@ jobs:
         run: corepack pnpm install --frozen-lockfile
       - name: Install Chromium headless shell and Linux dependencies
         run: corepack pnpm exec playwright install --with-deps --only-shell chromium
-      - name: Run browser smoke
-        env:
-          CI: 'true'
-          NUXT_APP_ENV: test
-          PULSEGRID_BROWSER_TEST_DATABASE_MODE: external-ci-service
-          PULSEGRID_DATABASE_URL: postgres://pulsegrid:pulsegrid-browser-ci@127.0.0.1:15432/pulsegrid_test?sslmode=disable
-        run: corepack pnpm run test:browser
+      - name: Run browser scenarios other than real expiry
+        if: matrix.suite == 'fast'
+        run: corepack pnpm run test:browser -- --grep-invert 'keeps ACK intermediate until the server records expiry'
+      - name: Run the real ACK-expiry browser scenario
+        if: matrix.suite == 'expiry'
+        run: corepack pnpm run test:browser -- --grep 'keeps ACK intermediate until the server records expiry'
       - name: Verify browser-runner interruption cleanup and rerun
-        env:
-          CI: 'true'
-          NUXT_APP_ENV: test
-          PULSEGRID_BROWSER_TEST_DATABASE_MODE: external-ci-service
-          PULSEGRID_DATABASE_URL: postgres://pulsegrid:pulsegrid-browser-ci@127.0.0.1:15432/pulsegrid_test?sslmode=disable
+        if: matrix.suite == 'fast'
         run: corepack pnpm run test:browser:lifecycle:reuse
       - name: Upload command-console visual QA evidence
-        if: success()
+        if: success() && matrix.suite == 'fast'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: command-console-visual-${{ github.run_id }}-${{ github.run_attempt }}
@@ -528,7 +532,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: playwright-diagnostics-${{ github.sha }}
+          name: playwright-diagnostics-${{ github.sha }}-${{ matrix.suite }}
           path: |
             test-results/
             playwright-report/

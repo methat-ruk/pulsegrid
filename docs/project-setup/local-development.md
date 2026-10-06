@@ -519,6 +519,12 @@ fake lifecycle fixtures probe the reserved test ports. The required
 `browser-smoke` result aggregates that safeguards job with the browser E2E job,
 so either failure blocks the same protected context.
 
+Hosted browser E2E runs the 36 non-expiry cases plus lifecycle and the real
+ACK-expiry case as separate matrix jobs, each with its own PostgreSQL service
+and test ports. The required aggregate waits for both jobs and runner
+safeguards; local `corepack pnpm run test:browser` continues to run the complete
+suite together.
+
 The standalone lifecycle command builds the API and Nuxt test artifacts once,
 then reuses them for the interrupted and recovery runs. After a successful
 `corepack pnpm run test:browser`, use
