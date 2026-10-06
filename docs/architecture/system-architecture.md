@@ -31,11 +31,10 @@ implementation and real PostgreSQL/Mosquitto evidence, including synchronized
 response admission at shutdown, expiry while the broker is down, and a forced
 response-drain deadline with an in-flight database lock. Main CI passed on
 the merge commit. MVP-012's command console merged as `1142eb7` in PR #22,
-with main CI passing. PR #24 supplies the MVP-013 joined product-loop
-acceptance candidate; its full local validation passed and it remains open and
-unmerged pending the protected branch checks. Production identity, deployment
-exposure, durable broker replay, and later event contracts remain
-unimplemented.
+with main CI passing. MVP-013's joined product-loop acceptance merged in PR #24
+as `2e05143`; its full local validation and [post-merge main CI](https://github.com/methat-ruk/pulsegrid/actions/runs/37433180990)
+passed. Production identity, deployment exposure, durable broker replay, and
+later event contracts remain unimplemented.
 
 Architecture diagrams below describe an intended sequence of evolution. They
 must not be read as deployed topology.

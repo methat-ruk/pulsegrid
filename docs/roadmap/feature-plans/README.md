@@ -111,9 +111,9 @@ platform foundation” is not an acceptable PR boundary.
 
 - [MVP-012 — Command console](completed/MVP-012-command-console.md) — merged as `1142eb7` (PR #22); main CI passed; workspace `node-forge` remains unresolved outside the runtime artifact gate
 
-### MVP acceptance
+### MVP acceptance — completed
 
-- [MVP-013 — End-to-end product loop](planned/MVP-013-end-to-end-product-loop.md) — ready for review in open PR #24; unmerged
+- [MVP-013 — End-to-end product loop](completed/MVP-013-end-to-end-product-loop.md) — merged as `2e05143` (PR #24); post-merge main CI passed
 
 ### Deferred packaging
 

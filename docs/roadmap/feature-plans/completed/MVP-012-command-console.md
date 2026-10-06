@@ -531,8 +531,8 @@ visible `node-forge` workspace finding. The workspace scan remains independent
 evidence after this change and continues to report `node-forge` while that
 published advisory applies. At the time of Re-plan 1, MVP-012 remained Blocked
 pending proof of the artifact-scoped gate, install contract and runtime smoke;
-that historical disposition was superseded by Re-plan 3. MVP-013/M5 remains
-planned behind M4.
+that historical disposition was superseded by Re-plan 3. At that same planning
+snapshot, MVP-013/M5 was still planned behind M4.
 
 **Approval record:** the user approved implementation of this exact
 artifact-scoped audit boundary on 2026-10-02, with no suppression, no

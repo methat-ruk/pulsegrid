@@ -1,19 +1,20 @@
 # MVP-013 — End-to-End Product Loop
 
-Status: Ready for review (PR #24 open; not merged)
+Status: Complete (PR #24 merged as `2e05143` on 2026-10-06)
 
 Branch: `test/mvp-013-end-to-end-product-loop`
 
-Intended PR: One MVP-acceptance PR, primarily tests, harness safeguards, and docs
+Intended PR: PR #24 — merged; primarily tests, harness safeguards, and docs
 
-Milestone: M5 — MVP acceptance
+Milestone: M5 — MVP acceptance (Complete)
 
 Plan review date: 2026-10-03
 
 Implementation authorization: User authorized execution of this revised scope
-on 2026-10-06 and later authorized remediation of PR #24 review findings. The
-implementation and author review are complete. The PR remains open and
-unmerged; M5 is not complete until the candidate is accepted.
+on 2026-10-06 and later authorized remediation of PR #24 review findings. PR
+#24 merged on 2026-10-06 as `2e051430e614c73350c223f2f043d1c992ba80e6`; the
+outcome was accepted and M5 is complete. This document preserves the dated
+planning and review record below.
 
 ## Goal
 
@@ -317,19 +318,19 @@ risk is explicitly accepted; missing evidence never becomes a pass.
 
 | Owner | Bounded cleanup/change |
 | --- | --- |
-| This plan | Own scenarios/decisions/review/evidence; Ready for review while PR #24 remains open and unmerged |
+| This plan | Own scenarios/decisions/review/evidence; moved to `completed/` and marked Complete after PR #24 merged |
 | `docs/project-setup/local-development.md` | Describe the joined browser workflow, lifecycle commands, expected outcomes, cleanup behavior and limits |
 | `docs/architecture/system-architecture.md` | Describe the validated product-loop candidate without changing module/data authority |
 | `docs/architecture/technology-decisions.md` | Preserve existing conditional/deferred technology decisions; no change was needed |
 | Product scope/API index/app READMEs/environment guide | Preserve canonical ownership; correct only affected contract/command/example drift; no new endpoint/schema/env key planned |
-| Root README/roadmap/plan index | Link reviewed scope and mark Ready for review; keep M5 incomplete until accepted delivery |
+| Root README/roadmap/plan index | Link the completed scope and mark M5 Complete after accepted delivery |
 
 Use lowercase `docs/` paths (the current filesystem also resolves `Docs/`).
 Preserve useful historical completed-plan evidence; label superseded candidate
 results and remove contradictory current claims instead of rewriting past
-results or duplicating canonical guidance. Move this plan to `completed/` only
-after the outcome is accepted, then update every inbound link in that same
-change. Generated artifacts stay ignored; commit concise sanitized evidence
+results or duplicating canonical guidance. This plan moved to `completed/`
+after the outcome was accepted; all inbound links were updated in the same
+change. Generated artifacts stay ignored; retain concise sanitized evidence
 references only.
 
 ## Risks / Open Decisions
@@ -351,8 +352,9 @@ references only.
 - The workspace audit still reports `node-forge`, `braces`, and `simple-git`;
   these remain visible and unresolved. The result does not claim their
   remediation or production readiness.
-- Full local validation passed on 2026-10-06. Protected branch CI must still
-  pass on the pushed candidate; M5 remains incomplete while PR #24 is unmerged.
+- Full local validation passed on 2026-10-06. Before merge, protected branch CI
+  remained the final delivery gate; the completed merge and post-merge CI are
+  recorded in the closeout below.
 
 Recovery: stop the failed owned run, retain minimal diagnostics, remove only its
 disposable resources, correct within authorized scope and rerun affected evidence.
@@ -385,10 +387,11 @@ Final plan challenge: the user's 2026-10-06 start request selected the revised
 scope. A verified singleton response-subscription filter changed the test
 method, not the product contract: T3 proves downstream tenant/device binding
 with real PostgreSQL and explicitly disclaims cross-tenant broker delivery.
-The PR #24 remediation is bounded to the findings and gaps below. The full local
-check now passes, including the required runtime artifact gate; protected CI on
-the pushed revision remains the final delivery gate. No production contract,
-tenant selector, broker subscription, or gate policy was widened.
+The PR #24 remediation was bounded to the findings and gaps below. At the
+pre-merge review point, the full local check passed, including the required
+runtime artifact gate, and protected CI remained the final delivery gate. No
+production contract, tenant selector, broker subscription, or gate policy was
+widened.
 
 ## Done Criteria
 
@@ -475,10 +478,11 @@ runtime artifact gate. The lifecycle step is intentionally last in the shared
 external-DB browser job; running the focused fixture first polluted the alert
 journey in CI, so the workflow now isolates that evidence by ordering.
 
-PR #24 remains open and unmerged. Implementation candidate
+At the time of this pre-merge validation snapshot, PR #24 was open and
+unmerged. Implementation candidate
 `55a5f8bd69baa7d8125143137163f7ef45b0a722` passed all 14 protected status
-contexts. The plan stays in `planned/` with Ready for review status; move it to
-`completed/` and mark M5 Complete only after the outcome is accepted.
+contexts. The action taken after acceptance is recorded in the merge closeout
+below.
 
 ### Latest PR #24 review follow-up — 2026-10-06
 
@@ -504,13 +508,13 @@ implementation candidate `55a5f8bd69baa7d8125143137163f7ef45b0a722`.
 | Additional — CI lifecycle isolation | Browser-smoke now runs before lifecycle against the shared CI PostgreSQL service, and lifecycle output stays under `test-results/lifecycle/`. On exact-head run 37421527287, browser-smoke passed 37/37, lifecycle passed, and all three command-console images uploaded as [artifact 11393960277](https://github.com/methat-ruk/pulsegrid/actions/runs/37421527287/artifacts/11393960277). |
 | Review performance note | A standalone lifecycle invocation builds API/Nuxt artifacts once and reuses them for its inner runs. Full `check` and CI run the browser suite first, then invoke `test:browser:lifecycle:reuse`; the exact-head CI log shows that command and a passing lifecycle without repeated API/Nuxt builds. Assertions, timeout, retries, and test scope are unchanged. |
 
-All **14 branch-protected status contexts** passed on exact-head run 37421527287;
-the complete run reports 18 successful check runs including matrix and
-aggregate contexts. The PR remains open and unmerged. Keep MVP-013 in `planned/`
-with Ready for review status until the outcome is accepted, then move it to
-`completed/` and mark M5 Complete. The broader workspace advisories and three
-Go module advisories outside reachable code remain known limitations; the
-production artifact audit and Go called-vulnerability scan pass.
+At the time of this pre-merge timing snapshot, all **14 branch-protected status
+contexts** passed on exact-head run 37428742571; the complete run reports 21
+successful check runs including matrix and aggregate contexts. The PR was still
+open at that checkpoint. Its later merge and M5 completion are recorded below.
+The broader workspace advisories and three Go module advisories outside
+reachable code remain known limitations; the production artifact audit and Go
+called-vulnerability scan pass.
 
 ### Latest PR #24 review follow-up — CI safeguard skips
 
@@ -580,3 +584,13 @@ A cross-job artifact producer remains deferred: each matrix runner currently
 sets up and builds its own candidate, and artifact transfer plus consumer setup
 could offset further savings. Reconsider it only if repeated measurements
 identify setup/build as a persistent critical-path cost.
+
+### Merge closeout — 2026-10-06
+
+PR #24 merged into `main` at
+`2e051430e614c73350c223f2f043d1c992ba80e6` on 2026-10-06. The post-merge
+Repository quality run [37433180990](https://github.com/methat-ruk/pulsegrid/actions/runs/37433180990)
+passed all 21 jobs on that merge commit. MVP-013 acceptance was therefore
+accepted and M5 is Complete; this plan moved from `planned/` to `completed/`.
+The remaining workspace advisories, production identity, deployment exposure,
+and production-readiness work remain outside this MVP acceptance outcome.

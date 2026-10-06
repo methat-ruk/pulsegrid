@@ -5,7 +5,7 @@
 Connect devices · Stream telemetry · Detect conditions · Deliver commands ·
 Operate fleets
 
-![Status](https://img.shields.io/badge/status-mvp--012--complete-green)
+![Status](https://img.shields.io/badge/status-mvp--013--complete-green)
 
 > [!IMPORTANT]
 > PulseGrid's documentation foundation, Go API foundation, Nuxt console
@@ -20,18 +20,20 @@ Operate fleets
 > MVP-011 command delivery, device acknowledgement/results, and automatic
 > timeout merged in PR #21 as `b209861`, with main CI passing. MVP-012's command
 > console merged in PR #22 as `1142eb7`; main CI passed on the merge commit.
-> M4 is complete. The workspace `node-forge` advisory remains unresolved and
-> visible; the production artifact gate does not claim to remediate it.
+> MVP-013's end-to-end acceptance loop merged in PR #24 as `2e05143` on
+> 2026-10-06, and main CI passed on the merge commit. M5 is complete. The
+> workspace `node-forge` advisory remains unresolved and visible; the
+> production artifact gate does not claim to remediate it.
 > Production identity and production readiness remain deferred.
 
-> [!WARNING]
+> [!NOTE]
 > The initial MVP-013 review candidate failed the production artifact gate on
 > `source-map-js@1.2.1`
 > ([GHSA-68fv-2mgg-jv7q](https://github.com/advisories/GHSA-68fv-2mgg-jv7q)).
-> PR #24 now resolves that package to patched `1.2.2` in the lockfile only; the
-> rebuilt production artifact passed the required gate on 2026-10-06. Separate
-> workspace findings (`node-forge`, `braces`, and `simple-git`) remain visible
-> and unresolved.
+> PR #24 updated only its lockfile resolution to patched `1.2.2`; the rebuilt
+> production artifact gate and post-merge main CI passed. Separate workspace
+> findings (`node-forge`, `braces`, and `simple-git`) remain visible and
+> unresolved.
 
 ## What is PulseGrid?
 
@@ -119,7 +121,7 @@ The decision state and adoption trigger for each technology are maintained in
 
 ## Project status
 
-**MVP-012 command console complete (PR #22, `1142eb7`); MVP-013 implementation and local acceptance checks complete (PR #24 open, not merged)**
+**MVP-013 end-to-end acceptance complete (PR #24 merged as `2e05143`; main CI passed)**
 
 - Product intent and MVP boundary: documented.
 - Architecture and technology adoption rules: documented.
@@ -144,21 +146,22 @@ The decision state and adoption trigger for each technology are maintained in
   timeout merged as `b209861` (PR #21), with main CI passing. The
   [MVP-012 command-console plan](docs/roadmap/feature-plans/completed/MVP-012-command-console.md)
   is complete and PR #22 merged as `1142eb7`; main CI passed on that commit.
-  M4 is complete. Its main CI artifact audit passed at merge. PR #24 addresses
-  its review findings; the 2026-10-06 full local `check` passed, including the
-  production artifact audit after the lockfile-only `source-map-js@1.2.2`
-  resolution. The workspace `node-forge`, `braces`, and `simple-git` advisories
-  remain separately reported and unresolved. PR #24 is not merged.
+  M4 is complete. Its main CI artifact audit passed at merge. MVP-013's joined
+  device-to-operator-to-device acceptance loop merged in PR #24 as `2e05143`
+  on 2026-10-06; the post-merge main CI run [37433180990](https://github.com/methat-ruk/pulsegrid/actions/runs/37433180990)
+  passed. M5 is complete. Its production artifact audit passed after the
+  lockfile-only `source-map-js@1.2.2` resolution. The workspace `node-forge`,
+  `braces`, and `simple-git` advisories remain separately reported and
+  unresolved.
   Production identity and production readiness remain deferred.
 - Repository-wide hooks, CI, and frontend workflow: implemented locally; the
   required checks include browser evidence for the real local API readiness
   journey.
 - Production readiness: out of current scope.
 
-Claims in this README should change from candidate/in progress to complete only
-after the corresponding behavior has been reviewed and accepted; local
-validation alone does not imply merge or production readiness. MVP-013 remains
-unmerged until PR #24's protected checks pass and its outcome is accepted.
+Claims in this README change to complete after the corresponding behavior is
+reviewed, accepted, and merged. MVP-013 is accepted and merged, which completes
+M5; that acceptance does not imply production readiness.
 
 ## High-level roadmap
 
@@ -170,7 +173,7 @@ unmerged until PR #24's protected checks pass and its outcome is accepted.
 | Telemetry and current state | Simulator-to-console MQTT telemetry flow | Complete |
 | Rules and alerts | A threshold condition creates an investigable alert | Complete |
 | Remote command loop | Command delivery with acknowledgement, result, failure, timeout, and console | Complete |
-| MVP acceptance | Repeatable end-to-end product loop | Ready for review (PR #24 open; not merged) |
+| MVP acceptance | Repeatable end-to-end product loop | Complete (PR #24 merged; main CI passed) |
 | Post-MVP evolution | Security hardening, event scale, specialized data, observability, orchestration, and fleet operations | Deferred |
 
 See the [roadmap](docs/roadmap/roadmap.md) for dependencies, outcomes, status,

@@ -1,12 +1,11 @@
 # PulseGrid local development
 
 Status: Local repository workflow and merge-gate enforcement implemented;
-FND-004 readiness and MVP-003 through MVP-012 are merged. MVP-013 implementation
-and local acceptance checks are complete in open, unmerged PR #24. Its 2026-10-06
-full local `check` passed, including the production artifact audit after a
-lockfile-only update to `source-map-js@1.2.2` (GHSA-68fv-2mgg-jv7q). The broader
-workspace audit still reports unresolved `node-forge`, `braces`, and
-`simple-git` findings; the PR does not claim to remediate them.
+FND-004 readiness and MVP-003 through MVP-013 are merged. MVP-013 merged as
+`2e05143` in PR #24 on 2026-10-06; its full local `check`, production artifact
+audit, and [post-merge main CI](https://github.com/methat-ruk/pulsegrid/actions/runs/37433180990)
+passed. The broader workspace audit still reports unresolved `node-forge`,
+`braces`, and `simple-git` findings; MVP-013 did not claim to remediate them.
 
 This is the canonical guide for setting up and validating the repository. The
 Go API and Nuxt console remain independently runnable, with an opt-in local
@@ -351,11 +350,11 @@ browser suite passed 32 tests. A Playwright Chromium check at 1440 × 900 and
 390 × 844 verified the detail identity, heading focus and Tab navigation,
 one-column reflow, no horizontal overflow, and no page or console errors.
 
-PR #19's evidence above records its accepted candidate. PR #24 adds the joined
-MVP-013 journey: provision one device, persist its simulator telemetry, inspect
-the resulting alert, send PING, and verify the stored terminal result after
-reload. The PR remains open and unmerged; its protected branch checks remain the
-delivery gate.
+PR #19's evidence above records its accepted candidate. Merged PR #24 added the
+joined MVP-013 journey: provision one device, persist its simulator telemetry,
+inspect the resulting alert, send PING, and verify the stored terminal result
+after reload. Post-merge main CI passed in
+[run 37433180990](https://github.com/methat-ruk/pulsegrid/actions/runs/37433180990).
 
 ### Local PostgreSQL, seed, and development GraphQL
 

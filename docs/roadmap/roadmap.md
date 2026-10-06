@@ -83,7 +83,6 @@ flowchart TD
 
     classDef complete fill:#DCFCE7,stroke:#15803D,color:#14532D;
     classDef progress fill:#FEF3C7,stroke:#B45309,color:#78350F;
-    classDef review fill:#DBEAFE,stroke:#1D4ED8,color:#1E3A8A;
     class DOC001 complete;
     class FND001 complete;
     class FND002 complete;
@@ -101,7 +100,7 @@ flowchart TD
     class MVP010 complete;
     class MVP011 complete;
     class MVP012 complete;
-    class MVP013 review;
+    class MVP013 complete;
 ```
 
 FND-001 implementation establishes the backend runtime shell, FND-002
@@ -222,7 +221,7 @@ Plans:
 
 ### M5 — MVP acceptance
 
-Status: Ready for review (PR #24 open; not merged)
+Status: Complete (PR #24 merged as `2e05143`; post-merge main CI passed)
 
 Dependency: M3 and M4
 
@@ -230,13 +229,13 @@ Outcome: The complete device-to-operator-to-device product loop is repeatable,
 observable, and validated from a clean local checkout.
 
 MVP-013's plan was revised and challenged on 2026-10-03 against merged MVP-012
-and main CI at `619e1c7`. PR #24 addresses its review findings and the full local
-check passed on 2026-10-06. The branch remains unmerged; required hosted checks
-on the pushed candidate remain the delivery gate.
+and main CI at `619e1c7`. PR #24 closed its review findings, passed the full
+local check, and merged on 2026-10-06 as `2e051430e614c73350c223f2f043d1c992ba80e6`.
+Post-merge main CI passed in [run 37433180990](https://github.com/methat-ruk/pulsegrid/actions/runs/37433180990).
 
 Plans:
 
-- [MVP-013 — End-to-end product loop](feature-plans/planned/MVP-013-end-to-end-product-loop.md) — ready for review in open PR #24; not merged
+- [MVP-013 — End-to-end product loop](feature-plans/completed/MVP-013-end-to-end-product-loop.md) — complete; merged as PR #24
 
 ## Post-MVP milestones
 
