@@ -475,27 +475,39 @@ runtime artifact gate. The lifecycle step is intentionally last in the shared
 external-DB browser job; running the focused fixture first polluted the alert
 journey in CI, so the workflow now isolates that evidence by ordering.
 
-PR #24 remains open and unmerged until the pushed candidate's 14 protected
-status checks pass. The plan stays in `planned/` with Ready for review status;
-move it to `completed/` and mark M5 Complete only after the outcome is accepted.
+PR #24 remains open and unmerged. Implementation candidate
+`55a5f8bd69baa7d8125143137163f7ef45b0a722` passed all 14 protected status
+contexts. The plan stays in `planned/` with Ready for review status; move it to
+`completed/` and mark M5 Complete only after the outcome is accepted.
 
 ### Latest PR #24 review follow-up — 2026-10-06
 
 The latest published review comment, [#6009823637](https://github.com/methat-ruk/pulsegrid/pull/24#issuecomment-6009823637), reviewed candidate
-`bec7149eab3c3428e8f0e2aa6b7956c60745b27b`. It confirmed F6–F8 and left G1/G3
-and the browser-smoke failure open. The current follow-up changes are:
+`bec7149eab3c3428e8f0e2aa6b7956c60745b27b`, confirmed F6–F8, and left G1/G3
+and the browser-smoke failure open. The fixes below were validated on
+implementation candidate `55a5f8bd69baa7d8125143137163f7ef45b0a722`.
 
-| Finding | Change and current evidence |
+| Finding / gap | Resolution and evidence |
 | --- | --- |
-| F6 — timestamp string oracle | Canonicalize UTC RFC3339 fractional seconds to PostgreSQL microsecond precision and remove insignificant trailing zeroes. A browser regression covers `.921060789` → `.92106`, a sub-microsecond fraction → no fractional part, and a distinct microsecond remaining distinct. The latest CI failure reproduced the old string mismatch; the regression awaits hosted browser-smoke on the updated candidate. |
-| F7 — outer lifecycle cancellation | The wrapper now handles SIGINT/SIGTERM, forwards cancellation to owned detached process groups, escalates a repeated signal, tracks every identified Compose project, and attempts bounded final cleanup. Controlled wrapper tests prove both signals remove the simulated process, ports, and resources and permit a successful rerun. |
-| F8 — Docker bound and cleanup result | Owned Docker commands now have a 15-second timeout with SIGTERM/SIGKILL escalation, and nonzero `compose down` makes the wrapper fail. Controlled tests inject a hanging network inspection and final `compose down` exit 29; both fail closed and leave no simulated process or resource. |
-| Review performance note | A standalone lifecycle run builds API/Nuxt artifacts once for its four inner runs. The full `check` and hosted browser-smoke now run the complete browser suite first, then invoke `test:browser:lifecycle:reuse` to reuse the exact candidate artifacts. This keeps assertions, timeout, retries, and test scope unchanged. |
-| Local real-browser attempt | `corepack pnpm run test:browser:lifecycle` built the test artifacts, interrupted the first real Compose run, and removed its resources. The subsequent Chromium launch was blocked by macOS sandbox bootstrap denial (`EPERM`, Chromium `SIGTRAP`); a Docker check showed no remaining containers, networks, or volumes for the test project. This local attempt is not counted as a passing real-browser lifecycle proof. |
+| F1 — production artifact advisory | Updated only the `source-map-js` lockfile resolution to compatible patched version `1.2.2`; the production runtime artifact gate passes without weakening its policy. The clean-check artifact SHA-256 is `fb63249fc6d03bce4ea69eaa5926ac06af9c1bedf26f0aadf14d8ed871adb1ab` (21 physical packages, 54 bundled package contexts across 126 modules, 23 physical package edges). The exact-head CI audit evidence is [artifact 11393267258](https://github.com/methat-ruk/pulsegrid/actions/runs/37421527287/artifacts/11393267258). Workspace-only advisories remain separately reported. |
+| F2 — browser descendant cleanup | The runner owns detached process groups and performs bounded termination even when a leader exits before its descendants. The exact-head `test:browser:runner` run passed 14/14 with no skips, including descendant cleanup and interruption cases. |
+| F3 — telemetry tenant oracle | Both A→B and B→A GraphQL responses are decoded and independently assert no current state and empty history. The tagged real-PostgreSQL integration suite passed in the clean full check and CI. |
+| F4 — rule mutation no-write oracle | Protected rule identity, ownership, metric, comparator, threshold, enabled state, revision, and timestamps are compared before/after denied mutations in both tenant directions. The tagged real-PostgreSQL integration suite passed in the clean full check and CI. |
+| F5 — response fixture cleanup | Fixture teardown runs before pool close, checks cleanup errors and verifies partial fixture cleanup. The tagged real-PostgreSQL integration suite passed in the clean full check and CI. |
+| F6 — timestamp string oracle | Normalize UTC RFC3339 fractional seconds to PostgreSQL microsecond precision and remove insignificant trailing zeroes; reject malformed values. The exact-head Chromium suite passed 37/37, including `.921060789` → `.92106`, sub-microsecond normalization, and preservation of a distinct microsecond. |
+| F7 — outer lifecycle cancellation | The wrapper handles SIGINT/SIGTERM, forwards cancellation to owned detached process groups, retains signals that arrive before child spawn, escalates repeated signals, tracks each identified Compose project, and performs bounded final cleanup. Controlled tests prove both signals remove simulated processes/resources and allow rerun; the real Compose lifecycle passed both signals in CI and the clean full check. |
+| F8 — Docker timeout and cleanup result | Owned Docker commands have a 15-second timeout and SIGTERM/SIGKILL escalation; nonzero `compose down` fails the wrapper. Controlled tests inject a hanging inspection and final `compose down` exit 29; both fail closed. All 14 exact-head runner tests passed, including these cases. |
+| G1 — real interruption lifecycle | Browser-smoke log for [run 37421527287](https://github.com/methat-ruk/pulsegrid/actions/runs/37421527287) records SIGINT and SIGTERM project removal followed by a passing focused rerun after each. The clean full check records the same two-signal result. |
+| G2 — registered-tenant telemetry evidence | Protected-state snapshots cover observation keys, observations, current state, and alerts across crossed deliveries; follow-up valid A/B messages persist, A creates its expected alert, and live GraphQL reads of B remain empty for A. All four MQTT integration suites passed in CI and the clean full check. |
+| G3 — clean local proof | A fresh clone at `/private/tmp/pulsegrid-pr24-55a5f8b` started without ignored env/build files. With pinned Node `24.20.0` and pnpm `12.3.4`, `corepack pnpm run setup` prepared Nuxt and completed; `corepack pnpm run check` passed formatting/generated checks, static analysis, lint/typechecks, 80 web unit tests, Go unit/race tests, builds, OpenAPI, runtime artifact and Go vulnerability audits, all four MQTT suites, tagged PostgreSQL integration, runner tests 14/14, browser tests 37/37, and the real two-signal lifecycle. |
+| Additional — clean setup | The earlier clean-check failure exposed missing Nuxt-generated ESLint configuration. Root `setup` now runs `nuxt prepare`, matching CI. Fresh `setup` and the full clean-check passed on the exact implementation candidate. |
+| Additional — CI lifecycle isolation | Browser-smoke now runs before lifecycle against the shared CI PostgreSQL service, and lifecycle output stays under `test-results/lifecycle/`. On exact-head run 37421527287, browser-smoke passed 37/37, lifecycle passed, and all three command-console images uploaded as [artifact 11393960277](https://github.com/methat-ruk/pulsegrid/actions/runs/37421527287/artifacts/11393960277). |
+| Review performance note | A standalone lifecycle invocation builds API/Nuxt artifacts once and reuses them for its inner runs. Full `check` and CI run the browser suite first, then invoke `test:browser:lifecycle:reuse`; the exact-head CI log shows that command and a passing lifecycle without repeated API/Nuxt builds. Assertions, timeout, retries, and test scope are unchanged. |
 
-On this candidate, `corepack pnpm run test:browser:runner` passed **14/14**
-controlled tests with no skips. Hosted validation and a fresh-checkout full
-check on the pushed candidate remain the authoritative open evidence for G1,
-G3, the added timestamp regression, and final merge readiness. This follow-up
-supersedes the earlier candidate's browser/lifecycle validation claims above;
-only exact-head results recorded after the final push close those gaps.
+All **14 branch-protected status contexts** passed on exact-head run 37421527287;
+the complete run reports 18 successful check runs including matrix and
+aggregate contexts. The PR remains open and unmerged. Keep MVP-013 in `planned/`
+with Ready for review status until the outcome is accepted, then move it to
+`completed/` and mark M5 Complete. The broader workspace advisories and three
+Go module advisories outside reachable code remain known limitations; the
+production artifact audit and Go called-vulnerability scan pass.
