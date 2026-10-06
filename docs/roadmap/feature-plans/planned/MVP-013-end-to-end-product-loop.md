@@ -401,23 +401,31 @@ This branch remains In progress and MVP-013/M5 is not accepted.
 
 ### Implementation Evidence Disposition — 2026-10-06
 
-Candidate is the working tree on `test/mvp-013-end-to-end-product-loop`, based
-on local HEAD `e076e47` / merged `main` `619e1c7`; implementation changes are
-uncommitted and no current branch-protection run exists.
+The initial pushed candidate was `784601a` on
+`test/mvp-013-end-to-end-product-loop`, based on merged `main` `619e1c7`.
+PR CI run [37405127371](https://github.com/methat-ruk/pulsegrid/actions/runs/37405127371)
+passed every check except `browser-smoke` and `node-dependency-audit`. The
+browser failure exposed that the simulator's nanosecond timestamp must be
+compared at PostgreSQL `timestamptz` microsecond precision. The browser assertion
+now normalizes its expected timestamp accordingly; the focused real-browser
+scenario and full 36-case browser suite pass locally after that fix. CI for the
+corrected pushed candidate is pending.
 
 | Plan items | Evidence observed | Current state |
 | --- | --- | --- |
-| P1 joined UI journey | Final `corepack pnpm run test:browser` included the real Chromium scenario against runner-owned PostgreSQL/Mosquitto: UI-created device, correlated telemetry/alert/command, detail/history and reload. Focused P1 also passed from a disposable clean checkout | Passed; 36 browser cases passed with final P1 assertions |
+| P1 joined UI journey | Initial PR CI run 37405127371 passed 35 browser cases; its P1 failure was only the nanosecond-vs-microsecond timestamp expectation. After normalizing the expected timestamp to PostgreSQL precision, the focused real-browser scenario passed and `corepack pnpm run test:browser` passed all 36 cases | Passed locally on the corrected working tree; corrected-head CI pending |
 | D1/D2 and T2 telemetry | `corepack pnpm run mqtt:test:integration`: malformed no-write, replay after restart, conflicting ID no-partial-write and registered-tenant MQTT behavior | Passed; all 4 suites passed |
 | T1 and T3 | `corepack pnpm run api:test:integration`: real-PostgreSQL symmetric GraphQL/Fiber tenant scope and response-service command/device binding | Passed; all tagged API DB tests passed |
-| D3/D4/D5 and browser regression | Full browser suite exercised device-reported failure, 2-minute expiry, lost-response recovery and the joined loop | Passed; 36 Chromium cases passed |
+| D3/D4/D5 and browser regression | Corrected-tree `corepack pnpm run test:browser` exercised device-reported failure, 2-minute expiry, lost-response recovery and the joined loop | Passed locally; corrected-head CI pending |
 | E1 runner safeguards | `corepack pnpm run test:browser:runner`: unsafe DSN refusal, local rejection of CI-only mode, missing CI DSN refusal, occupied port, partial Compose startup cleanup and SIGTERM cleanup | Passed; 6 node tests passed |
 | L1 clean setup | Disposable clone started without ignored env files or build output; `corepack pnpm run setup`, repository policy, `check:fast`, runner safeguards and focused P1 all passed there | Passed for setup and targeted behavior; root full `check` remains blocked by the artifact advisory |
 | Static, unit and contract checks | `corepack pnpm run check:fast` and `corepack pnpm run api:vuln` | Passed; Go vuln tool found 0 called vulnerabilities and 3 findings in required modules outside scanned code paths |
-| Full local gate | `corepack pnpm run check` passed through `check:fast`, race, build and OpenAPI; `node:audit` stopped on affected `source-map-js@1.2.1` in the exact production artifact | **Failed; blocking for artifact acceptance.** Later checks in the aggregate command did not run on that attempt |
+| Full local / branch gates | Local `corepack pnpm run check` passed through `check:fast`, race, build and OpenAPI, then failed at `node:audit`. Initial branch CI run 37405127371 passed all checks except `browser-smoke` and `node-dependency-audit`; its browser assertion is corrected locally and awaits rerun | **Artifact audit remains blocking.** It found `source-map-js@1.2.1` in the exact production artifact; later local aggregate checks did not run on that attempt |
 
-The targeted browser and clean-checkout evidence now pass. Branch CI remains
-outstanding, and the full local `check` remains blocked at the artifact advisory.
-Independently run any useful checks after disposition; none can override that
-gate. Do not resolve the advisory by editing dependencies, filtering reports,
-or weakening controls inside MVP-013.
+The corrected browser suite now passes locally. The initial CI run passed all
+other contexts but exposed the browser timestamp assertion and the artifact
+gate; the corrected-head CI rerun remains pending. The full local `check` and CI
+artifact gate remain blocked by the production dependency advisory.
+Independently run checks after that disposition; none can override the gate.
+Do not resolve the advisory by editing dependencies, filtering reports, or
+weakening controls inside MVP-013.

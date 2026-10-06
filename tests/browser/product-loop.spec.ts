@@ -79,6 +79,10 @@ function uniqueKey(testInfo: TestInfo) {
   return `mvp013-${Date.now()}-${testInfo.workerIndex}-${testInfo.retry}`
 }
 
+function postgresMicrosecondTimestamp(timestamp: string) {
+  return timestamp.replace(/(\.\d{6})\d+(?=Z$)/u, '$1')
+}
+
 test.describe('MVP-013 complete product loop', () => {
   test('provisions, investigates simulator telemetry, and observes the stored PING result', async ({ page }, testInfo) => {
     test.setTimeout(60_000)
@@ -127,7 +131,7 @@ test.describe('MVP-013 complete product loop', () => {
       deviceId,
       ruleId: rule.id,
       messageId: aboveThreshold.messageID,
-      observedAt: aboveThreshold.observedAt,
+      observedAt: postgresMicrosecondTimestamp(aboveThreshold.observedAt),
       temperatureCelsius: 31,
       comparator: 'GT',
       thresholdCelsius: 25,
