@@ -523,12 +523,12 @@ database. The earlier `14/14` claim referred to local execution, not hosted CI;
 this section corrects that evidence record.
 
 The safeguards now run in a separate `browser-runner-safeguards` job without
-services, in parallel with `browser-e2e`. The existing required `browser-smoke`
-context remains an aggregate that fails unless both jobs succeed. This
-preserves the runner's full owned-port collision checks and prevents a
-PostgreSQL service from turning cases into skips. Local safeguards passed
-**14/14**; repository policy, workflow YAML parsing, and `git diff --check`
-passed.
+services, in parallel with both `browser-e2e` matrix jobs. The existing
+required `browser-smoke` context remains an aggregate that fails unless the
+safeguards job and every matrix leg succeed. This preserves the runner's full
+owned-port collision checks and prevents a PostgreSQL service from turning
+cases into skips. Local safeguards passed **14/14**; repository policy,
+workflow YAML parsing, and `git diff --check` passed.
 
 Hosted validation on exact head `127334671c4a7bbe13139db9c9cc288de71ce1bb`
 passed: run [37425948915](https://github.com/methat-ruk/pulsegrid/actions/runs/37425948915)
@@ -557,7 +557,26 @@ Separate Playwright `--list` checks confirm the selections partition the
 current suite into **36 + 1 = 37** tests without overlap. Both E2E matrix legs
 retain one worker, isolated ports and databases, the two-minute expiry, all
 assertions, retries, and fail-on-flaky behavior. The estimated four-minute
-target remains an estimate until the hosted run is measured. A cross-job
-artifact producer remains deferred because transfer and consumer setup could
-offset its savings; the expiry split is measured before reconsidering that
-cost.
+wait target was checked against the hosted candidate in run
+[37428742571](https://github.com/methat-ruk/pulsegrid/actions/runs/37428742571)
+at `96692ae9d56c5c0ca476e17d3653cfa71eb8400d`:
+
+- `browser-e2e (fast)` completed in **3:20**; its log reports **36 passed**
+  using one worker, followed by the real SIGINT/SIGTERM lifecycle and reruns.
+- `browser-e2e (expiry)` completed in **4:12**; its log reports **1 passed**
+  in **2.1 minutes**, preserving the real server-recorded expiry.
+- `browser-runner-safeguards` completed in **0:54** with **14 passed, 0 failed,
+  0 skipped**. The required `browser-smoke` aggregate passed after all three
+  work paths completed, and all **14 branch-protected contexts** passed.
+- From the first affected job start to the aggregate pass, the observed wait
+  was **4:18** (07:17:29–07:21:47 UTC), compared with **5:18** on run
+  [37426735689](https://github.com/methat-ruk/pulsegrid/actions/runs/37426735689)
+  before the split. This one-run comparison is about one minute shorter, but
+  does not establish a stable or causal improvement because runner and cache
+  variance were not controlled. The four-minute target is approximate, not a
+  guaranteed ceiling.
+
+A cross-job artifact producer remains deferred: each matrix runner currently
+sets up and builds its own candidate, and artifact transfer plus consumer setup
+could offset further savings. Reconsider it only if repeated measurements
+identify setup/build as a persistent critical-path cost.
