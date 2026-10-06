@@ -13,11 +13,12 @@ evidence; main CI passed on the merge commit. MVP-012's command-console plan
 is complete and PR #22 merged as `1142eb7`; main CI passed on the merge commit.
 Its production artifact dependency-audit gate passed on the merged candidate.
 The initial MVP-013 review candidate failed the production artifact gate on
-`source-map-js@1.2.1` (GHSA-68fv-2mgg-jv7q). PR #24 updates only its lockfile
-resolution to patched `1.2.2`; the rebuilt artifact passed the full local gate
-on 2026-10-06. Separate workspace findings for `node-forge`, `braces`, and
-`simple-git` remain visible and unresolved. No command API contract change was
-needed.
+`source-map-js@1.2.1` (GHSA-68fv-2mgg-jv7q). PR #24 updated only its lockfile
+resolution to patched `1.2.2`, then merged as `2e05143`; the rebuilt artifact
+gate, full local check, and [post-merge main CI](https://github.com/methat-ruk/pulsegrid/actions/runs/37433180990)
+passed on 2026-10-06. Separate workspace findings for `node-forge`, `braces`,
+and `simple-git` remain visible and unresolved. No command API contract change
+was needed.
 Production identity, production MQTT, and permanent high-volume storage remain
 deferred.
 
